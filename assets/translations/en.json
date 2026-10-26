@@ -1,0 +1,47 @@
+{
+  "app": { "name": "Vía Justa" },
+  "common": { "back": "Back", "continue": "Continue", "clear": "Clear", "retry": "Retry" },
+  "login": {
+    "tagline": "Fair prices, clear paperwork and verified services wherever you go.",
+    "google": "Continue with Google",
+    "email": "Use email",
+    "or": "or",
+    "legal_prefix": "By continuing, you accept our ",
+    "legal_terms": "Terms of Service",
+    "legal_and": " and the ",
+    "legal_privacy": "Privacy Policy",
+    "legal_suffix": "."
+  },
+  "onboarding": {
+    "greeting": "Hi, {name}! 👋",
+    "subtitle": "To set up your tools and adapt to your needs, tell us about your current situation.",
+    "visitor": {
+      "title": "Visitor / Tourist",
+      "description": "I want to check local prices, find emergency services and get around safely during my trip."
+    },
+    "settler": {
+      "title": "Settling in / Migrant",
+      "description": "I'll be staying for a while. I need to organize paperwork, store documents and know the real cost of living.",
+      "badge": "Most complete"
+    },
+    "resident": {
+      "title": "Local / Resident",
+      "description": "I live here. I want to register my business, check prices in my area and contribute reports."
+    }
+  },
+  "map": {
+    "search_hint": "Search department...",
+    "unavailable": "This department is not available yet.",
+    "sample_note": "Sample map",
+    "semantics": "Department map. Tap a department or use the search field."
+  },
+  "municipality": {
+    "destination": "DESTINATION",
+    "search_hint": "Search municipality",
+    "search_prompt": "Type the municipality name to search for it.",
+    "pilot_badge": "Pilot",
+    "no_results": "No results found.",
+    "load_error": "We couldn't load the municipalities.",
+    "placeholder": "Municipality {code} (coming soon)"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "app": { "name": "Vía Justa" },
+  "common": { "back": "Atrás", "continue": "Continuar", "clear": "Borrar", "retry": "Reintentar" },
+  "login": {
+    "tagline": "Precios justos, trámites claros y servicios verificados dondequiera que vayas.",
+    "google": "Continuar con Google",
+    "email": "Usar correo electrónico",
+    "or": "o",
+    "legal_prefix": "Al continuar, aceptas nuestros ",
+    "legal_terms": "Términos de Servicio",
+    "legal_and": " y la ",
+    "legal_privacy": "Política de Privacidad",
+    "legal_suffix": "."
+  },
+  "onboarding": {
+    "greeting": "¡Hola, {name}! 👋",
+    "subtitle": "Para configurar tus herramientas y adaptarnos a tus necesidades, cuéntanos tu situación actual.",
+    "visitor": {
+      "title": "Visitante / Turista",
+      "description": "Busco verificar precios locales, encontrar servicios de emergencia y moverme seguro durante mi viaje."
+    },
+    "settler": {
+      "title": "Instalación / Migrante",
+      "description": "Me quedaré por un tiempo. Necesito organizar trámites, guardar documentos y conocer el costo de vida real.",
+      "badge": "Más completo"
+    },
+    "resident": {
+      "title": "Local / Residente",
+      "description": "Vivo aquí. Quiero registrar mi negocio, conocer los precios de mi zona y aportar reportes."
+    }
+  },
+  "map": {
+    "search_hint": "Buscar departamento...",
+    "unavailable": "Este departamento aún no está disponible.",
+    "sample_note": "Mapa de ejemplo",
+    "semantics": "Mapa de departamentos. Toca un departamento o usa el buscador."
+  },
+  "municipality": {
+    "destination": "DESTINO",
+    "search_hint": "Buscar municipio",
+    "search_prompt": "Escribe el nombre del municipio para buscarlo.",
+    "pilot_badge": "Piloto",
+    "no_results": "No encontramos resultados.",
+    "load_error": "No pudimos cargar los municipios.",
+    "placeholder": "Municipio {code} (próximamente)"
+  }
+}
