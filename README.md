@@ -17,7 +17,7 @@
 
 ## 2. Pila Tecnológica
 
-- **Framework:** Flutter (Dart 3.x), compilación orientada a Android.
+- **Framework:** Flutter 3.47.7 (Dart 3.13.5), compilación orientada a Android.
 - **Gestión de Estado:** Riverpod 3 (`Notifier`, `Provider`, `FutureProvider`).
 - **Navegación:** `go_router` con rutas declarativas y centralizadas.
 - **Internacionalización:** `easy_localization` con soporte simultáneo español e inglés.
@@ -63,10 +63,12 @@ via-justa/
 ## 4. Requisitos y Configuración del Entorno
 
 ### Requisitos Previos
-1. **Dart SDK:** Restricción declarada en `pubspec.yaml` como `sdk: ^3.13.5` (Dart 3.x).
-2. **Flutter SDK:** Instalación de Flutter para Android compatible con la restricción de Dart (Flutter 3.13+ o superior).
-3. **Android SDK & Build Tools:** JDK 17, Android SDK Command-line Tools y herramientas de plataforma (`adb`).
-4. **Editor recomendado:** VS Code con extensiones oficiales de Flutter y Dart.
+1. **Dart SDK:** Restricción declarada en `pubspec.yaml` como `sdk: ^3.13.5` (entorno exacto `dart: ">=3.13.5 <4.0.0"` registrado en `pubspec.lock`).
+2. **Flutter SDK (Línea base reproducible):** **Flutter 3.47.7 (canal `stable`)**.  
+   *Nota de compatibilidad oficial:* La versión histórica Flutter 3.13 (2023) incluía Dart 3.1 y no satisface la restricción del proyecto. De acuerdo con el archivo oficial de versiones del SDK de Flutter y el bloqueo en `pubspec.lock` (`sdks: flutter: ">=3.47.0"`), Dart 3.13.5 es empaquetado por la serie estable Flutter 3.47.x (Flutter 3.47.6 / 3.47.7). Esta versión queda fijada para desarrollo local y pipelines de GitHub Actions (`subosito/flutter-action@v2` con `flutter-version: '3.47.7'`).
+3. **Compatibilidad de dependencias:** Todas las dependencias directas del proyecto en `pubspec.lock` (`flutter_riverpod: 3.4.3`, `go_router: 18.1.1`, `easy_localization: 3.0.8` y `flutter_lints: 6.0.0`) son plenamente compatibles con Flutter 3.47.7 y Dart 3.13.5.
+4. **Android SDK & Build Tools:** JDK 17, Android SDK Command-line Tools y herramientas de plataforma (`adb`).
+5. **Editor recomendado:** VS Code con extensiones oficiales de Flutter y Dart.
 
 ### Puesta en Marcha Local
 ```powershell
