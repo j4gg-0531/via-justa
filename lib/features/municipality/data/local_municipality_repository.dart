@@ -48,4 +48,20 @@ class LocalMunicipalityRepository implements MunicipalityRepository {
 
     return municipalities;
   }
+
+  @override
+  Future<Municipality?> getByCode(String code) async {
+    if (code.length < 2) {
+      return null;
+    }
+
+    final municipalities = await getByDepartment(code.substring(0, 2));
+    for (final municipality in municipalities) {
+      if (municipality.code == code) {
+        return municipality;
+      }
+    }
+
+    return null;
+  }
 }

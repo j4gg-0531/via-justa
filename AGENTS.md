@@ -12,7 +12,7 @@ flutter test test/municipality_search_test.dart   # single file
 flutter run -d <device-id> --no-pub
 ```
 
-- Jump straight to a screen while iterating: `flutter run -d <device-id> --route=/department/20 --no-pub`. `initialLocation` is `/splash`, which auto-navigates to `/login` after 1.8 s.
+- Jump straight to a screen while iterating: `flutter run -d <device-id> --route=/department/20 --no-pub`. `initialLocation` is `/splash`, which auto-navigates to `/welcome` after 1.8 s.
 - `adb` is not on PATH; use `C:\Android\Sdk\platform-tools\adb.exe`. List devices with `flutter devices` or `flutter emulators --launch Pixel_8`.
 - `flutter analyze` and `flutter test` must both pass. There is no CI config in the repo.
 
@@ -20,7 +20,7 @@ flutter run -d <device-id> --no-pub
 
 - Entrypoint: `lib/main.dart` (`EasyLocalization` > `ProviderScope`) -> `lib/app/app.dart` (`MaterialApp.router`) -> `routerProvider` in `lib/core/router/app_router.dart`.
 - `lib/core/` is shared infrastructure: `router/`, `theme/`, `widgets/` (`VjButton`, `VjCard`, `VjBadge`, `VjSearchField`), `utils/`, `demo/`.
-- Features live in `lib/features/<feature>/{domain,data,presentation/{pages,state}}/`. Current features: `onboarding`, `splash`, `map_colombia`, `municipality`.
+- Features live in `lib/features/<feature>/{domain,data,presentation/{pages,state}}/`. Current features: `auth`, `home`, `onboarding`, `splash`, `map_colombia`, `municipality`.
 - Routes and `AppRoutes` path helpers are centralized in `app_router.dart`. Add routes there, not inline. Splash uses `context.go` (no back to splash); drill-down uses `context.push`.
 - State is Riverpod 3: `ConsumerWidget`/`ConsumerStatefulWidget`, `Provider`, `FutureProvider.family`, `NotifierProvider`. The concrete municipality repository is only referenced by `municipalityRepositoryProvider` so it can be swapped for Supabase later.
 
@@ -38,7 +38,7 @@ flutter run -d <device-id> --no-pub
 
 - Municipality data is local sample data in `assets/data/municipalities_cesar.json`; `LocalMunicipalityRepository` only serves department code `20` (Cesar) and returns an empty list for others. DIVIPOLA codes have not been verified against DANE.
 - Department shapes on the map are provisional `Path` ovals, not real geography; the map is labeled as a sample.
-- `municipality_placeholder_page.dart` is a temporary screen 6 target and is expected to be replaced.
+- `home_placeholder_page.dart` es un inicio temporal; el Paso 7 lo reemplaza.
 - Layout screens are tested at narrow widths and large system font scales; prefer content-sized/scrollable layouts over fixed header heights.
 
 ## Verification
@@ -87,7 +87,7 @@ Lo compartido por varias funcionalidades va en `lib/core/`. Las dependencias van
 
 ## 5. Antes de dar una tarea por terminada
 1. `flutter analyze` sin errores y `flutter test` en verde.
-2. Busca en `lib/**/presentation/` (excluyendo `presentation/state/`) la expresión regular `normalizeForSearch|search[A-Z]\w*\(|\.where\(|\.sort\(|firstWhere|jsonDecode|rootBundle|Timer|Future\.delayed`. Cada coincidencia debe justificarse (animación, dibujo o excepción temporal) o moverse a `domain/` o a un provider.
+2. Busca en `lib/**/presentation/` (excluyendo `presentation/state/`) la expresión regular `normalizeForSearch|search[A-Z]\w*\(|\.where\(|\.sort\(|firstWhere|jsonDecode|rootBundle|Timer|Future\.delayed`. Cada coincidencia debe justificarse (animación, dibujo o excepción temporal) o moverse a `domain/` o a un provider. Ejecuta la búsqueda sensible a mayúsculas (`Select-String -CaseSensitive` en PowerShell o la opción `Aa` en VS Code) para no capturar nombres de widgets como `VjSearchField(`.
 3. Toda regla nueva en `domain/` tiene su prueba unitaria; los providers con lógica tienen prueba con `ProviderContainer` y un repositorio falso.
 4. Nunca afirmes haber ejecutado un comando, una prueba o una verificación visual que no ejecutaste.
 

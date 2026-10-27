@@ -2,8 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:via_justa/core/demo/demo_data.dart';
 import 'package:via_justa/core/router/app_router.dart';
+import 'package:via_justa/core/session/session_providers.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
@@ -18,6 +18,7 @@ class ProfileSelectionPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selected = ref.watch(profileTypeProvider);
+    final displayName = ref.watch(displayNameProvider);
     final notifier = ref.read(profileTypeProvider.notifier);
     final textTheme = Theme.of(context).textTheme;
 
@@ -47,7 +48,7 @@ class ProfileSelectionPage extends ConsumerWidget {
                       const SizedBox(height: AppSpacing.lg),
                       Text(
                         'onboarding.greeting'.tr(
-                          namedArgs: {'name': DemoData.userName},
+                          namedArgs: {'name': displayName},
                         ),
                         style: textTheme.headlineMedium,
                       ),
