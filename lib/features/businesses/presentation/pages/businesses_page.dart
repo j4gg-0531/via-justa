@@ -358,7 +358,11 @@ class _BusinessCard extends StatelessWidget {
                   style: textTheme.titleMedium,
                 ),
               ),
-              VjBadge(label: 'businesses.verified_badge'.tr()),
+              VjBadge(
+                label: business.isVerified
+                    ? 'businesses.verified_badge'.tr()
+                    : 'businesses.demo_badge'.tr(),
+              ),
             ],
           ),
           if (business.description.isNotEmpty) ...[

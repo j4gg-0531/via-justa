@@ -30,9 +30,10 @@ void main() {
     expect(find.text('businesses.category_lodging'), findsOneWidget);
     expect(find.text('businesses.category_services'), findsOneWidget);
 
-    // Verify sample business items rendered
-    expect(find.text('Restaurante El Pilón Vallenato'), findsOneWidget);
-    expect(find.text('businesses.verified_badge'), findsWidgets);
+    // Verify sample business items rendered with DEMO tag and no fake verified badge
+    expect(find.text('[DEMO] Restaurante El Pilón Vallenato'), findsOneWidget);
+    expect(find.text('businesses.demo_badge'), findsWidgets);
+    expect(find.text('businesses.verified_badge'), findsNothing);
   });
 
   testWidgets('filter by category updates displayed items', (tester) async {
@@ -55,8 +56,8 @@ void main() {
         .selectCategory(BusinessCategory.transport);
     await tester.pumpAndSettle();
 
-    expect(find.text('Cooperativa Taxis Cacique Upar'), findsOneWidget);
-    expect(find.text('Restaurante El Pilón Vallenato'), findsNothing);
+    expect(find.text('[DEMO] Cooperativa Taxis Cacique Upar'), findsOneWidget);
+    expect(find.text('[DEMO] Restaurante El Pilón Vallenato'), findsNothing);
 
     // Switch to food
     container
@@ -64,8 +65,8 @@ void main() {
         .selectCategory(BusinessCategory.food);
     await tester.pumpAndSettle();
 
-    expect(find.text('Restaurante El Pilón Vallenato'), findsOneWidget);
-    expect(find.text('Cooperativa Taxis Cacique Upar'), findsNothing);
+    expect(find.text('[DEMO] Restaurante El Pilón Vallenato'), findsOneWidget);
+    expect(find.text('[DEMO] Cooperativa Taxis Cacique Upar'), findsNothing);
   });
 
   testWidgets('tapping register business card triggers dialog', (tester) async {

@@ -22,7 +22,7 @@ class Business {
     required this.address,
     required this.phone,
     required this.municipalityCode,
-    this.isVerified = true,
+    this.isVerified = false,
     this.description = '',
   });
 
