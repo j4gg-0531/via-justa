@@ -49,6 +49,13 @@ class Departments {
     isAvailable: false,
   );
 
+  static const all = <Department>[
+    cesar,
+    laGuajira,
+    magdalena,
+    norteDeSantander,
+  ];
+
   static Department? byCode(String code) {
     switch (code) {
       case '20':

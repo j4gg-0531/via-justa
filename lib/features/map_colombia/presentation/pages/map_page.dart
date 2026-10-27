@@ -1,24 +1,24 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
-import 'package:via_justa/core/utils/text_normalizer.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/core/widgets/vj_search_field.dart';
 import 'package:via_justa/features/map_colombia/domain/department.dart';
+import 'package:via_justa/features/map_colombia/presentation/state/map_providers.dart';
 
 /// Pantalla 3 · Mapa de departamentos con buscador.
-class MapPage extends StatefulWidget {
+class MapPage extends ConsumerStatefulWidget {
   const MapPage({super.key});
 
   @override
-  State<MapPage> createState() => _MapPageState();
+  ConsumerState<MapPage> createState() => _MapPageState();
 }
 
-class _MapPageState extends State<MapPage> {
-  String _query = '';
+class _MapPageState extends ConsumerState<MapPage> {
   late final List<_MapDepartment> _departments;
 
   @override
@@ -53,10 +53,10 @@ class _MapPageState extends State<MapPage> {
     ];
   }
 
-  void _onDepartmentTap(_MapDepartment dept) {
+  void _onDepartmentTap(Department department) {
     FocusScope.of(context).unfocus();
-    if (dept.department.isAvailable) {
-      context.push(AppRoutes.departmentPath(dept.department.code));
+    if (department.isAvailable) {
+      context.push(AppRoutes.departmentPath(department.code));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('map.unavailable'.tr())),
@@ -64,16 +64,10 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  List<_MapDepartment> get _filteredDepartments {
-    if (_query.trim().isEmpty) return _departments;
-    final normalized = normalizeForSearch(_query);
-    return _departments
-        .where((d) => normalizeForSearch(d.department.name).contains(normalized))
-        .toList();
-  }
-
   @override
   Widget build(BuildContext context) {
+    final query = ref.watch(departmentQueryProvider);
+    final suggestions = ref.watch(filteredDepartmentsProvider);
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -107,7 +101,7 @@ class _MapPageState extends State<MapPage> {
                             // Evaluar en orden inverso (el último pintado = encima)
                             for (final dept in _departments.reversed) {
                               if (dept.path.contains(details.localPosition)) {
-                                _onDepartmentTap(dept);
+                                _onDepartmentTap(dept.department);
                                 break;
                               }
                             }
@@ -120,11 +114,8 @@ class _MapPageState extends State<MapPage> {
                                 top: 10,
                                 child: _DepartmentBubble(
                                   department: Departments.cesar,
-                                  onTap: () => _onDepartmentTap(
-                                    _departments.firstWhere(
-                                      (d) => d.department.code == '20',
-                                    ),
-                                  ),
+                                  onTap: () =>
+                                      _onDepartmentTap(Departments.cesar),
                                 ),
                               ),
                             ],
@@ -148,20 +139,21 @@ class _MapPageState extends State<MapPage> {
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 child: VjSearchField(
                   hint: 'map.search_hint'.tr(),
-                  onChanged: (value) => setState(() => _query = value),
+                  onChanged:
+                      ref.read(departmentQueryProvider.notifier).setQuery,
                 ),
               ),
             ),
           ),
 
           // Sugerencias del buscador
-          if (_query.trim().isNotEmpty)
+          if (query.trim().isNotEmpty)
             Positioned(
               top: 100,
               left: AppSpacing.lg,
               right: AppSpacing.lg,
               child: VjCard(
-                child: _filteredDepartments.isEmpty
+                child: suggestions.isEmpty
                     ? Padding(
                         padding: const EdgeInsets.all(AppSpacing.lg),
                         child: Text(
@@ -173,12 +165,14 @@ class _MapPageState extends State<MapPage> {
                       )
                     : Column(
                         mainAxisSize: MainAxisSize.min,
-                        children: _filteredDepartments.map((dept) {
+                        children: suggestions.map((dept) {
                           return ListTile(
-                            title: Text(dept.department.name),
+                            title: Text(dept.name),
                             onTap: () {
                               _onDepartmentTap(dept);
-                              setState(() => _query = '');
+                              ref
+                                  .read(departmentQueryProvider.notifier)
+                                  .setQuery('');
                             },
                           );
                         }).toList(),
