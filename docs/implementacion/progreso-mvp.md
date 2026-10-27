@@ -1,15 +1,16 @@
 # Progreso y Control de Cambios — Vía Justa MVP
 
 **Última actualización:** 27 de octubre de 2026  
-**Rama base inicial:** `main` (`294e169`) — PR #4 y PR #5 integrados.  
-**Rama de trabajo VJ-02:** `feature/vj-02-ci-higiene`  
+**Rama base actual:** `main` (`3df5c7b`) — PR #4, PR #5 y PR #6 integrados.  
+**Rama de trabajo VJ-03:** `feature/vj-03-navegacion-shell`  
 **Repositorio remoto:** `https://github.com/j4gg-0531/via-justa.git`  
 **Entorno de ejecución:** Windows 10/11 x64, PowerShell 5.1  
 **Gradle Wrapper:** 9.3.1 (`android/gradle/wrapper/gradle-wrapper.properties`)  
 **Android Gradle Plugin:** 9.1.0 (`android/settings.gradle.kts`)  
 **Kotlin:** 2.4.0 (`android/settings.gradle.kts`)  
 **JVM Target:** Java 17 (`android/app/build.gradle.kts`)  
-**Flutter SDK:** Flutter 3.47.7 (canal `stable`, Dart 3.13.5) instalado en `C:\Users\JUAN\flutter` y añadido al PATH de usuario.
+**Flutter SDK:** Flutter 3.47.7 (canal `stable`, Dart 3.13.5) instalado en `C:\Users\JUAN\flutter` y añadido al PATH de usuario.  
+**Suite de pruebas:** 92 pruebas automatizadas ejecutadas y 92 aprobadas (100% éxito).
 
 ---
 
@@ -19,8 +20,8 @@
 |---|---|---|---|---|---|
 | **VJ-00** | P0 | Ambos | Inventario inicial, baseline reproducible y control de cambios | **INTEGRADO (PR #4)** | Ninguna |
 | **VJ-01** | P0 | Ambos | Decisiones, contrato con compañero, diagrama ER y gobierno | **INTEGRADO (PR #5)** | VJ-00 |
-| **VJ-02** | P0 | Frontend | Higiene técnica, README, CI y accesibilidad base | **HECHO-VERIFICADO (PR #6)** | VJ-00, VJ-01 |
-| **VJ-03** | P0 | Frontend | Pantallas 7–9: shell con barra inferior de 5 pestañas | **PENDIENTE** | VJ-02 |
+| **VJ-02** | P0 | Frontend | Higiene técnica, README, CI y accesibilidad base | **INTEGRADO (PR #6)** | VJ-00, VJ-01 |
+| **VJ-03** | P0 | Frontend | Navegación principal: ShellRoute con 5 pestañas persistentes | **HECHO-VERIFICADO (PR #7)** | VJ-02 |
 | **VJ-04** | P1 | Ambos | Motor visual de semáforo demo: pantallas 10 y 11 | **PENDIENTE** | VJ-03 |
 | **VJ-05** | P1 | Frontend | Pantalla 12: aportar precio en 4 pasos demo | **PENDIENTE** | VJ-04 |
 | **VJ-06** | P1 | Ambos | Cierre del primer avance: walkthrough, CI, docs | **PENDIENTE** | VJ-03, VJ-04, VJ-05 |
@@ -42,53 +43,35 @@
 
 ---
 
-## 2. Inventario de Código en Rama Base (`c082ce8`)
+## 2. Inventario de Código en Rama Base (`3df5c7b`)
 
 ### Páginas y Widgets de Presentación (`lib/`)
 - `lib/main.dart`: Bootstrap con `EasyLocalization` y `ProviderScope`.
 - `lib/app/app.dart`: Configuración de `MaterialApp.router` con tema centralizado y delegados de localización.
-- `lib/core/router/app_router.dart`: Rutas centralizadas con `GoRouter` (`/splash`, `/welcome`, `/login`, `/register`, `/onboarding`, `/map`, `/department/:code`, `/municipality/:code`, `/home`).
-- `lib/core/session/session_providers.dart`: Estado en memoria para `userNameProvider` y `displayNameProvider` (demo).
-- `lib/core/theme/`: `app_colors.dart`, `app_spacing.dart` (incluye `AppRadius`), `app_theme.dart`.
-- `lib/core/widgets/`: `vj_button.dart`, `vj_card.dart`, `vj_badge.dart`, `vj_search_field.dart`, `vj_text_field.dart`.
-- `lib/features/splash/presentation/pages/splash_page.dart`: Pantalla de inicio con temporizador de 1.8s (excepción temporal documentada en AGENTS.md).
-- `lib/features/auth/presentation/pages/welcome_page.dart`: Opciones de ingreso (Google / correo).
-- `lib/features/auth/presentation/pages/login_page.dart`: Formulario de inicio de sesión con validación local.
-- `lib/features/auth/presentation/pages/register_page.dart`: Formulario de registro con validación de nombre, email, contraseña y términos.
-- `lib/features/auth/presentation/state/`: `login_form_provider.dart`, `register_form_provider.dart`.
-- `lib/features/auth/presentation/widgets/`: `auth_error_texts.dart`, `legal_text.dart`, `or_divider.dart`.
-- `lib/features/onboarding/presentation/pages/profile_selection_page.dart`: Selección de perfiles (Visitante, Instalación, Residente).
-- `lib/features/onboarding/presentation/state/profile_type_provider.dart`: Notifier con `autoDispose` para el perfil seleccionado.
-- `lib/features/onboarding/presentation/widgets/profile_option_card.dart`: Tarjeta accesible de selección de perfil.
-- `lib/features/map_colombia/presentation/pages/map_page.dart`: Mapa interactivo provisional con óvalos y buscador flotante.
-- `lib/features/map_colombia/presentation/state/map_providers.dart`: Búsqueda de departamentos en provider.
-- `lib/features/municipality/presentation/pages/municipality_selector_page.dart`: Lista con autocompletado de municipios de Cesar.
-- `lib/features/municipality/presentation/pages/municipality_page.dart`: Detalle de municipio piloto (`20001`, Valledupar) vs. fuera de piloto.
-- `lib/features/municipality/presentation/state/municipality_providers.dart`: Providers para repositorio, consulta por departamento, por código, búsqueda y registro de interés local.
-- `lib/features/home/presentation/pages/home_placeholder_page.dart`: Pantalla provisional de inicio a reemplazar por Pantallas 7 y 8.
+- `lib/core/router/app_router.dart`: Rutas centralizadas con `GoRouter` (`StatefulShellRoute.indexedStack` con 5 pestañas: `/home`, `/map`, `/scan`, `/businesses`, `/profile`).
+- `lib/core/navigation/app_scaffold.dart`: Shell persistente con `NavigationBar` y manejo del botón atrás de Android vía `BackButtonListener`.
+- `lib/features/home/presentation/pages/home_page.dart`: Inicio dinámico según perfil (M04 Settler, M05 Visitor, M02 adaptado Resident).
+- `lib/features/scan/presentation/pages/scan_page.dart`: Pantalla de escaneo M06 con selector segmentado Precio vs Contrato y visor simulado.
+- `lib/features/businesses/presentation/pages/businesses_page.dart`: Directorio M21 de comercios de muestra en Valledupar con buscador y categorías.
+- `lib/features/profile/presentation/pages/profile_page.dart`: Perfil de usuario M17, selector de perfil en memoria, conmutador de idioma y logout.
+- `lib/features/map_colombia/presentation/pages/map_page.dart`: Mapa departamental con botón volver condicional.
 
-### Dominio (`domain/`)
-- `lib/features/auth/domain/auth_validators.dart`: Validadores puros de nombre, email, longitud de contraseña.
-- `lib/features/auth/domain/display_name.dart`: Lógica pura de extracción del primer nombre.
-- `lib/features/onboarding/domain/profile_type.dart`: Enum `ProfileType` (`visitor`, `settler`, `resident`).
-- `lib/features/map_colombia/domain/department.dart`: Entidad `Department` y catálogo de departamentos de muestra.
-- `lib/features/map_colombia/domain/department_search.dart`: Función pura de filtrado de departamentos sin tildes ni mayúsculas.
-- `lib/features/municipality/domain/municipality.dart`: Entidad `Municipality`.
-- `lib/features/municipality/domain/municipality_repository.dart`: Interfaz abstracta del repositorio de municipios.
-- `lib/features/municipality/domain/municipality_search.dart`: Función pura de filtrado de municipios.
-- `lib/core/utils/text_normalizer.dart`: Función pura de normalización de cadenas (eliminación de diacríticos y conversión a minúsculas).
+### Capa de Dominio (`domain/`)
+- `lib/features/businesses/domain/business.dart`: Entidad inmutable `Business` y enum `BusinessCategory`.
+- `lib/features/businesses/domain/business_filter.dart`: Función pura `filterBusinesses` para filtrado por texto y categoría.
+- `lib/features/businesses/domain/business_repository.dart`: Interfaz abstracta del repositorio de negocios.
 
-### Datos (`data/`)
+### Capa de Datos (`data/`)
+- `lib/features/businesses/data/local_business_repository.dart`: Repositorio local de muestra para comercios en Valledupar.
 - `lib/features/municipality/data/local_municipality_repository.dart`: Implementación local que lee `assets/data/municipalities_cesar.json`.
 
 ### Recursos y Assets
 - `assets/data/municipalities_cesar.json`: 25 municipios del Cesar, Valledupar marcado con `isPilot: true`.
-- `assets/translations/es.json` y `assets/translations/en.json`: 60 claves terminales en perfecta paridad.
+- `assets/translations/es.json` y `assets/translations/en.json`: Claves terminales sincronizadas en 100% de paridad.
 
 ### Ausencias Confirmadas
-- `supabase/`: Inexistente en el repositorio.
-- `.github/workflows/`: Inexistente en el repositorio.
-- Dependencias de backend/mapas en `pubspec.yaml`: Ausentes (`supabase_flutter`, `google_maps_flutter`).
+- `supabase/`: Migraciones a cargo de Isaac en `feature/supabase-init`; no tocadas en frontend.
+- `.github/workflows/ci.yml`: Pipeline activo en GitHub Actions.
 
 ---
 
@@ -98,10 +81,10 @@
 |---|---|---|---|---|---|
 | **M01** | Entrada | `/welcome` | `mockup_01.jpg` (izq.) | Demo implementada | Mantener estilo blanco, enlaces a términos/privacidad, Google como demo |
 | **M02** | Onboarding perfil | `/onboarding` | `mockup_01.jpg` (cen.) | Demo implementada | Tres tarjetas (incluye Residente D11), saludo dinámico |
-| **M03** | Mapa departamentos | `/map` | `mockup_01.jpg` (der.) | Demo provisional | Óvalos provisionales; pendiente agregar botón Volver y geometría DANE |
-| **M04** | Inicio Instalación | `/home` | `mockup_02.jpg` (izq.) | Placeholder | Tarjeta principal, herramientas reales, "Próximamente" en trámites |
-| **M05** | Inicio Visitante | `/home` | `mockup_02.jpg` (cen.) | Placeholder | Banner azul claro DEMO para evento, accesos a Escanear/Mapa/Negocios |
-| **M06** | Escanear precio/contrato | `/scan` | `mockup_02.jpg` (der.) | Inexistente | Selector Precio/Contrato; "Próximamente" en shell inicial |
+| **M03** | Mapa departamentos | `/map` | `mockup_01.jpg` (der.) | Demo provisional | Óvalos provisionales, botón volver condicional integrado |
+| **M04** | Inicio Instalación | `/home` | `mockup_02.jpg` (izq.) | Implementado (M04) | Tarjeta principal de instalación, accesos rápidos, "Próximamente" en trámites |
+| **M05** | Inicio Visitante | `/home` | `mockup_02.jpg` (cen.) | Implementado (M05) | Banner azul claro DEMO para evento, accesos a Escanear/Mapa/Negocios |
+| **M06** | Escanear precio/contrato | `/scan` | `mockup_02.jpg` (der.) | Implementado (M06) | Selector Precio/Contrato; visor de encuadre y estado "Próximamente" |
 | **M07** | Resultado de análisis | `/prices/result` | `mockup_03.jpg` (izq.) | Inexistente | Reemplazar "promedio" por "referencia (mediana)", 3 colores + texto + ícono |
 | **M08** | Mapa de precios | `/prices/map` | `mockup_03.jpg` (cen.) | Inexistente | Google Maps o estático rotulado, filtros por categoría |
 | **M09** | Detalle negocio/servicio | `/businesses/:id` | `mockup_03.jpg` (der.) | Inexistente | Ficha de negocio verificado, acciones WhatsApp/Llamar/Llegar |
@@ -112,11 +95,11 @@
 | **M14** | Municipio piloto | `/municipality/20001`| `mockup_05.jpg` (cen.) | Demo implementada | Botón Entrar, insignia de piloto, aviso honesto |
 | **M15** | Municipio no piloto | `/municipality/:code` | `mockup_05.jpg` (der.) | Demo implementada | Información no verificada, interés solo en memoria ("Te avisaremos") |
 | **M16** | Login / Registro correo | `/login`, `/register` | Nuevo v1.1 | Demo implementada | Formularios rediseñados con validación en `domain/` |
-| **M17** | Perfil y ajustes | `/profile` | Nuevo v1.1 | Inexistente | Cambio de idioma es/en, cambio de perfil, ciudad actual y logout |
+| **M17** | Perfil y ajustes | `/profile` | Nuevo v1.1 | Implementado (M17) | Cambio de idioma es/en, cambio de perfil, ciudad actual y logout |
 | **M18** | Vista cultural Valledupar | `/city/20001` | Nuevo v1.1 | Inexistente | Cabecera hero, contenido cultural bilingüe es/en con fuentes citadas |
 | **M19** | Registro negocio (4 pasos)| `/businesses/register`| Nuevo v1.1 | Inexistente | Wizard 4 pasos para dueños locales; estado inicial pending |
 | **M20** | Estado insuficiente semáforo| `/prices/result` | Nuevo v1.1 | Inexistente | Estado neutro gris para N < 3 reportes, sin recomendación |
-| **M21** | Directorio de negocios | `/businesses` | Nuevo v1.1 | Inexistente | Catálogo de negocios aprobados, buscador y filtros |
+| **M21** | Directorio de negocios | `/businesses` | Nuevo v1.1 | Implementado (M21) | Catálogo de negocios aprobados de muestra, buscador y filtros |
 
 ---
 
@@ -137,30 +120,6 @@
 
 ## 5. Auditoría de Seguridad y Detección de Secretos
 
-- **Gitleaks Scan:** Ejecutado sobre los 6 commits de la historia Git (`gitleaks git --verbose`). Resultado: **0 leaks detectados**, 0 claves expuestas.
-- **Rastreo de extensiones sensibles:** `git ls-files` no arrojó coincidencias con `.env`, `key.properties`, `.jks`, o credenciales.
-- **Configuración de Gradle:** `android/app/build.gradle.kts` utiliza `com.example.via_justa` como `applicationId` provisional y firma release con la clave de debug (deuda técnica a subsanar en VJ-20).
-
----
-
-## 6. Estado de Pruebas Automatizadas
-
-- **Total de pruebas declaradas en código:** 72 pruebas distribuidas en 15 archivos dentro de `test/`.
-- **Estado de ejecución actual:** **72 PRUEBAS EJECUTADAS Y APROBADAS (100% ÉXITO)** con Flutter 3.47.7 (Dart 3.13.5).
-- **Análisis estático (`flutter analyze`):** 0 errores, 0 advertencias, 0 lints.
-- **Desglose de casos verificados:**
-  - `test/architecture_rules_test.dart`: 1 caso (validación automatizada de regla 5.2 de `AGENTS.md`)
-  - `test/auth_pages_test.dart`: 2 casos
-  - `test/auth_validators_test.dart`: 16 casos
-  - `test/department_search_test.dart`: 4 casos
-  - `test/display_name_test.dart`: 5 casos
-  - `test/local_municipality_repository_test.dart`: 4 casos
-  - `test/login_form_provider_test.dart`: 5 casos
-  - `test/municipality_interest_test.dart`: 3 casos
-  - `test/municipality_page_test.dart`: 3 casos
-  - `test/municipality_providers_test.dart`: 5 casos
-  - `test/municipality_search_test.dart`: 11 casos
-  - `test/register_form_provider_test.dart`: 5 casos
-  - `test/session_providers_test.dart`: 2 casos
-  - `test/theme_accessibility_test.dart`: 5 casos (contrastes WCAG 2.1 AA y tamaño táctil >= 48 dp)
-  - `test/translations_test.dart`: 1 caso (paridad de 60 claves es/en)
+- **Gitleaks Scan:** 0 leaks detectados.
+- **Rastreo de extensiones sensibles:** Sin `.env`, `.key`, `*.jks`, `*.keystore` en el repositorio.
+- **Configuración de Gradle:** `android/app/build.gradle.kts` utiliza firma release con clave debug para desarrollo local (deuda técnica VJ-20).

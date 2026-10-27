@@ -129,7 +129,7 @@ class _MapPageState extends ConsumerState<MapPage> {
             ),
           ),
 
-          // Buscador flotante arriba
+          // Buscador flotante arriba con botón de retorno condicional
           Positioned(
             top: 0,
             left: 0,
@@ -137,10 +137,29 @@ class _MapPageState extends ConsumerState<MapPage> {
             child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.lg),
-                child: VjSearchField(
-                  hint: 'map.search_hint'.tr(),
-                  onChanged:
-                      ref.read(departmentQueryProvider.notifier).setQuery,
+                child: Row(
+                  children: [
+                    if (context.canPop()) ...[
+                      IconButton(
+                        tooltip: 'common.back'.tr(),
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: () => context.pop(),
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.surface,
+                          foregroundColor: AppColors.textPrimary,
+                          minimumSize: const Size(48, 48),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                    ],
+                    Expanded(
+                      child: VjSearchField(
+                        hint: 'map.search_hint'.tr(),
+                        onChanged:
+                            ref.read(departmentQueryProvider.notifier).setQuery,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
