@@ -36,14 +36,19 @@ Los controles de seguridad y privacidad se clasifican rigurosamente según su es
 - Al invocar `logout()`, el cliente invalida los tokens en el servidor de Supabase, limpia los proveedores de Riverpod en memoria (`userNameProvider`, `profileTypeProvider`, `selectedMunicipalityProvider`, etc.) y redirige mediante `context.go(AppRoutes.welcome)` **[PROPUESTO]**.
 - El historial de navegación de `go_router` se reinicia para impedir que el botón "Atrás" de Android recupere vistas privadas anteriores **[PROPUESTO]**.
 
-### 2.5 Eliminación de Cuenta y Tratamiento de Reportes (RF-06)
+### 2.5 Protocolo Transaccional de Eliminación de Cuenta y Minimizacion de Datos (RF-06)
 - El usuario puede solicitar la eliminación definitiva de su cuenta desde la pantalla de Perfil **[PROPUESTO]**.
-- **Estrategia de Anonimización Integral (Habeas Data - Ley 1581 de 2012):**
-  - La eliminación borra el registro en `auth.users`, lo que desencadena la eliminación en cascada (`ON DELETE CASCADE`) de su registro en `profiles` y de sus solicitudes en `interest_registrations`.
-  - **Desvinculación relacional y depuración de PII [PROPUESTO]:** La clave foránea `price_reports.user_id` utiliza `ON DELETE SET NULL`. Sin embargo, para satisfacer los estándares de la Ley 1581 de 2012 y garantizar la anonimización completa:
-    1. Se vacían los campos de texto libre (`source_note = NULL`) para impedir la persistencia de nombres o datos identificables introducidos por el usuario.
-    2. Las coordenadas geográficas exactas (`location`) de reportes asociados a domicilios privados se disocian o generalizan al centroide municipal, conservando únicamente `municipality_code` y `category_id`.
-    3. El registro numérico histórico (`amount_cop`, fecha y categoría) se preserva de manera irreversiblemente disociada para el cálculo de la mediana comunitaria de 60 días.
+- **Orden de Ejecución Obligatorio (Pre-supresión antes de eliminar `auth.users`):**
+  - La clave foránea `ON DELETE SET NULL` sólo opera al suprimirse el registro de autenticación. Si se elimina primero en `auth.users`, los reportes quedan huérfanos con `user_id = NULL` y se pierde la capacidad de saber qué reportes pertenecían a ese usuario para depurar información contextual o privada.
+  - El protocolo de backend debe ejecutarse en el siguiente orden estricto mediante una operación transaccional segura:
+    1. **Fase 1 (Saneamiento previo de reportes contextuales):** Con el usuario aún identificable por `user_id = auth.uid()`, dentro de una transacción se depuran `source_note = NULL`, `place_name = NULL` y se nulifican las coordenadas GPS de alta precisión (`location = NULL`), preservando únicamente `{municipality_code, category_id, amount_cop, created_at}` para el cálculo estadístico de la mediana.
+    2. **Fase 2 (Supresión de datos directos):** Se eliminan los consentimientos en `consents` y solicitudes en `interest_registrations`.
+    3. **Fase 3 (Baja en Supabase Auth):** Se elimina el usuario en `auth.users` vía API administrativa. La eliminación en cascada suprime `profiles` y fija `price_reports.user_id = NULL`.
+- **Tratamiento de Errores y Transaccionalidad:**
+  - Si el saneamiento previo en la Fase 1 falla o arroja excepción, la transacción revierte íntegramente (`ROLLBACK`) y la cuenta permanece activa, informando del fallo al usuario.
+  - Si la baja en `auth.users` encuentra un error tras la sanitización, se genera una alerta en la bitácora de auditoría para resolución administrativa, evitando inconsistencias entre Auth y la base de datos pública.
+- **Evaluación de Riesgo de Reidentificación:**
+  - No se declara "anonimización irreversible absoluta" sin una verificación formal de reidentificación (análisis de singularidad espacio-temporal y $k$-anonimato bajo directrices de la SIC). El modelo se define como minimización rigurosa de datos y disociación seudónima reforzada **[PROPUESTO / PENDIENTE DE AUDITORÍA]**.
 
 ---
 

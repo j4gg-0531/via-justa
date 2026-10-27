@@ -13,11 +13,13 @@
 3. **Moneda:** Pesos colombianos (COP) almacenados como enteros positivos (`INTEGER` o `BIGINT`), sin centavos.
 4. **Fechas:** Con zona horaria estricta (`TIMESTAMPTZ`), por defecto `now()`.
 5. **Tipos Enumerados y Restricciones de Dominio:**
-   - En las migraciones reales del backend (`20261027151910_profiles_and_consents.sql`), las restricciones de dominio se implementan mediante columnas `TEXT` con restricciones `CHECK` para facilitar el mantenimiento y evitar bloqueos de esquema:
-     - `profile_type`: `TEXT CHECK (profile_type in ('visitor', 'settler'))` (implementado en migración; inclusión de `'resident'` **PROPUESTA** en D11).
-     - `language`: `TEXT CHECK (language in ('es', 'en'))` (implementado con valor por defecto `'es'`).
+   - En las migraciones reales del backend (`20261027151910_profiles_and_consents.sql`), las restricciones de dominio se implementan mediante columnas `TEXT` con restricciones `CHECK`:
+     - `profile_type`:
+       - **Valores admitidos actualmente en base de datos [IMPLEMENTADO]:** `'visitor'` y `'settler'` (mediante `CHECK (profile_type IN ('visitor', 'settler'))`).
+       - **Valor propuesto [PROPUESTA D11]:** `'resident'`, formalmente solicitado para el perfil local/residente, pero pendiente de ratificación de Isaac y de su respectiva migración complementaria.
+     - `language`: `TEXT CHECK (language IN ('es', 'en'))` (implementado con valor por defecto `'es'`).
    - Para entidades posteriores planificadas:
-     - `business_status`: `TEXT CHECK (status in ('pending', 'approved', 'rejected'))` (planificado para VJ-16).
+     - `business_status`: `TEXT CHECK (status IN ('pending', 'approved', 'rejected'))` (planificado para VJ-16).
      - `verdict_level`: valor de texto retornado por la función de semáforo (`'insufficient'`, `'green'`, `'yellow'`, `'red'`).
    - **Eliminación de `user_role_enum`:** Se elimina formalmente cualquier tipo de rol en `profiles`. La pertenencia a administración vive exclusivamente en la tabla `public.admin_users` evaluada por la función `public.is_admin()`.
 
@@ -34,7 +36,7 @@
   |---|---|---|---|
   | `id` | `UUID` | PK, FK -> `auth.users(id)` ON DELETE CASCADE | Identificador unívoco del usuario en Auth |
   | `display_name` | `TEXT` | NULL | Nombre para mostrar (inicializado por trigger desde metadata) |
-  | `profile_type` | `TEXT` | NULL, CHECK (`profile_type IN ('visitor', 'settler', 'resident')`) | Perfil de usuario (D11 propuesto; NULL hasta completar onboarding) |
+  | `profile_type` | `TEXT` | NULL, CHECK (`profile_type IN ('visitor', 'settler')`) [IMPLEMENTADO] / `('visitor', 'settler', 'resident')` [PROPUESTO D11] | Perfil de usuario. Valores admitidos actualmente en base de datos: `'visitor'`, `'settler'`. El valor `'resident'` es una propuesta pendiente de aprobación D11. Campo inicialmente NULL hasta completar onboarding |
   | `origin_country` | `TEXT` | NULL | País de origen (opcional) |
   | `current_municipality_code` | `TEXT` | NULL, FK -> `municipalities(code)` | Municipio seleccionado como residencia/estadía |
   | `language` | `TEXT` | NOT NULL DEFAULT 'es', CHECK (`language IN ('es', 'en')`) | Idioma preferido |
@@ -44,6 +46,8 @@
 > **Compatibilidad con `handle_new_user()`:** Al registrarse un usuario en `auth.users`, el trigger inicial de base de datos ejecuta:
 > `INSERT INTO public.profiles (id, display_name) VALUES (new.id, coalesce(...));`
 > Para que esta inserción no falle, las columnas `profile_type`, `origin_country` y `current_municipality_code` son inicialmente `NULL` y se completan durante el onboarding. `language` cuenta con `DEFAULT 'es'`.
+>
+> **Distinción de perfiles admitidos vs. propuestos:** La migración `20261027151910_profiles_and_consents.sql` valida activamente `check (profile_type in ('visitor', 'settler'))`. La inclusión del perfil `'resident'` es una propuesta (D11) sujeta a validación con backend; hasta que se aplique la migración complementaria correspondiente, cualquier intento de escribir `'resident'` generará un error de restricción de integridad en PostgreSQL.
 
 #### `admin_users` (Autorización Administrativa Separada)
 Siguiendo la arquitectura de seguridad implementada en la migración `20261027151910_profiles_and_consents.sql`, **los privilegios de administración NO se guardan en `profiles`**. Se aísla el acceso administrativo en una tabla separada:
@@ -157,12 +161,26 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
   | `source_note` | `VARCHAR(255)` | NULL | Fuente u observación (ej. "Factura local", "Observación en terminal") |
   | `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha y hora del reporte |
 
-> **Tratamiento ante eliminación de cuenta (Habeas Data - Ley 1581 de 2012):**  
-> La desvinculación relacional mediante `ON DELETE SET NULL` sobre `price_reports.user_id` es indispensable pero **no garantiza por sí sola la anonimización completa** si persisten datos contextuales reidentificables. Por tanto, el protocolo de supresión de cuenta exige:
-> 1. **Desvinculación relacional:** `price_reports.user_id` se fija en `NULL`.
-> 2. **Depuración de texto libre (Scrubbing de PII):** Se vacía el campo `source_note` (`UPDATE price_reports SET source_note = NULL WHERE user_id = ...`) para erradicar nombres, números telefónicos o descripciones personales que el usuario haya ingresado.
-> 3. **Disociación espacial:** Si el reporte contiene coordenadas GPS de alta precisión (`location`) correspondientes a ubicaciones domiciliarias o privadas, se disocian o generalizan al centroide municipal, conservando únicamente `municipality_code` y `category_id`.
-> 4. **Garantía estadística irreversible:** El registro histórico restante en la ventana de 60 días queda disociado de forma irreversible `{municipality_code, category_id, amount_cop, created_at}`, impidiendo cualquier reidentificación directa o indirecta del titular conforme a las directrices de la SIC.
+> **Protocolo Transaccional de Supresión de Cuenta y Minimizacion de Datos (Habeas Data - Ley 1581 de 2012):**  
+> 
+> La desvinculación de la clave foránea mediante `ON DELETE SET NULL` sobre `price_reports.user_id` ocurre al suprimirse el usuario. Sin embargo, **si se elimina primero el registro en `auth.users`, los reportes quedan huérfanos con `user_id = NULL` y se vuelve imposible identificar cuáles pertenecían a ese usuario para depurar información contextual o privada**.
+>
+> Por tanto, el protocolo de eliminación **debe ejecutarse en orden estricto antes de la baja del usuario**, mediante una operación de backend segura y transaccional (RPC con `SECURITY DEFINER` o Edge Function administrativa con `service_role`):
+> 
+> 1. **Fase 1: Pre-supresión y depuración contextual (Antes de eliminar la cuenta):**
+>    - Se valida que el llamador autenticado coincida con el usuario objetivo (`auth.uid() = p_user_id`).
+>    - Dentro de una transacción atómica de base de datos:
+>      - **Depuración de texto libre e identificadores:** Se vacían `source_note = NULL` y `place_name = NULL` (`UPDATE price_reports SET source_note = NULL, place_name = NULL WHERE user_id = p_user_id;`), erradicando nombres comerciales atípicos, referencias domiciliarias o comentarios con PII.
+>      - **Saneamiento espacial:** Si el reporte contiene coordenadas GPS de alta precisión (`location`) asociadas a domicilios privados o rutas personales, se disocian fijándolas en `NULL` (`UPDATE price_reports SET location = NULL WHERE user_id = p_user_id;`), conservando únicamente `municipality_code` y `category_id`.
+>      - **Eliminación de registros personales directos:** Se suprimen los registros en `consents` y solicitudes en `interest_registrations`.
+> 2. **Fase 2: Supresión del usuario en `auth.users`:**
+>    - Una vez saneados los datos contextuales, se invoca la eliminación en el subsistema de autenticación (`supabase.auth.admin.deleteUser(p_user_id)`).
+>    - Esta baja elimina en cascada `public.profiles` (`ON DELETE CASCADE`) y activa `ON DELETE SET NULL` sobre `price_reports.user_id`, desvinculando la clave foránea del registro numérico previamente saneado.
+> 3. **Manejo transaccional y tratamiento de errores:**
+>    - Si la depuración en la Fase 1 falla o arroja excepción, la transacción hace `ROLLBACK` completo y la cuenta **NO** se elimina, retornando un error controlado al cliente (`500 Internal Error / Error en saneamiento previo de cuenta`).
+>    - Si la Fase 1 culmina exitosamente pero falla la invocación de `deleteUser` en Auth, la operación se registra en bitácora administrativa para reintento y se notifica al usuario, evitando inconsistencias entre Auth y la base de datos pública.
+> 4. **Aclaración sobre el nivel de privacidad:**
+>    - No se califica este procedimiento como "anonimización irreversible absoluta", ya que el riesgo residual de reidentificación depende del tamaño de la muestra comunitaria ($k$-anonimato) y de correlaciones externas. Se clasifica formalmente como una **estrategia de minimización de datos y disociación seudónima reforzada** conforme a la Ley 1581 de 2012 y las directrices de la SIC, sujeta a auditoría de privacidad empírica.
 - **Índices obligatorios:**
   - `CREATE INDEX idx_price_reports_stat ON price_reports(municipality_code, category_id, created_at) WHERE is_hidden = false AND is_demo = false;`
   - `CREATE INDEX idx_price_reports_location ON price_reports USING GIST(location);`
