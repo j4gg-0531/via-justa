@@ -92,3 +92,37 @@ De acuerdo con la regla 5.2 de `AGENTS.md`, las vistas (`presentation/pages/` y 
 normalizeForSearch|search[A-Z]\w*\(|\.where\(|\.sort\(|firstWhere|jsonDecode|rootBundle|Timer|Future\.delayed
 ```
 Ningún widget debe coincidir con este patrón, excepto excepciones temporales explícitamente documentadas (e.g. animación o timer transitorio de splash).
+
+---
+
+## 8. Gobierno de Cambios y Coordinación Frontend / Backend
+
+Para evitar divergencias entre el modelo en Flutter y las tablas en Supabase, toda modificación al modelo de datos sigue un ciclo riguroso de 7 pasos:
+
+```text
+ 1. Proponer Cambio (Issue / RFC)
+        │
+        ▼
+ 2. Actualizar Contrato de Datos (docs/contrato-datos-v1.md)
+        │
+        ▼
+ 3. Evaluar Impacto en Flutter (Modelos, Repositorios, Providers)
+        │
+        ▼
+ 4. Aprobación y Consenso del Equipo (Frontend + Backend)
+        │
+        ▼
+ 5. Crear Migración Versionada (supabase/migrations/NNNN_nombre.sql)
+        │
+        ▼
+ 6. Pruebas Locales (Test unitarios, pruebas RLS, seed local)
+        │
+        ▼
+ 7. Integración Controlada mediante Pull Request a main
+```
+
+### Reglas del Procedimiento
+1. **Contract-First:** Ningún integrante escribe código de consumo ni migraciones en Supabase antes de que el cambio esté plasmado y aprobado en `docs/contrato-datos-v1.md`.
+2. **Prohibición de Cambios Manuales:** Queda terminantemente prohibido modificar tablas, columnas, RLS o funciones directamente desde la consola web de Supabase en producción. Todo cambio debe ser una migración SQL versionada e inmutable.
+3. **Compatibilidad Hacia Atrás:** Todo cambio de esquema debe prever migraciones no destructivas mientras el cliente móvil se actualiza.
+
