@@ -39,7 +39,7 @@ El estado de la aplicación se orquesta con **Riverpod 3** siguiendo convencione
 
 ## 3. Enrutamiento y Navegación con GoRouter
 
-Todas las rutas del aplicativo se definen y administran de forma centralizada en [`lib/core/router/app_router.dart`](file:///C:/Users/JUAN/Antigravity%20IDE/via-justa/lib/core/router/app_router.dart):
+Todas las rutas del aplicativo se definen y administran de forma centralizada en [`lib/core/router/app_router.dart`](../lib/core/router/app_router.dart):
 - **`AppRoutes`:** Constantes de rutas y métodos auxiliares para paths parametrizados (`municipalityPath(code)`).
 - **Estrategia de Navegación:**
   - `context.go`: Se reserva exclusivamente para cambios de raíz donde no debe existir retorno en el stack (e.g. desde splash al flujo inicial, o logout hacia `/welcome`).
@@ -72,9 +72,9 @@ Para cumplir con el principio de no acoplar la interfaz al backend:
 ## 6. Sistema de Diseño, Tokens y Accesibilidad
 
 - **Tokens centralizados:**
-  - Colores: [`lib/core/theme/app_colors.dart`](file:///C:/Users/JUAN/Antigravity%20IDE/via-justa/lib/core/theme/app_colors.dart). Los colores verde, ámbar y rojo están reservados exclusivamente para el semáforo de justicia.
-  - Espaciados y Radios: [`lib/core/theme/app_spacing.dart`](file:///C:/Users/JUAN/Antigravity%20IDE/via-justa/lib/core/theme/app_spacing.dart) (incluye `AppRadius`).
-  - Tema: [`lib/core/theme/app_theme.dart`](file:///C:/Users/JUAN/Antigravity%20IDE/via-justa/lib/core/theme/app_theme.dart).
+  - Colores: [`lib/core/theme/app_colors.dart`](../lib/core/theme/app_colors.dart). Los colores verde, ámbar y rojo están reservados exclusivamente para el semáforo de justicia.
+  - Espaciados y Radios: [`lib/core/theme/app_spacing.dart`](../lib/core/theme/app_spacing.dart) (incluye `AppRadius`).
+  - Tema: [`lib/core/theme/app_theme.dart`](../lib/core/theme/app_theme.dart).
 - **Reglas de Accesibilidad y Responsividad:**
   - Blanco táctil mínimo de 48x48 dp.
   - Diseño adaptable sin desbordes a 360 dp de ancho y compatible con configuraciones de accesibilidad de escala de fuente aumentada.

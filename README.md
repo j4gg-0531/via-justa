@@ -10,8 +10,8 @@
 
 - **Ciudad Piloto:** Valledupar (Cesar).
 - **Enfoque técnico:** Android-first, arquitectura en tres capas, bilingüe (`es` / `en`).
-- **Núcleo de precios:** Regla estadística verificable (mediana comunitaria, ventana móvil de 60 días, mínimo $N \ge 3$ reportes), **no una caja negra de IA**.
-- **Núcleo de contratos:** Análisis asistido por IA (Gemini vía Edge Functions) con detección de cláusulas abusivas y advertencias legales orientativas.
+- **Núcleo de precios:** Regla estadística verificable (mediana comunitaria, ventana móvil de 60 días, mínimo $N \ge 3$ reportes), **no una caja negra de IA** *(Planificado para el avance / semanas 3-4)*.
+- **Núcleo de contratos:** Análisis asistido por IA (Gemini vía Edge Functions) con detección de cláusulas abusivas y advertencias legales orientativas *(Planificado para semana 4)*.
 
 ---
 
@@ -22,7 +22,7 @@
 - **Navegación:** `go_router` con rutas declarativas y centralizadas.
 - **Internacionalización:** `easy_localization` con soporte simultáneo español e inglés.
 - **Componentes Compartidos:** Atomic design (`VjButton`, `VjCard`, `VjBadge`, `VjSearchField`, `VjTextField`).
-- **Backend (Planeado):** Supabase (PostgreSQL, PostGIS, Auth, Storage, Edge Functions).
+- **Backend (Planificado):** Supabase (PostgreSQL, PostGIS, Auth, Storage, Edge Functions) *(Propuesto / En preparación en rama feature/supabase-init)*.
 
 ---
 
@@ -63,9 +63,10 @@ via-justa/
 ## 4. Requisitos y Configuración del Entorno
 
 ### Requisitos Previos
-1. **Flutter SDK:** Versión `>= 3.13.5` (compatible con Dart 3.x).
-2. **Android SDK & Build Tools:** JDK 17, `platform-tools` (`adb`).
-3. **Editor recomendado:** VS Code con extensiones oficiales de Flutter y Dart.
+1. **Dart SDK:** Restricción declarada en `pubspec.yaml` como `sdk: ^3.13.5` (Dart 3.x).
+2. **Flutter SDK:** Instalación de Flutter para Android compatible con la restricción de Dart (Flutter 3.13+ o superior).
+3. **Android SDK & Build Tools:** JDK 17, Android SDK Command-line Tools y herramientas de plataforma (`adb`).
+4. **Editor recomendado:** VS Code con extensiones oficiales de Flutter y Dart.
 
 ### Puesta en Marcha Local
 ```powershell
