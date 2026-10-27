@@ -1,66 +1,197 @@
-# Registro de Decisiones de Arquitectura y Producto
+# Registro de Decisiones de Arquitectura y Producto (ADRs)
 
-Este documento centraliza las decisiones arquitectónicas y técnicas (ADRs) adoptadas para el desarrollo del MVP de Vía Justa, distinguiendo formalmente entre decisiones [Acordadas], [Propuestas] y [Pendientes].
+Este documento formaliza el registro de decisiones técnicas y de producto para el proyecto **Vía Justa MVP**, estableciendo su estado, justificación, alternativas e impacto entre frontend y backend.
 
 ---
 
-## D1 · Soporte bilingüe en español e inglés desde el inicio
-- **Fecha:** 19 de octubre de 2026
-- **Estado:** [Acordado]
-- **Efecto:** Todo texto presentado al usuario debe gestionarse mediante internacionalización; prohibido el texto estático en duro (*hardcoded*).
-- **Justificación:** Los perfiles de usuarios (turistas extranjeros, migrantes y locales) demandan paridad bilingüe inmediata.
+## Índice de Decisiones
+
+| ID | Decisión | Estado | Responsable | Fecha Evidencia |
+|---|---|---|---|---|
+| **D1** | Soporte bilingüe español/inglés desde el día 1 | **ACORDADA** | Ambos | 19 de octubre de 2026 |
+| **D2** | Internacionalización con `easy_localization` | **ACORDADA** | Frontend | 19 de octubre de 2026 |
+| **D3** | Google Maps (`google_maps_flutter`) y Places | **ACORDADA** | Ambos | 19 de octubre de 2026 |
+| **D4** | Backend en Supabase (PostgreSQL, PostGIS, Auth, Storage, Edge Functions) | **PROPUESTA** | Backend | 19 de octubre de 2026 |
+| **D5** | Estado con Riverpod 3 y navegación con `go_router` | **ACORDADA** | Frontend | 19 de octubre de 2026 |
+| **D6** | Negocios sin pedidos internos (enlace externo) | **ACORDADA** | Ambos | 19 de octubre de 2026 |
+| **D7** | Contacto por WhatsApp externo sin chat propio | **ACORDADA** | Ambos | 19 de octubre de 2026 |
+| **D8** | Arquitectura en capas ligeras y reglas en `AGENTS.md` | **ACORDADA** | Ambos | 19 de octubre de 2026 |
+| **D9** | Gemini en Edge Function como proveedor LLM para contratos | **ACORDADA** | Ambos | 19 de octubre de 2026 |
+| **D10**| Repositorio único, ramas cortas por tarea y PR revisado | **ACORDADA** | Ambos | 19 de octubre de 2026 |
+| **D11**| Tercer perfil de usuario: Local / Residente (`resident`) | **PROPUESTA** | Backend / Ambos | 25 de octubre de 2026 |
+| **D12**| Barra inferior fija de cinco pestañas | **ACORDADA** | Frontend | 27 de octubre de 2026 |
+| **D13**| Categorías de precio estrictamente comparables | **PENDIENTE** | Ambos | — |
+| **D14**| Política de contraseñas y confirmación de correo | **PENDIENTE** | Backend | — |
+
+---
+
+## D1 · Soporte bilingüe en español e inglés desde el primer día
+- **Estado:** **ACORDADA**
+- **Responsable:** Ambos integrantes.
+- **Fecha de evidencia:** 19 de octubre de 2026 (Plan de trabajo v1.0, sección 2.2).
+- **Descripción:** La aplicación debe soportar español e inglés en todos los textos de la interfaz desde el inicio. No se admite texto estático sin clave de traducción.
+- **Justificación técnica:** Los usuarios objetivos abarcan turistas internacionales (inglés), migrantes (inglés/español) y residentes locales (español). La paridad temprana evita costosas refactorizaciones posteriores.
+- **Alternativas consideradas:** Español único en MVP y traducción en Fase 2 (descartada por no satisfacer el requisito de inclusión internacional).
+- **Impacto Frontend:** Uso exclusivo de `'clave'.tr()`. Test automatizado `translations_test.dart` que exige paridad exacta de claves entre `es.json` y `en.json`.
+- **Impacto Backend:** Las entidades con contenido descriptivo curado (`city_content`, `businesses`) deben almacenar versiones en ambos idiomas (`description_es`, `description_en`) o columnas por idioma.
+
+---
 
 ## D2 · Gestión de internacionalización con `easy_localization`
-- **Fecha:** 19 de octubre de 2026
-- **Estado:** [Acordado]
-- **Efecto:** Archivos de traducción en `assets/translations/es.json` y `assets/translations/en.json` con claves idénticas y prueba automatizada de paridad terminal.
+- **Estado:** **ACORDADA**
+- **Responsable:** Frontend.
+- **Fecha de evidencia:** 19 de octubre de 2026.
+- **Descripción:** Adopción del paquete `easy_localization` para cargar recursos JSON en tiempo de ejecución y permitir el cambio de idioma dinámico sin reiniciar la aplicación.
+- **Justificación técnica:** API concisa basada en extensiones sobre `String`, soporte inmediato de archivos JSON estructurados y persistencia automática de la preferencia del usuario.
+- **Alternativas consideradas:** `flutter_localizations` nativo con archivos `.arb` (más complejo de mantener manualmente) o providers propios con mapas en memoria (propenso a errores).
+- **Impacto Frontend:** `EasyLocalization` envuelve la app en `main.dart`. Pantalla de perfil modifica el idioma vía `context.setLocale()`.
+- **Impacto Backend:** Ninguno directo.
+
+---
 
 ## D3 · Uso de Google Maps (`google_maps_flutter`) y Places
-- **Fecha:** 19 de octubre de 2026
-- **Estado:** [Acordado]
-- **Efecto:** Requiere cuenta de Google Cloud Platform (GCP) con facturación, APIs habilitadas y clave de Android restringida por paquete y huella SHA-1.
-- **Alternativa para avance:** Si las credenciales no están listas en la fase preliminar, se usará un mapa estático de muestra debidamente rotulado como DEMO.
+- **Estado:** **ACORDADA**
+- **Responsable:** Ambos integrantes (GCP Billing y Android SDK).
+- **Fecha de evidencia:** 19 de octubre de 2026.
+- **Descripción:** Visualización de precios y ubicación de negocios mediante Google Maps SDK en Android.
+- **Justificación técnica:** Familiaridad para el usuario final, precisión cartográfica en Colombia y cobertura completa de lugares con Places API.
+- **Alternativas consideradas:** OpenStreetMap / MapLibre (descartadas por menor detalle urbano y carencia de Places nativo sin servicios terceros).
+- **Impacto Frontend:** Requiere clave de API restringida en `AndroidManifest.xml` por `applicationId` y huella SHA-1.
+- **Impacto Backend:** Almacenar únicamente `place_id` y coordenadas geográficas (`ST_Point`), evitando almacenar datos propietarios de Google protegidos por términos de servicio.
+- **Plan de contingencia:** Si la clave o facturación no están disponibles en avances preliminares, se utilizará un mapa estático debidamente rotulado como DEMO.
 
-## D4 · Backend en Supabase (PostgreSQL, PostGIS, Auth, Storage, Edge Functions)
-- **Fecha:** 19 de octubre de 2026
-- **Estado:** [Propuesto - Pendiente ratificación con compañero de backend]
-- **Efecto:** Centraliza base de datos relacional y geoespacial, autenticación, almacenamiento multimedia de negocios y funciones sin servidor para el análisis con LLM.
+---
 
-## D5 · Gestión de estado con Riverpod y navegación declarativa con `go_router`
-- **Fecha:** 19 de octubre de 2026
-- **Estado:** [Acordado]
-- **Efecto:** Estado desacoplado de la interfaz por funcionalidad; rutas centralizadas en `lib/core/router/app_router.dart`.
-- **Regla:** Uso estricto de Riverpod 3 (`Notifier`, `Provider`, `FutureProvider`); prohibido el uso de `StateProvider` o `ChangeNotifierProvider`.
+## D4 · Supabase como plataforma de Backend (BaaS)
+- **Estado:** **PROPUESTA** *(Pendiente de ratificación explícita del compañero de backend)*
+- **Responsable:** Compañero de backend.
+- **Fecha de evidencia:** 19 de octubre de 2026 (registrada como propuesta en el Plan de trabajo).
+- **Descripción:** Adopción de Supabase (PostgreSQL 15+, PostGIS, Supabase Auth, Storage y Edge Functions con Deno) como infraestructura única de backend.
+- **Justificación técnica:**
+  1. Base de datos relacional robusta con soporte geoespacial PostGIS nativo para radios y cuadrantes de precios.
+  2. Seguridad a nivel de fila (RLS) que garantiza aislamiento de datos privados directamente en la base de datos.
+  3. Edge Functions para encapsular la invocación de Gemini API sin exponer la clave en el cliente móvil.
+  4. Cero necesidad de aprovisionar y mantener servidores Linux dedicados.
+- **Alternativas consideradas:**
+  - Firebase Firestore: No relacional; dificulta el cálculo eficiente de medianas estadísticas ponderadas sobre ventanas de 60 días; sin PostGIS nativo.
+  - Backend propio en Node.js/Python: Sobrecarga operativa inasumible para un equipo de 2 personas con 6 semanas de plazo.
+- **Impacto Frontend:** Integración de `supabase_flutter` a partir de VJ-07/VJ-08 mediante adaptadores en `data/` controlados por Riverpod.
+- **Impacto Backend:** El compañero de backend gestiona las migraciones SQL numeradas, políticas RLS, roles y la configuración de Edge Functions.
+- **Condición de activación:** No aplicar migraciones ni instanciar clientes de red hasta la confirmación formal del compañero.
 
-## D6 · Negocios sin pedidos internos
-- **Fecha:** 19 de octubre de 2026
-- **Estado:** [Acordado]
-- **Efecto:** La app no procesa transacciones comerciales ni cobros dentro de la plataforma; el botón de pedido redirige a enlaces externos del propio comercio.
+---
 
-## D7 · Contacto por WhatsApp sin chat interno
-- **Fecha:** 19 de octubre de 2026
-- **Estado:** [Acordado]
-- **Efecto:** El contacto entre usuarios y negocios se realiza mediante enlaces `wa.me` externos con mensaje prellenado en el idioma seleccionado.
+## D5 · Gestión de estado con Riverpod 3 y navegación con `go_router`
+- **Estado:** **ACORDADA**
+- **Responsable:** Frontend.
+- **Fecha de evidencia:** 19 de octubre de 2026.
+- **Descripción:** Riverpod 3 como gestor de estado e inyección de dependencias (`Notifier`, `Provider`, `FutureProvider`). `go_router` como enrutador declarativo centralizado.
+- **Justificación técnica:** Cero acoplamiento a `BuildContext` para lógica de negocio; recarga y prueba aislada de providers con `ProviderContainer`. `go_router` permite deep-linking y guardas de redirección por sesión.
+- **Alternativas consideradas:** `Provider` tradicional (propenso a `ProviderNotFoundException`), `BLoC` (demasiada ceremonia de eventos para un MVP ágil).
+- **Impacto Frontend:** Todas las rutas viven en `lib/core/router/app_router.dart`. Estado efímero usa `.autoDispose`.
+- **Impacto Backend:** Ninguno.
 
-## D8 · Arquitectura por capas ligeras y agente de código con archivo de reglas
-- **Fecha:** 19 de octubre de 2026
-- **Estado:** [Propuesto / Aplicado en código]
-- **Efecto:** Estructuración estricta en capas `presentation/`, `domain/` y `data/`. Reglas operativas documentadas en `AGENTS.md`. Prohibida la lógica de negocio en las vistas.
+---
 
-## D9 · Gemini como proveedor de LLM para contratos
-- **Fecha:** 19 de octubre de 2026
-- **Estado:** [Acordado]
-- **Efecto:** El análisis de cláusulas de contratos se delega al modelo Gemini mediante invocación segura desde una Edge Function. La API Key nunca reside en el cliente móvil.
+## D6 · Negocios sin pedidos ni transacciones internas
+- **Estado:** **ACORDADA**
+- **Responsable:** Ambos integrantes.
+- **Fecha de evidencia:** 19 de octubre de 2026.
+- **Descripción:** La plataforma no gestiona carritos de compras, pasarelas de pago ni cobros a comisiones.
+- **Justificación técnica:** Evita implicaciones legales de recaudo, pasarelas bancarias y gestión transaccional de pagos, concentrándose en el valor núcleo de transparencia y contacto.
+- **Alternativas consideradas:** Integración de Wompi / PSE (pospuesto a Fase 2).
+- **Impacto Frontend:** Botón "Pedir" opcional que redirige mediante `url_launcher` al enlace externo configurado por el comercio.
+- **Impacto Backend:** Campo opcional `order_url TEXT` en la tabla `businesses`.
 
-## D10 · Un único repositorio, ramas cortas por tarea y PR con revisión
-- **Fecha:** 19 de octubre de 2026
-- **Estado:** [Acordado]
-- **Efecto:** Rama `main` protegida; cada tarea abre una rama específica y se integra mediante Pull Request revisado por el otro integrante.
+---
 
-## D11 · Tercer perfil "Local / Residente" (`profile_type = resident`)
-- **Fecha:** 25 de octubre de 2026
-- **Estado:** [Propuesto - Falta confirmación con compañero de backend]
-- **Qué cambia:** El onboarding ofrece tres perfiles: `visitor`, `settler` y `resident`. El valor `resident` debe aceptarse en el constraint o enum `profiles.profile_type` antes de cerrar la migración 0001 de base de datos.
-- **Motivo:** El profesor solicitó que los usuarios puedan registrar negocios locales (restaurantes, bandas, etc.). Quien registra suele ser residente local y los perfiles de Visitante e Instalación no representan adecuadamente esa realidad.
-- **Alternativa descartada:** Mantener únicamente dos perfiles y forzar a los dueños locales a encajar en Visitante o Instalación.
-- **Notas:** Registrar un negocio no es un tipo de cuenta restringido: cualquier perfil podrá solicitar el registro desde la pestaña Negocios. El inicio temporal para `resident` en el primer avance se equiparará a `settler` con una marca `TODO(D11)`.
+## D7 · Contacto por WhatsApp externo sin chat propio
+- **Estado:** **ACORDADA**
+- **Responsable:** Ambos integrantes.
+- **Fecha de evidencia:** 19 de octubre de 2026.
+- **Descripción:** La comunicación entre usuarios y dueños de negocio se canaliza vía WhatsApp externo mediante URLs `https://wa.me/<numero>?text=<mensaje>`.
+- **Justificación técnica:** Aprovecha el canal comercial estándar en Colombia. Ahorra semanas de desarrollo de WebSockets, notificaciones push de mensajería y almacenamiento de chats.
+- **Alternativas consideradas:** Chat en tiempo real basado en Supabase Realtime (descartado por esfuerzo excesivo y falta de moderación de contenido).
+- **Impacto Frontend:** Lanzamiento de intent externo con consentimiento del usuario.
+- **Impacto Backend:** Columna `whatsapp TEXT` y registro de fecha de consentimiento `whatsapp_consent_at TIMESTAMPTZ` en `businesses`.
+
+---
+
+## D8 · Arquitectura en tres capas ligeras y reglas de higiene en `AGENTS.md`
+- **Estado:** **ACORDADA** *(Propuesta en plan original; ratificada en código y documentación)*
+- **Responsable:** Ambos integrantes.
+- **Fecha de evidencia:** 19 de octubre de 2026.
+- **Descripción:** Estructura modular `presentation/`, `domain/` y `data/` por funcionalidad. Prohibición estricta de lógica de negocio, filtros o acceso a datos en widgets visuales.
+- **Justificación técnica:** Facilita la defensa técnica ante el evaluador académico y asegura pruebas unitarias rápidas e independientes del framework.
+- **Alternativas consideradas:** Arquitectura por tipo de componente (separar todos los widgets juntos, todos los modelos juntos) — descartada por dificultar el escalamiento por funcionalidad.
+- **Impacto:** Cumplimiento continuo de la regla 5.2 de `AGENTS.md` y verificación por regex.
+
+---
+
+## D9 · Gemini como proveedor LLM para análisis de contratos
+- **Estado:** **ACORDADA**
+- **Responsable:** Ambos integrantes.
+- **Fecha de evidencia:** 19 de octubre de 2026.
+- **Descripción:** Empleo del modelo Gemini (familia Flash) mediante invocación segura desde una Edge Function para evaluar cláusulas abusivas en contratos de arrendamiento y servicios.
+- **Justificación técnica:** Excelente capacidad de razonamiento en español jurídico, soporte de salidas estructuradas en JSON (`responseSchema`), latencia reducida y cuota gratuita adecuada para pruebas.
+- **Alternativas consideradas:** OpenAI GPT-4o-mini (descartado por conveniencia de lineamientos del proyecto).
+- **Impacto Frontend:** Envío de texto extraído por OCR a la Edge Function; renderizado de semáforo de contrato (`green|yellow|red`) con advertencia legal explícita.
+- **Impacto Backend:** Edge Function valida autenticación, aplica límite diario (`ai_usage`), sanitiza el prompt contra inyecciones y valida el esquema JSON retornado. La API Key nunca se incluye en el cliente móvil.
+
+---
+
+## D10 · Repositorio único, ramas cortas por tarea y PR revisado
+- **Estado:** **ACORDADA**
+- **Responsable:** Ambos integrantes.
+- **Fecha de evidencia:** 19 de octubre de 2026.
+- **Descripción:** Trabajo colaborativo sobre un único repositorio Git. Cada tarea del plan opera en una rama específica (`feature/vj-XX-...` o `fix/vj-XX-...`) y se integra a `main` tras validación.
+- **Justificación técnica:** Mantiene sincronizados los contratos entre frontend y backend y previene colisiones de código.
+- **Regla:** Rama `main` protegida; commits convencionales; prohibidas las mezclas unilaterales sin autorización.
+
+---
+
+## D11 · Tercer perfil de usuario: Local / Residente (`resident`)
+- **Estado:** **PROPUESTA** *(Falta confirmación del compañero de backend antes de aplicar la migración SQL 0001)*
+- **Responsable:** Compañero de backend y equipo.
+- **Fecha de evidencia:** 25 de octubre de 2026.
+- **Descripción:** El onboarding ofrece 3 perfiles: Visitante (`visitor`), Instalación (`settler`) y Residente (`resident`).
+- **Justificación técnica:**
+  1. Permite diferenciar las necesidades del turista (eventos, precios de urgencia), del recién llegado (trámites, arriendos) y del habitante establecido (registro de su negocio, precios cotidianos de su barrio).
+  2. La solicitud del profesor de permitir el registro de negocios locales por usuarios de la comunidad exige que el residente se sienta representado.
+- **Reglas críticas:**
+  1. **Seguridad:** El perfil de usuario (`profile_type`) **NUNCA confiere privilegios administrativos** ni modifica el rol de seguridad (`role` en `profiles` debe ser inmutable por el usuario y evaluado por RLS).
+  2. **Compatibilidad:** El enum persistido en PostgreSQL (`CREATE TYPE profile_type_enum AS ENUM ('visitor', 'settler', 'resident')`) debe coincidir exactamente con `ProfileType` en Dart (`lib/features/onboarding/domain/profile_type.dart`).
+  3. **Comportamiento inicial:** Para el primer avance, el perfil `resident` compartirá la experiencia de `settler` con una marca `TODO(D11)` en el dominio.
+
+---
+
+## D12 · Barra inferior fija de cinco pestañas
+- **Estado:** **ACORDADA**
+- **Responsable:** Frontend.
+- **Fecha de evidencia:** 27 de octubre de 2026 (Plan v1.1 y auditoría).
+- **Descripción:** Implementación de navegación principal fija con 5 pestañas: `Inicio`, `Mapa`, `Escanear` (central), `Negocios` y `Perfil`.
+- **Justificación técnica:** Los mockups heredados cambiaban la navegación según el perfil ("Guardados" vs "Dinero"), lo cual generaba desorientación y estados incoherentes al cambiar de perfil. La barra fija simplifica la estructura de rutas (`ShellRoute`) y mantiene accesibles las funcionalidades clave.
+- **Impacto Frontend:** Pestañas no desarrolladas en el avance mostrarán un estado accesible "Próximamente" sin bloquear la navegación.
+
+---
+
+## D13 · Categorías de precio estrictamente comparables
+- **Estado:** **PENDIENTE** *(Requiere consenso de catálogo entre frontend y backend)*
+- **Responsable:** Ambos integrantes.
+- **Descripción:** Definir la lista de categorías y subcategorías obligatorias para el reporte de precios.
+- **Justificación técnica:** Una regla estadística de mediana pierde validez si compara magnitudes heterogéneas. Por ejemplo, en "Transporte" debe compararse "Carrera mínima de taxi diurna" vs "Carrera mínima", sin mezclar tarifas de buses intermunicipales o transporte informal.
+- **Propuesta base:**
+  1. `transport_taxi_minimal`: Carrera mínima urbana de taxi.
+  2. `food_lunch_executive`: Almuerzo ejecutivo / menú del día.
+  3. `lodging_hotel_standard`: Noche de hotel habitación estándar individual.
+  4. `housing_rent_apartment_2b`: Arriendo mensual apartamento 2 habitaciones.
+
+---
+
+## D14 · Política de contraseñas y confirmación de correo
+- **Estado:** **PENDIENTE** *(Requiere definición del compañero de backend en Supabase Auth)*
+- **Responsable:** Compañero de backend.
+- **Descripción:** Establecer la política de seguridad para el registro de cuentas:
+  1. Longitud mínima de contraseña: 8 caracteres (validada en `auth_validators.dart`).
+  2. Confirmación de correo por enlace o token: Definir si el usuario debe confirmar obligatoriamente su correo antes de acceder al sistema o si se permite un estado de gracia inicial.
+- **Recomendación arquitectónica:** En el MVP, habilitar auto-confirmación o modo tolerante en desarrollo para facilitar las pruebas del evaluador sin depender de servidores SMTP reales.

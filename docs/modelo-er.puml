@@ -1,0 +1,206 @@
+@startuml modelo_er_via_justa
+!theme plain
+skinparam linetype ortho
+skinparam roundcorner 5
+skinparam shadowing false
+skinparam class {
+    BackgroundColor white
+    ArrowColor #1E293B
+    BorderColor #475569
+}
+
+title Vía Justa MVP — Modelo Entidad-Relación v1.0 (PostgreSQL + PostGIS)
+
+package "Autenticación (Supabase Auth)" {
+    entity "auth.users" as auth_users {
+        * id : UUID <<PK>>
+        --
+        email : VARCHAR
+        created_at : TIMESTAMPTZ
+    }
+}
+
+package "Núcleo de Usuarios y Consentimiento" {
+    entity "profiles" as profiles {
+        * id : UUID <<PK, FK>>
+        --
+        display_name : VARCHAR(100)
+        profile_type : profile_type_enum
+        origin_country : VARCHAR(3)
+        current_municipality_code : VARCHAR(5) <<FK>>
+        language : VARCHAR(2)
+        role : user_role_enum
+        created_at : TIMESTAMPTZ
+        updated_at : TIMESTAMPTZ
+    }
+
+    entity "consents" as consents {
+        * id : UUID <<PK>>
+        --
+        user_id : UUID <<FK>>
+        doc_type : VARCHAR(50)
+        version : VARCHAR(20)
+        accepted_at : TIMESTAMPTZ
+    }
+}
+
+package "División Político-Administrativa (DANE)" {
+    entity "departments" as departments {
+        * code : VARCHAR(2) <<PK>>
+        --
+        name : VARCHAR(100)
+        is_available : BOOLEAN
+    }
+
+    entity "municipalities" as municipalities {
+        * code : VARCHAR(5) <<PK>>
+        --
+        department_code : VARCHAR(2) <<FK>>
+        name : VARCHAR(100)
+        is_pilot : BOOLEAN
+    }
+
+    entity "interest_registrations" as interest_registrations {
+        * id : UUID <<PK>>
+        --
+        user_id : UUID <<FK>>
+        municipality_code : VARCHAR(5) <<FK>>
+        created_at : TIMESTAMPTZ
+    }
+}
+
+package "Motor de Precios y Semáforo Estadístico" {
+    entity "price_categories" as price_categories {
+        * id : VARCHAR(50) <<PK>>
+        --
+        group_key : VARCHAR(50)
+        name_es : VARCHAR(100)
+        name_en : VARCHAR(100)
+        unit_description_es : VARCHAR(100)
+        unit_description_en : VARCHAR(100)
+        sort_order : INTEGER
+        is_active : BOOLEAN
+    }
+
+    entity "price_reports" as price_reports {
+        * id : UUID <<PK>>
+        --
+        user_id : UUID <<FK>>
+        category_id : VARCHAR(50) <<FK>>
+        municipality_code : VARCHAR(5) <<FK>>
+        amount_cop : INTEGER
+        location : GEOGRAPHY(Point, 4326)
+        place_name : VARCHAR(150)
+        is_seed : BOOLEAN
+        is_demo : BOOLEAN
+        is_hidden : BOOLEAN
+        source_note : VARCHAR(255)
+        created_at : TIMESTAMPTZ
+    }
+
+    entity "events" as events {
+        * id : UUID <<PK>>
+        --
+        municipality_code : VARCHAR(5) <<FK>>
+        name : VARCHAR(150)
+        starts_at : TIMESTAMPTZ
+        ends_at : TIMESTAMPTZ
+        is_demo : BOOLEAN
+    }
+
+    entity "app_config" as app_config {
+        * key : VARCHAR(50) <<PK>>
+        --
+        value : JSONB
+        updated_at : TIMESTAMPTZ
+    }
+}
+
+package "Análisis de Contratos con IA (Gemini)" {
+    entity "ai_usage" as ai_usage {
+        * user_id : UUID <<PK, FK>>
+        * day : DATE <<PK>>
+        --
+        count : INTEGER
+    }
+}
+
+package "Comercios y Directorio Local" {
+    entity "businesses" as businesses {
+        * id : UUID <<PK>>
+        --
+        owner_id : UUID <<FK>>
+        municipality_code : VARCHAR(5) <<FK>>
+        type : VARCHAR(50)
+        name : VARCHAR(150)
+        description_es : TEXT
+        description_en : TEXT
+        location : GEOGRAPHY(Point, 4326)
+        place_id : VARCHAR(150)
+        phone : VARCHAR(20)
+        whatsapp : VARCHAR(20)
+        whatsapp_consent_at : TIMESTAMPTZ
+        order_url : TEXT
+        hours : JSONB
+        status : business_status_enum
+        rejection_reason : TEXT
+        created_at : TIMESTAMPTZ
+    }
+
+    entity "business_photos" as business_photos {
+        * id : UUID <<PK>>
+        --
+        business_id : UUID <<FK>>
+        storage_path : TEXT
+        position : INTEGER
+        is_cover : BOOLEAN
+    }
+
+    entity "business_dishes" as business_dishes {
+        * id : UUID <<PK>>
+        --
+        business_id : UUID <<FK>>
+        name : VARCHAR(100)
+        price_cop : INTEGER
+        description : TEXT
+        sort_order : INTEGER
+    }
+
+    entity "city_content" as city_content {
+        * id : UUID <<PK>>
+        --
+        municipality_code : VARCHAR(5) <<FK>>
+        locale : VARCHAR(2)
+        section : VARCHAR(50)
+        title : VARCHAR(150)
+        body : TEXT
+        image_path : TEXT
+        source_citation : VARCHAR(255)
+    }
+}
+
+' Relaciones de Autenticación y Perfil
+auth_users ||--|| profiles : "1:1 hereda identidad"
+auth_users ||--o{ consents : "1:N acepta"
+auth_users ||--o{ ai_usage : "1:N consume cuota diaria"
+auth_users ||--o{ interest_registrations : "1:N solicita apertura"
+
+' Relaciones Geográficas
+departments ||--o{ municipalities : "1:N contiene"
+municipalities ||--o{ profiles : "0..1:N residencia"
+municipalities ||--o{ price_reports : "1:N ubica"
+municipalities ||--o{ events : "1:N celebra"
+municipalities ||--o{ businesses : "1:N localiza"
+municipalities ||--o{ city_content : "1:N divulga cultura"
+municipalities ||--o{ interest_registrations : "1:N recibe interés"
+
+' Relaciones de Precios
+auth_users ||--o{ price_reports : "1:N reporta"
+price_categories ||--o{ price_reports : "1:N clasifica"
+
+' Relaciones de Negocios
+auth_users ||--o{ businesses : "1:N registra/propietario"
+businesses ||--o{ business_photos : "1:N (máx 5 fotos)"
+businesses ||--o{ business_dishes : "1:N (máx 5 platos)"
+
+@enduml
