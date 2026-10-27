@@ -24,27 +24,56 @@
 
 ## 2. Especificación de Entidades
 
-### 2.1 `profiles`
-- **Finalidad:** Almacenar la información pública y preferencias del usuario autenticado en `auth.users`.
-- **Estructura:**
+### 2.1 `profiles` y Autorización Administrativa
+
+#### `profiles` (Información del Usuario)
+- **Finalidad:** Almacenar los datos de identidad, preferencias e idioma del usuario autenticado en `auth.users`.
+- **Estructura conciliada con migraciones reales de backend:**
   | Columna | Tipo | Restricciones | Descripción |
   |---|---|---|---|
   | `id` | `UUID` | PK, FK -> `auth.users(id)` ON DELETE CASCADE | Identificador unívoco del usuario en Auth |
-  | `display_name` | `VARCHAR(100)` | NOT NULL | Nombre para mostrar registrado en bienvenida |
-  | `profile_type` | `profile_type_enum`| NOT NULL DEFAULT 'visitor' | Perfil de usuario (D11 propuesto) |
-  | `origin_country` | `VARCHAR(3)` | NULL | Código ISO de país de origen (opcional) |
-  | `current_municipality_code` | `VARCHAR(5)` | NULL, FK -> `municipalities(code)` | Municipio seleccionado como residencia/estadía |
-  | `language` | `VARCHAR(2)` | NOT NULL DEFAULT 'es' | Idioma preferido (`es` / `en`) |
-  | `role` | `user_role_enum` | NOT NULL DEFAULT 'authenticated_user' | Rol del usuario. **No editable por el cliente** |
+  | `display_name` | `TEXT` | NULL | Nombre para mostrar (inicializado por trigger desde metadata) |
+  | `profile_type` | `TEXT` | NULL, CHECK (`profile_type IN ('visitor', 'settler', 'resident')`) | Perfil de usuario (D11 propuesto; NULL hasta completar onboarding) |
+  | `origin_country` | `TEXT` | NULL | País de origen (opcional) |
+  | `current_municipality_code` | `TEXT` | NULL, FK -> `municipalities(code)` | Municipio seleccionado como residencia/estadía |
+  | `language` | `TEXT` | NOT NULL DEFAULT 'es', CHECK (`language IN ('es', 'en')`) | Idioma preferido |
   | `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha de creación del perfil |
-  | `updated_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha de última modificación |
-- **Índices:** `CREATE INDEX idx_profiles_municipality ON profiles(current_municipality_code);`
-- **Políticas RLS:**
-  - `SELECT`: Público para datos no sensibles o restringido al propio usuario (`auth.uid() = id`).
-  - `INSERT`: Solo el propio usuario (`auth.uid() = id`).
-  - `UPDATE`: Solo el propio usuario sobre sus columnas, **excluyendo `role`** (garantizado con triggers o políticas de columnas).
-  - `DELETE`: Cascada desde `auth.users` o llamada administrativa.
-- **Responsabilidad:** Frontend gestiona creación al completar registro; Backend valida integridad y bloquea escalamiento de privilegios a `admin`.
+  | `updated_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha de última modificación (mantenida por trigger) |
+
+> **Compatibilidad con `handle_new_user()`:** Al registrarse un usuario en `auth.users`, el trigger inicial de base de datos ejecuta:
+> `INSERT INTO public.profiles (id, display_name) VALUES (new.id, coalesce(...));`
+> Para que esta inserción no falle, las columnas `profile_type`, `origin_country` y `current_municipality_code` son inicialmente `NULL` y se completan durante el onboarding. `language` cuenta con `DEFAULT 'es'`.
+
+#### `admin_users` (Autorización Administrativa Separada)
+Siguiendo la arquitectura de seguridad implementada en la migración `20261027151910_profiles_and_consents.sql`, **los privilegios de administración NO se guardan en `profiles`**. Se aísla el acceso administrativo en una tabla separada:
+```sql
+CREATE TABLE public.admin_users (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE
+);
+ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para authenticated/anon
+```
+- **Función de verificación:**
+  ```sql
+  CREATE OR REPLACE FUNCTION public.is_admin()
+  RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+    SELECT EXISTS (SELECT 1 FROM public.admin_users WHERE user_id = auth.uid());
+  $$;
+  ```
+
+#### Políticas de Privacidad y Control a Nivel de Columna en `profiles`
+1. **Lectura privada:** La política RLS existente `profiles_select_own` restringe la lectura al propio usuario (`id = auth.uid()`).
+2. **Proyección pública:** Para mostrar nombres en reportes comunitarios o comercios sin exponer datos privados (idioma, país, municipio), se proyecta una función segura:
+   ```sql
+   CREATE OR REPLACE FUNCTION public.get_public_author_name(p_user_id UUID)
+   RETURNS TEXT LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+     SELECT coalesce(display_name, 'Usuario Comunitario') FROM public.profiles WHERE id = p_user_id;
+   $$;
+   ```
+3. **Protección de columnas contra alteración:**
+   ```sql
+   REVOKE UPDATE ON public.profiles FROM authenticated;
+   GRANT UPDATE (display_name, origin_country, current_municipality_code, language, profile_type) ON public.profiles TO authenticated;
+   ```
 
 ---
 
@@ -68,28 +97,27 @@
 
 ### 2.3 `departments`
 - **Finalidad:** Catálogo maestro oficial de los 32 departamentos y Bogotá D.C. según DANE.
-- **Estructura:**
+- **Estructura (conciliada con migración `20261027151907_extensions_and_geography.sql`):**
   | Columna | Tipo | Restricciones | Descripción |
   |---|---|---|---|
-  | `code` | `VARCHAR(2)` | PK | Código DIVIPOLA de 2 dígitos (ej. `'20'` para Cesar) |
-  | `name` | `VARCHAR(100)` | NOT NULL, UNIQUE | Nombre oficial del departamento |
-  | `is_available` | `BOOLEAN` | NOT NULL DEFAULT false | Habilitado para navegación operativa |
+  | `code` | `TEXT` | PK, CHECK (`code ~ '^[0-9]{2}$'`) | Código DANE de 2 dígitos (ej. `'20'` para Cesar) |
+  | `name` | `TEXT` | NOT NULL | Nombre oficial del departamento |
 - **Políticas RLS:** `SELECT` público a todos los usuarios (`anon`, `authenticated`). Modificaciones solo `admin`.
 
 ---
 
 ### 2.4 `municipalities`
 - **Finalidad:** Catálogo de municipios colombianos con indicación de ciudades piloto.
-- **Estructura:**
+- **Estructura (conciliada con migración `20261027151907_extensions_and_geography.sql`):**
   | Columna | Tipo | Restricciones | Descripción |
   |---|---|---|---|
-  | `code` | `VARCHAR(5)` | PK | Código DIVIPOLA de 5 dígitos (ej. `'20001'` para Valledupar) |
-  | `department_code` | `VARCHAR(2)` | NOT NULL, FK -> `departments(code)` | Departamento al que pertenece |
-  | `name` | `VARCHAR(100)` | NOT NULL | Nombre del municipio |
-  | `is_pilot` | `BOOLEAN` | NOT NULL DEFAULT false | Si es `true`, abre la experiencia completa de la app |
+  | `code` | `TEXT` | PK, CHECK (`code ~ '^[0-9]{5}$'`) | Código DIVIPOLA de 5 dígitos (ej. `'20001'` para Valledupar) |
+  | `department_code` | `TEXT` | NOT NULL, FK -> `departments(code)` | Código de departamento al que pertenece |
+  | `name` | `TEXT` | NOT NULL | Nombre oficial del municipio |
+  | `is_pilot` | `BOOLEAN` | NOT NULL DEFAULT false | Si es `true`, habilita la experiencia funcional de la app |
 - **Índices:**
-  - `CREATE INDEX idx_municipalities_dept ON municipalities(department_code);`
-  - `CREATE INDEX idx_municipalities_search ON municipalities USING gin(to_tsvector('spanish', name));`
+  - `CREATE INDEX municipalities_department_idx ON public.municipalities(department_code);`
+  - `CREATE INDEX idx_municipalities_search ON public.municipalities USING gin(to_tsvector('spanish', name));`
 - **Políticas RLS:** `SELECT` público a todos los usuarios (`anon`, `authenticated`). Modificaciones solo `admin`.
 
 ---
@@ -117,9 +145,9 @@
   | Columna | Tipo | Restricciones | Descripción |
   |---|---|---|---|
   | `id` | `UUID` | PK DEFAULT gen_random_uuid() | Identificador del reporte |
-  | `user_id` | `UUID` | NOT NULL, FK -> `auth.users(id)` | Usuario que reporta el precio |
+  | `user_id` | `UUID` | NULL, FK -> `auth.users(id)` ON DELETE SET NULL | Usuario que reporta (se desvincula si borra su cuenta) |
   | `category_id` | `VARCHAR(50)` | NOT NULL, FK -> `price_categories(id)` | Categoría comparable específica |
-  | `municipality_code` | `VARCHAR(5)` | NOT NULL, FK -> `municipalities(code)` | Municipio del reporte |
+  | `municipality_code` | `TEXT` | NOT NULL, FK -> `municipalities(code)` | Municipio del reporte |
   | `amount_cop` | `INTEGER` | NOT NULL, CHECK (amount_cop > 0) | Monto observado en pesos colombianos |
   | `location` | `GEOGRAPHY(Point, 4326)` | NULL | Coordenadas aproximadas del reporte (PostGIS) |
   | `place_name` | `VARCHAR(150)` | NULL | Nombre descriptivo del lugar o sector |
@@ -128,6 +156,8 @@
   | `is_hidden` | `BOOLEAN` | NOT NULL DEFAULT false | Oculto por moderación o anomalía |
   | `source_note` | `VARCHAR(255)` | NULL | Fuente u observación (ej. "Factura local", "Observación en terminal") |
   | `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha y hora del reporte |
+
+> **Tratamiento ante eliminación de cuenta (Habeas Data):** Cuando un usuario ejerce su derecho de supresión de cuenta en `auth.users`, la clave foránea `user_id` pasa a `NULL` mediante `ON DELETE SET NULL`. Esto desvincula todo dato personal (PII) pero conserva intacto el registro numérico (`amount_cop`), la categoría y la fecha, evitando destruir el histórico estadístico necesario para calcular la mediana comunitaria de precios.
 - **Índices obligatorios:**
   - `CREATE INDEX idx_price_reports_stat ON price_reports(municipality_code, category_id, created_at) WHERE is_hidden = false AND is_demo = false;`
   - `CREATE INDEX idx_price_reports_location ON price_reports USING GIST(location);`

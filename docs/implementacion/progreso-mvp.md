@@ -2,8 +2,8 @@
 
 **Última actualización:** 27 de octubre de 2026  
 **Rama base inicial:** `main` (`c082ce81b51064bfbf630d558711fe226fc58434`)  
-**Rama VJ-00:** `feature/vj-00-baseline-inventario` (`6ad1991`) — Completada localmente; pendiente de integración a `main` (bloqueo por acceso a GitHub).  
-**Rama de trabajo VJ-01:** `feature/vj-01-contrato-datos` (ramificada desde VJ-00 bajo autorización explícita — Opción B).  
+**Rama VJ-00:** `feature/vj-00-baseline-inventario` — PR #4 publicado hacia `main` (actualizado tras revisión; pendiente de aprobación/merge).  
+**Rama de trabajo VJ-01:** `feature/vj-01-contrato-datos` — PR #5 publicado hacia `feature/vj-00-baseline-inventario` (actualizado tras revisión con reconciliación de backend; pendiente de aprobación/merge).  
 **Repositorio remoto:** `https://github.com/j4gg-0531/via-justa.git`  
 **Entorno de ejecución:** Windows 10/11 x64, PowerShell 5.1  
 **Gradle Wrapper:** 9.3.1 (`android/gradle/wrapper/gradle-wrapper.properties`)  
@@ -18,8 +18,8 @@
 
 | ID | Prioridad | Rol | Tarea | Estado | Dependencias |
 |---|---|---|---|---|---|
-| **VJ-00** | P0 | Ambos | Inventario inicial, baseline reproducible y control de cambios | **HECHO-VERIFICADO** *(Local, pendiente merge main)* | Ninguna |
-| **VJ-01** | P0 | Ambos | Decisiones, contrato con compañero, diagrama ER y gobierno | **HECHO-VERIFICADO** | VJ-00 |
+| **VJ-00** | P0 | Ambos | Inventario inicial, baseline reproducible y control de cambios | **REVISIÓN (PR #4)** | Ninguna |
+| **VJ-01** | P0 | Ambos | Decisiones, contrato con compañero, diagrama ER y gobierno | **REVISIÓN (PR #5)** | VJ-00 |
 | **VJ-02** | P0 | Frontend | Higiene técnica, README, CI y accesibilidad base | **PENDIENTE** | VJ-00 |
 | **VJ-03** | P0 | Frontend | Pantallas 7–9: shell con barra inferior de 5 pestañas | **PENDIENTE** | VJ-02 |
 | **VJ-04** | P1 | Ambos | Motor visual de semáforo demo: pantallas 10 y 11 | **PENDIENTE** | VJ-03 |

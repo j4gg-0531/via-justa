@@ -159,8 +159,8 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
   1. Permite diferenciar las necesidades del turista (eventos, precios de urgencia), del recién llegado (trámites, arriendos) y del habitante establecido (registro de su negocio, precios cotidianos de su barrio).
   2. La solicitud del profesor de permitir el registro de negocios locales por usuarios de la comunidad exige que el residente se sienta representado.
 - **Reglas críticas:**
-  1. **Seguridad:** El perfil de usuario (`profile_type`) **NUNCA confiere privilegios administrativos** ni modifica el rol de seguridad (`role` en `profiles` debe ser inmutable por el usuario y evaluado por RLS).
-  2. **Compatibilidad:** El enum persistido en PostgreSQL (`CREATE TYPE profile_type_enum AS ENUM ('visitor', 'settler', 'resident')`) debe coincidir exactamente con `ProfileType` en Dart (`lib/features/onboarding/domain/profile_type.dart`).
+  1. **Seguridad:** El perfil de usuario (`profile_type`) **NUNCA confiere privilegios administrativos**. La autorización administrativa no reside en `profiles` (se descarta la columna `role`) sino en la tabla independiente `public.admin_users` mediante la función `public.is_admin()`, preservando el principio de mínimo privilegio y separando el tipo de perfil de la autorización de administración.
+  2. **Compatibilidad:** En la migración inicial de backend (`20261027151910_profiles_and_consents.sql`) existe una restricción `check (profile_type in ('visitor', 'settler'))`. La inclusión de 'resident' se mantiene como propuesta formal pendiente de aprobación de Isaac para incorporar la migración complementaria correspondiente.
   3. **Comportamiento inicial:** Para el primer avance, el perfil `resident` compartirá la experiencia de `settler` con una marca `TODO(D11)` en el dominio.
 
 ---

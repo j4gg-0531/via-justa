@@ -9,14 +9,20 @@ skinparam class {
     BorderColor #475569
 }
 
-title Vía Justa MVP — Modelo Entidad-Relación v1.0 (PostgreSQL + PostGIS)
+title Vía Justa MVP — Modelo Entidad-Relación v1.1 (Conciliado con feature/supabase-init)
 
-package "Autenticación (Supabase Auth)" {
+package "Autenticación y Autorización (Supabase Auth)" {
     entity "auth.users" as auth_users {
         * id : UUID <<PK>>
         --
         email : VARCHAR
         created_at : TIMESTAMPTZ
+    }
+
+    entity "admin_users" as admin_users {
+        * user_id : UUID <<PK, FK>>
+        --
+        (Sin RLS pública; evaluada por is_admin())
     }
 }
 
@@ -24,12 +30,11 @@ package "Núcleo de Usuarios y Consentimiento" {
     entity "profiles" as profiles {
         * id : UUID <<PK, FK>>
         --
-        display_name : VARCHAR(100)
-        profile_type : profile_type_enum
-        origin_country : VARCHAR(3)
-        current_municipality_code : VARCHAR(5) <<FK>>
-        language : VARCHAR(2)
-        role : user_role_enum
+        display_name : TEXT
+        profile_type : TEXT (NULL inicial; D11 propuesto)
+        origin_country : TEXT
+        current_municipality_code : TEXT <<FK>>
+        language : TEXT (DEFAULT 'es')
         created_at : TIMESTAMPTZ
         updated_at : TIMESTAMPTZ
     }
@@ -38,25 +43,24 @@ package "Núcleo de Usuarios y Consentimiento" {
         * id : UUID <<PK>>
         --
         user_id : UUID <<FK>>
-        doc_type : VARCHAR(50)
-        version : VARCHAR(20)
+        doc_type : TEXT
+        version : TEXT
         accepted_at : TIMESTAMPTZ
     }
 }
 
 package "División Político-Administrativa (DANE)" {
     entity "departments" as departments {
-        * code : VARCHAR(2) <<PK>>
+        * code : TEXT (regex ^[0-9]{2}$) <<PK>>
         --
-        name : VARCHAR(100)
-        is_available : BOOLEAN
+        name : TEXT
     }
 
     entity "municipalities" as municipalities {
-        * code : VARCHAR(5) <<PK>>
+        * code : TEXT (regex ^[0-9]{5}$) <<PK>>
         --
-        department_code : VARCHAR(2) <<FK>>
-        name : VARCHAR(100)
+        department_code : TEXT <<FK>>
+        name : TEXT
         is_pilot : BOOLEAN
     }
 
@@ -64,7 +68,7 @@ package "División Político-Administrativa (DANE)" {
         * id : UUID <<PK>>
         --
         user_id : UUID <<FK>>
-        municipality_code : VARCHAR(5) <<FK>>
+        municipality_code : TEXT <<FK>>
         created_at : TIMESTAMPTZ
     }
 }
@@ -85,9 +89,9 @@ package "Motor de Precios y Semáforo Estadístico" {
     entity "price_reports" as price_reports {
         * id : UUID <<PK>>
         --
-        user_id : UUID <<FK>>
+        user_id : UUID <<FK, NULL>> (ON DELETE SET NULL)
         category_id : VARCHAR(50) <<FK>>
-        municipality_code : VARCHAR(5) <<FK>>
+        municipality_code : TEXT <<FK>>
         amount_cop : INTEGER
         location : GEOGRAPHY(Point, 4326)
         place_name : VARCHAR(150)
@@ -101,7 +105,7 @@ package "Motor de Precios y Semáforo Estadístico" {
     entity "events" as events {
         * id : UUID <<PK>>
         --
-        municipality_code : VARCHAR(5) <<FK>>
+        municipality_code : TEXT <<FK>>
         name : VARCHAR(150)
         starts_at : TIMESTAMPTZ
         ends_at : TIMESTAMPTZ
@@ -130,7 +134,7 @@ package "Comercios y Directorio Local" {
         * id : UUID <<PK>>
         --
         owner_id : UUID <<FK>>
-        municipality_code : VARCHAR(5) <<FK>>
+        municipality_code : TEXT <<FK>>
         type : VARCHAR(50)
         name : VARCHAR(150)
         description_es : TEXT
@@ -169,7 +173,7 @@ package "Comercios y Directorio Local" {
     entity "city_content" as city_content {
         * id : UUID <<PK>>
         --
-        municipality_code : VARCHAR(5) <<FK>>
+        municipality_code : TEXT <<FK>>
         locale : VARCHAR(2)
         section : VARCHAR(50)
         title : VARCHAR(150)
@@ -179,8 +183,9 @@ package "Comercios y Directorio Local" {
     }
 }
 
-' Relaciones de Autenticación y Perfil
+' Relaciones de Autenticación y Autorización
 auth_users ||--|| profiles : "1:1 hereda identidad"
+auth_users ||--o| admin_users : "1:0..1 rol de administración aislado"
 auth_users ||--o{ consents : "1:N acepta"
 auth_users ||--o{ ai_usage : "1:N consume cuota diaria"
 auth_users ||--o{ interest_registrations : "1:N solicita apertura"
@@ -195,7 +200,7 @@ municipalities ||--o{ city_content : "1:N divulga cultura"
 municipalities ||--o{ interest_registrations : "1:N recibe interés"
 
 ' Relaciones de Precios
-auth_users ||--o{ price_reports : "1:N reporta"
+auth_users ||--o{ price_reports : "1:N reporta (anónimo si cuenta se elimina)"
 price_categories ||--o{ price_reports : "1:N clasifica"
 
 ' Relaciones de Negocios
