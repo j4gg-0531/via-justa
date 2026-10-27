@@ -1,0 +1,59 @@
+name: CI — Vía Justa
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Análisis estático, higiene y pruebas
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Configurar Flutter 3.47.7
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          channel: 'stable'
+          cache: true
+
+      - name: Descargar dependencias
+        run: flutter pub get
+
+      - name: Análisis estático (flutter analyze)
+        run: flutter analyze
+
+      - name: Verificación de paridad de traducciones (es / en)
+        run: flutter test test/translations_test.dart
+
+      - name: Verificación de Regla de Arquitectura 5.2 (AGENTS.md)
+        shell: bash
+        run: |
+          echo "Verificando ausencia de lógica de negocio en vistas de presentación..."
+          # Coincidencias en lib/**/presentation/ excluyendo presentation/state/
+          # La única excepción aceptada y documentada en AGENTS.md es el Timer del splash_page.dart
+          MATCHES=$(grep -rnE 'normalizeForSearch|search[A-Z]\w*\(|\.where\(|\.sort\(|firstWhere|jsonDecode|rootBundle|Timer|Future\.delayed' lib/ 2>/dev/null | grep '/presentation/' | grep -v '/presentation/state/' | grep -v 'lib/features/splash/presentation/pages/splash_page.dart' || true)
+          if [ -n "$MATCHES" ]; then
+            echo "ERROR: Violación de la regla 5.2 de AGENTS.md en capas de presentación:"
+            echo "$MATCHES"
+            exit 1
+          fi
+          echo "Regla 5.2 validada: Cero lógica de negocio no autorizada en vistas."
+
+      - name: Ejecutar suite de pruebas unitarias y de widgets (flutter test)
+        run: flutter test --coverage

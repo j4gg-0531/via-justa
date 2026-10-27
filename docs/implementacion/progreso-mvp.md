@@ -1,16 +1,15 @@
 # Progreso y Control de Cambios — Vía Justa MVP
 
 **Última actualización:** 27 de octubre de 2026  
-**Rama base inicial:** `main` (`c082ce81b51064bfbf630d558711fe226fc58434`)  
-**Rama VJ-00:** `feature/vj-00-baseline-inventario` — PR #4 publicado hacia `main` (actualizado tras revisión; pendiente de aprobación/merge).  
-**Rama de trabajo VJ-01:** `feature/vj-01-contrato-datos` — PR #5 publicado hacia `feature/vj-00-baseline-inventario` (actualizado tras revisión con reconciliación de backend; pendiente de aprobación/merge).  
+**Rama base inicial:** `main` (`294e169`) — PR #4 y PR #5 integrados.  
+**Rama de trabajo VJ-02:** `feature/vj-02-ci-higiene`  
 **Repositorio remoto:** `https://github.com/j4gg-0531/via-justa.git`  
 **Entorno de ejecución:** Windows 10/11 x64, PowerShell 5.1  
 **Gradle Wrapper:** 9.3.1 (`android/gradle/wrapper/gradle-wrapper.properties`)  
 **Android Gradle Plugin:** 9.1.0 (`android/settings.gradle.kts`)  
 **Kotlin:** 2.4.0 (`android/settings.gradle.kts`)  
 **JVM Target:** Java 17 (`android/app/build.gradle.kts`)  
-**Flutter SDK:** No disponible en PATH en la terminal actual (registrado como bloqueo de ejecución local).
+**Flutter SDK:** Flutter 3.47.7 (canal `stable`, Dart 3.13.5) instalado en `C:\Users\JUAN\flutter` y añadido al PATH de usuario.
 
 ---
 
@@ -18,9 +17,9 @@
 
 | ID | Prioridad | Rol | Tarea | Estado | Dependencias |
 |---|---|---|---|---|---|
-| **VJ-00** | P0 | Ambos | Inventario inicial, baseline reproducible y control de cambios | **REVISIÓN (PR #4)** | Ninguna |
-| **VJ-01** | P0 | Ambos | Decisiones, contrato con compañero, diagrama ER y gobierno | **REVISIÓN (PR #5)** | VJ-00 |
-| **VJ-02** | P0 | Frontend | Higiene técnica, README, CI y accesibilidad base | **PENDIENTE** | VJ-00 |
+| **VJ-00** | P0 | Ambos | Inventario inicial, baseline reproducible y control de cambios | **INTEGRADO (PR #4)** | Ninguna |
+| **VJ-01** | P0 | Ambos | Decisiones, contrato con compañero, diagrama ER y gobierno | **INTEGRADO (PR #5)** | VJ-00 |
+| **VJ-02** | P0 | Frontend | Higiene técnica, README, CI y accesibilidad base | **HECHO-VERIFICADO (PR #6)** | VJ-00, VJ-01 |
 | **VJ-03** | P0 | Frontend | Pantallas 7–9: shell con barra inferior de 5 pestañas | **PENDIENTE** | VJ-02 |
 | **VJ-04** | P1 | Ambos | Motor visual de semáforo demo: pantallas 10 y 11 | **PENDIENTE** | VJ-03 |
 | **VJ-05** | P1 | Frontend | Pantalla 12: aportar precio en 4 pasos demo | **PENDIENTE** | VJ-04 |
@@ -146,9 +145,11 @@
 
 ## 6. Estado de Pruebas Automatizadas
 
-- **Total de pruebas declaradas en código:** 66 pruebas distribuidas en 13 archivos dentro de `test/`.
-- **Estado de ejecución actual:** **NO EJECUTADAS EN ESTA SESIÓN** debido a la ausencia del ejecutable `flutter` en el PATH de la terminal Windows.
-- **Desglose de casos escritos:**
+- **Total de pruebas declaradas en código:** 72 pruebas distribuidas en 15 archivos dentro de `test/`.
+- **Estado de ejecución actual:** **72 PRUEBAS EJECUTADAS Y APROBADAS (100% ÉXITO)** con Flutter 3.47.7 (Dart 3.13.5).
+- **Análisis estático (`flutter analyze`):** 0 errores, 0 advertencias, 0 lints.
+- **Desglose de casos verificados:**
+  - `test/architecture_rules_test.dart`: 1 caso (validación automatizada de regla 5.2 de `AGENTS.md`)
   - `test/auth_pages_test.dart`: 2 casos
   - `test/auth_validators_test.dart`: 16 casos
   - `test/department_search_test.dart`: 4 casos
@@ -161,4 +162,5 @@
   - `test/municipality_search_test.dart`: 11 casos
   - `test/register_form_provider_test.dart`: 5 casos
   - `test/session_providers_test.dart`: 2 casos
-  - `test/translations_test.dart`: 1 caso
+  - `test/theme_accessibility_test.dart`: 5 casos (contrastes WCAG 2.1 AA y tamaño táctil >= 48 dp)
+  - `test/translations_test.dart`: 1 caso (paridad de 60 claves es/en)
