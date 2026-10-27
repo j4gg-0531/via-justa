@@ -9,6 +9,10 @@ class _UserNameNotifier extends Notifier<String?> {
   void setName(String name) {
     state = name;
   }
+
+  void clear() {
+    state = null;
+  }
 }
 
 final userNameProvider = NotifierProvider<_UserNameNotifier, String?>(
