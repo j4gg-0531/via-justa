@@ -31,6 +31,10 @@ class _SelectedMunicipalityNotifier extends Notifier<Municipality?> {
   void select(Municipality municipality) {
     state = municipality;
   }
+
+  void clear() {
+    state = null;
+  }
 }
 
 /// Proveedor del municipio seleccionado.
@@ -46,6 +50,10 @@ class _MunicipalityQueryNotifier extends Notifier<String> {
 
   void setQuery(String value) {
     state = value;
+  }
+
+  void clear() {
+    state = '';
   }
 }
 
@@ -73,6 +81,10 @@ class _MunicipalityInterestNotifier extends Notifier<Set<String>> {
 
   void register(String municipalityCode) {
     state = {...state, municipalityCode};
+  }
+
+  void clear() {
+    state = const <String>{};
   }
 }
 

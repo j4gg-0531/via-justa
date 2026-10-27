@@ -17,6 +17,10 @@ class BusinessCategoryNotifier extends Notifier<BusinessCategory?> {
   void selectCategory(BusinessCategory? category) {
     state = category;
   }
+
+  void clear() {
+    state = null;
+  }
 }
 
 /// Provider de la categoría activa de negocio.

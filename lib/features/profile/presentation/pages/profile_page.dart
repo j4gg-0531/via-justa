@@ -390,7 +390,7 @@ class ProfilePage extends ConsumerWidget {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    ref.read(userNameProvider.notifier).clear();
+                    ref.read(sessionControllerProvider).signOut();
                     try {
                       context.go(AppRoutes.welcome);
                     } catch (_) {}

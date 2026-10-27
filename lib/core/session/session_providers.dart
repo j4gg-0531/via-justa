@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:via_justa/core/demo/demo_data.dart';
+import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
+import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
+import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
 
 /// Nombre que el usuario escribió al crear su cuenta (null si no se registró).
 class _UserNameNotifier extends Notifier<String?> {
@@ -22,4 +25,26 @@ final userNameProvider = NotifierProvider<_UserNameNotifier, String?>(
 /// Nombre para mostrar: el registrado o, si no hay, el de ejemplo (DEMO).
 final displayNameProvider = Provider<String>((ref) {
   return ref.watch(userNameProvider) ?? DemoData.userName;
+});
+
+/// Controlador centralizado de sesión para gestionar el ciclo de vida del estado de usuario (DEMO).
+class SessionController {
+  const SessionController(this._ref);
+
+  final Ref _ref;
+
+  /// Restablece íntegramente el estado DEMO de la sesión:
+  /// nombre, perfil, municipio seleccionado, intereses registrados y filtros de búsqueda.
+  void signOut() {
+    _ref.read(userNameProvider.notifier).clear();
+    _ref.read(profileTypeProvider.notifier).clear();
+    _ref.read(selectedMunicipalityProvider.notifier).clear();
+    _ref.read(municipalityInterestProvider.notifier).clear();
+    _ref.read(businessSearchQueryProvider.notifier).clear();
+    _ref.read(businessCategoryProvider.notifier).clear();
+  }
+}
+
+final sessionControllerProvider = Provider<SessionController>((ref) {
+  return SessionController(ref);
 });

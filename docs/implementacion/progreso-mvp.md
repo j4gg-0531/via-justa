@@ -10,7 +10,7 @@
 **Kotlin:** 2.4.0 (`android/settings.gradle.kts`)  
 **JVM Target:** Java 17 (`android/app/build.gradle.kts`)  
 **Flutter SDK:** Flutter 3.47.7 (canal `stable`, Dart 3.13.5) instalado en `C:\Users\JUAN\flutter` y añadido al PATH de usuario.  
-**Suite de pruebas:** 92 pruebas automatizadas ejecutadas y 92 aprobadas (100% éxito).
+**Suite de pruebas:** 93 pruebas automatizadas ejecutadas y 93 aprobadas (100% éxito).
 
 ---
 

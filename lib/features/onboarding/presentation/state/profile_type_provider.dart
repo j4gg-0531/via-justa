@@ -8,6 +8,10 @@ class ProfileTypeNotifier extends Notifier<ProfileType?> {
   void select(ProfileType type) {
     state = type;
   }
+
+  void clear() {
+    state = null;
+  }
 }
 
 final profileTypeProvider = NotifierProvider<ProfileTypeNotifier, ProfileType?>(
