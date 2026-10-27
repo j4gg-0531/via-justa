@@ -146,7 +146,7 @@ package "Comercios y Directorio Local" {
         whatsapp_consent_at : TIMESTAMPTZ
         order_url : TEXT
         hours : JSONB
-        status : business_status_enum
+        status : TEXT [pending|approved|rejected]
         rejection_reason : TEXT
         created_at : TIMESTAMPTZ
     }

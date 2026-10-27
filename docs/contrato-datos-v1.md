@@ -12,13 +12,14 @@
 2. **Nombres:** Tablas en plural y snake_case (`price_reports`, `businesses`). Columnas en snake_case (`created_at`, `amount_cop`).
 3. **Moneda:** Pesos colombianos (COP) almacenados como enteros positivos (`INTEGER` o `BIGINT`), sin centavos.
 4. **Fechas:** Con zona horaria estricta (`TIMESTAMPTZ`), por defecto `now()`.
-5. **Tipos Enumerados (Enums):**
-   ```sql
-   CREATE TYPE profile_type_enum AS ENUM ('visitor', 'settler', 'resident');
-   CREATE TYPE business_status_enum AS ENUM ('pending', 'approved', 'rejected');
-   CREATE TYPE verdict_level_enum AS ENUM ('insufficient', 'green', 'yellow', 'red');
-   CREATE TYPE user_role_enum AS ENUM ('authenticated_user', 'admin');
-   ```
+5. **Tipos Enumerados y Restricciones de Dominio:**
+   - En las migraciones reales del backend (`20261027151910_profiles_and_consents.sql`), las restricciones de dominio se implementan mediante columnas `TEXT` con restricciones `CHECK` para facilitar el mantenimiento y evitar bloqueos de esquema:
+     - `profile_type`: `TEXT CHECK (profile_type in ('visitor', 'settler'))` (implementado en migración; inclusión de `'resident'` **PROPUESTA** en D11).
+     - `language`: `TEXT CHECK (language in ('es', 'en'))` (implementado con valor por defecto `'es'`).
+   - Para entidades posteriores planificadas:
+     - `business_status`: `TEXT CHECK (status in ('pending', 'approved', 'rejected'))` (planificado para VJ-16).
+     - `verdict_level`: valor de texto retornado por la función de semáforo (`'insufficient'`, `'green'`, `'yellow'`, `'red'`).
+   - **Eliminación de `user_role_enum`:** Se elimina formalmente cualquier tipo de rol en `profiles`. La pertenencia a administración vive exclusivamente en la tabla `public.admin_users` evaluada por la función `public.is_admin()`.
 
 ---
 
@@ -60,20 +61,19 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
   $$;
   ```
 
-#### Políticas de Privacidad y Control a Nivel de Columna en `profiles`
-1. **Lectura privada:** La política RLS existente `profiles_select_own` restringe la lectura al propio usuario (`id = auth.uid()`).
-2. **Proyección pública:** Para mostrar nombres en reportes comunitarios o comercios sin exponer datos privados (idioma, país, municipio), se proyecta una función segura:
-   ```sql
-   CREATE OR REPLACE FUNCTION public.get_public_author_name(p_user_id UUID)
-   RETURNS TEXT LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
-     SELECT coalesce(display_name, 'Usuario Comunitario') FROM public.profiles WHERE id = p_user_id;
-   $$;
-   ```
-3. **Protección de columnas contra alteración:**
-   ```sql
-   REVOKE UPDATE ON public.profiles FROM authenticated;
-   GRANT UPDATE (display_name, origin_country, current_municipality_code, language, profile_type) ON public.profiles TO authenticated;
-   ```
+#### Políticas de Privacidad, Autoría y Control de Columnas en `profiles`
+1. **Lectura privada [IMPLEMENTADO]:** La política RLS existente `profiles_select_own` en `20261027151910_profiles_and_consents.sql` restringe estrictamente la lectura al propio usuario (`id = auth.uid()`).
+2. **Auditoría de autoría y descarte de `get_public_author_name()`:**
+   - **Evaluación de riesgos de seguridad:** Se auditó la propuesta de exponer `get_public_author_name(p_user_id UUID)` con `SECURITY DEFINER` y permisos `EXECUTE`. Esta función permitiría que cualquier cliente (incluso no autenticado o autenticado con fines maliciosos) consulte UUIDs arbitrarios en bucle, facilitando la **cosecha masiva de identidades y nombres reales (PII)** eludiendo la política RLS.
+   - **Decisión arquitectónica:** En el MVP, los aportes a la base de precios son datos agregados para cálculo estadístico (mediana) y no requieren mostrar la identidad del autor a terceros. Por tanto, el nombre del autor permanece **estrictamente privado** y la función queda **[POSPUESTA / FUERA DE MVP]**. Cada usuario únicamente consulta sus propios aportes mediante RLS (`using (user_id = auth.uid())`).
+3. **Restricción de actualización: RLS implementado vs. GRANTs propuestos:**
+   - **RLS a nivel de fila [IMPLEMENTADO]:** La política `profiles_update_own` en la migración de Isaac garantiza que solo el dueño del registro pueda ejecutar `UPDATE` sobre su fila (`using (id = auth.uid()) with check (id = auth.uid())`).
+   - **GRANTs a nivel de columna [PROPUESTO para VJ-07/VJ-08]:** Como mecanismo adicional de defensa en profundidad para evitar que se intenten modificar columnas inmutables o de auditoría, se propone para VJ-07 la siguiente configuración de privilegios (pendiente de incorporar por backend):
+     ```sql
+     -- Propuesta de defensa en profundidad (pendiente de acuerdo con Isaac en VJ-07):
+     REVOKE UPDATE ON public.profiles FROM authenticated;
+     GRANT UPDATE (display_name, origin_country, current_municipality_code, language, profile_type) ON public.profiles TO authenticated;
+     ```
 
 ---
 
@@ -157,7 +157,12 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
   | `source_note` | `VARCHAR(255)` | NULL | Fuente u observación (ej. "Factura local", "Observación en terminal") |
   | `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha y hora del reporte |
 
-> **Tratamiento ante eliminación de cuenta (Habeas Data):** Cuando un usuario ejerce su derecho de supresión de cuenta en `auth.users`, la clave foránea `user_id` pasa a `NULL` mediante `ON DELETE SET NULL`. Esto desvincula todo dato personal (PII) pero conserva intacto el registro numérico (`amount_cop`), la categoría y la fecha, evitando destruir el histórico estadístico necesario para calcular la mediana comunitaria de precios.
+> **Tratamiento ante eliminación de cuenta (Habeas Data - Ley 1581 de 2012):**  
+> La desvinculación relacional mediante `ON DELETE SET NULL` sobre `price_reports.user_id` es indispensable pero **no garantiza por sí sola la anonimización completa** si persisten datos contextuales reidentificables. Por tanto, el protocolo de supresión de cuenta exige:
+> 1. **Desvinculación relacional:** `price_reports.user_id` se fija en `NULL`.
+> 2. **Depuración de texto libre (Scrubbing de PII):** Se vacía el campo `source_note` (`UPDATE price_reports SET source_note = NULL WHERE user_id = ...`) para erradicar nombres, números telefónicos o descripciones personales que el usuario haya ingresado.
+> 3. **Disociación espacial:** Si el reporte contiene coordenadas GPS de alta precisión (`location`) correspondientes a ubicaciones domiciliarias o privadas, se disocian o generalizan al centroide municipal, conservando únicamente `municipality_code` y `category_id`.
+> 4. **Garantía estadística irreversible:** El registro histórico restante en la ventana de 60 días queda disociado de forma irreversible `{municipality_code, category_id, amount_cop, created_at}`, impidiendo cualquier reidentificación directa o indirecta del titular conforme a las directrices de la SIC.
 - **Índices obligatorios:**
   - `CREATE INDEX idx_price_reports_stat ON price_reports(municipality_code, category_id, created_at) WHERE is_hidden = false AND is_demo = false;`
   - `CREATE INDEX idx_price_reports_location ON price_reports USING GIST(location);`
@@ -241,7 +246,7 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
   | `whatsapp_consent_at`| `TIMESTAMPTZ` | NOT NULL | Consentimiento para enlace comercial wa.me |
   | `order_url` | `TEXT` | NULL | Enlace opcional a carta o sistema de pedidos externo |
   | `hours` | `JSONB` | NULL | Estructura de horarios de atención |
-  | `status` | `business_status_enum` | NOT NULL DEFAULT 'pending' | Estado: `pending`, `approved`, `rejected` |
+  | `status` | `TEXT` | NOT NULL DEFAULT 'pending', CHECK (status in ('pending', 'approved', 'rejected')) | Estado: `pending`, `approved`, `rejected` |
   | `rejection_reason` | `TEXT` | NULL | Motivo de rechazo en caso de no aprobación |
   | `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha de registro |
 - **Índices:**

@@ -38,9 +38,12 @@ Los controles de seguridad y privacidad se clasifican rigurosamente según su es
 
 ### 2.5 Eliminación de Cuenta y Tratamiento de Reportes (RF-06)
 - El usuario puede solicitar la eliminación definitiva de su cuenta desde la pantalla de Perfil **[PROPUESTO]**.
-- **Estrategia de Desvinculación de Datos (Habeas Data):**
+- **Estrategia de Anonimización Integral (Habeas Data - Ley 1581 de 2012):**
   - La eliminación borra el registro en `auth.users`, lo que desencadena la eliminación en cascada (`ON DELETE CASCADE`) de su registro en `profiles` y de sus solicitudes en `interest_registrations`.
-  - **Conservación Estadística sin PII:** Para evitar destruir el histórico comunitario de precios (mediana de 60 días), la clave foránea `price_reports.user_id` utiliza `ON DELETE SET NULL`. De este modo, el registro de precio se conserva anonimizado sin almacenar ningún identificador de usuario ni rastro personal **[PROPUESTO / PENDIENTE DE PRUEBA]**.
+  - **Desvinculación relacional y depuración de PII [PROPUESTO]:** La clave foránea `price_reports.user_id` utiliza `ON DELETE SET NULL`. Sin embargo, para satisfacer los estándares de la Ley 1581 de 2012 y garantizar la anonimización completa:
+    1. Se vacían los campos de texto libre (`source_note = NULL`) para impedir la persistencia de nombres o datos identificables introducidos por el usuario.
+    2. Las coordenadas geográficas exactas (`location`) de reportes asociados a domicilios privados se disocian o generalizan al centroide municipal, conservando únicamente `municipality_code` y `category_id`.
+    3. El registro numérico histórico (`amount_cop`, fecha y categoría) se preserva de manera irreversiblemente disociada para el cálculo de la mediana comunitaria de 60 días.
 
 ---
 
@@ -64,7 +67,7 @@ Todas las tablas de la base de datos deben tener RLS activado de forma obligator
 | Tabla | Operación | Rol Permitido | Condición de Política RLS | Estado |
 |---|---|---|---|---|
 | `profiles` | SELECT | `authenticated` | `id = auth.uid()` (lectura privada de perfil propio) | **[IMPLEMENTADO EN feature/supabase-init]** |
-| `profiles` | UPDATE | `authenticated` | `id = auth.uid()` (solo datos propios; columnas restringidas por GRANT) | **[IMPLEMENTADO EN feature/supabase-init]** |
+| `profiles` | UPDATE | `authenticated` | `id = auth.uid()` (solo fila propia mediante política RLS; restricciones por columna por GRANT son propuestas) | **[IMPLEMENTADO EN feature/supabase-init]** |
 | `admin_users` | ALL | `service_role` | Sin políticas para anon/authenticated; evaluada por `is_admin()` | **[IMPLEMENTADO EN feature/supabase-init]** |
 | `consents` | SELECT | `authenticated` | `auth.uid() = user_id` | **[IMPLEMENTADO EN feature/supabase-init]** |
 | `consents` | INSERT | `authenticated` | `auth.uid() = user_id` | **[IMPLEMENTADO EN feature/supabase-init]** |
@@ -80,13 +83,18 @@ Todas las tablas de la base de datos deben tener RLS activado de forma obligator
 | `interest_registrations` | INSERT | `authenticated` | `auth.uid() = user_id` | **[PROPUESTO]** |
 
 ### 4.1 Separación Administrativa y Prevención de Escalada de Privilegios
-- Siguiendo la arquitectura implementada por backend en `admin_users`, **los usuarios no poseen columna de rol en `profiles`**.
-- La pertenencia a `admin_users` se administra directamente en el servidor sin políticas RLS públicas.
-- Para proteger las columnas de `profiles` contra modificaciones arbitrarias, se complementa RLS con permisos a nivel de columna:
-  ```sql
-  REVOKE UPDATE ON public.profiles FROM authenticated;
-  GRANT UPDATE (display_name, origin_country, current_municipality_code, language, profile_type) ON public.profiles TO authenticated;
-  ```
+- Siguiendo la arquitectura implementada por backend en `admin_users`, **los usuarios no poseen columna de rol en `profiles`** **[IMPLEMENTADO]**.
+- La pertenencia a `admin_users` se administra directamente en el servidor sin políticas RLS públicas y es evaluada mediante la función segura `public.is_admin()` **[IMPLEMENTADO]**.
+- **Distinción entre RLS y permisos a nivel de columna:**
+  - La migración `20261027151910_profiles_and_consents.sql` implementa la política RLS a nivel de fila `profiles_update_own` (`using (id = auth.uid()) with check (id = auth.uid())`) **[IMPLEMENTADO]**.
+  - La restricción de actualización por columna mediante permisos SQL GRANT es una propuesta de defensa en profundidad para VJ-07 **[PROPUESTO]**, que impedirá modificar columnas del sistema:
+    ```sql
+    -- Propuesta complementaria para VJ-07 (a incorporar por backend):
+    REVOKE UPDATE ON public.profiles FROM authenticated;
+    GRANT UPDATE (display_name, origin_country, current_municipality_code, language, profile_type) ON public.profiles TO authenticated;
+    ```
+- **Auditoría de autoría y descarte de funciones públicas:**
+  - Se evaluó y descartó la creación de funciones `SECURITY DEFINER` de consulta de nombres por UUID (como `get_public_author_name()`), dado que facilitan la enumeración y cosecha masiva de PII eludiendo RLS. En el MVP, los aportes a precios son agregados estadísticos y la identidad del autor permanece **estrictamente privada** **[DECISIÓN DE SEGURIDAD]**.
 
 ---
 
