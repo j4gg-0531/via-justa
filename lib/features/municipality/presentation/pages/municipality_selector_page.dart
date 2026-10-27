@@ -11,27 +11,17 @@ import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/core/widgets/vj_search_field.dart';
 import 'package:via_justa/features/map_colombia/domain/department.dart';
 import 'package:via_justa/features/municipality/domain/municipality.dart';
-import 'package:via_justa/features/municipality/domain/municipality_search.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 
 /// Pantalla 4 · Selector de municipios de un departamento.
-class MunicipalitySelectorPage extends ConsumerStatefulWidget {
+class MunicipalitySelectorPage extends ConsumerWidget {
   const MunicipalitySelectorPage({super.key, required this.departmentCode});
 
   final String departmentCode;
 
   @override
-  ConsumerState<MunicipalitySelectorPage> createState() =>
-      _MunicipalitySelectorPageState();
-}
-
-class _MunicipalitySelectorPageState
-    extends ConsumerState<MunicipalitySelectorPage> {
-  String _query = '';
-
-  @override
-  Widget build(BuildContext context) {
-    final department = Departments.byCode(widget.departmentCode);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final department = Departments.byCode(departmentCode);
     final textTheme = Theme.of(context).textTheme;
 
     if (department == null) {
@@ -55,9 +45,9 @@ class _MunicipalitySelectorPageState
     }
 
     final asyncMunicipalities = ref.watch(
-      municipalitiesByDepartmentProvider(widget.departmentCode),
+      filteredMunicipalitiesProvider(departmentCode),
     );
-    final hasQuery = _query.trim().isNotEmpty;
+    final hasQuery = ref.watch(municipalityQueryProvider).trim().isNotEmpty;
 
     return Scaffold(
       body: CustomScrollView(
@@ -66,7 +56,9 @@ class _MunicipalitySelectorPageState
           SliverToBoxAdapter(
             child: _HeaderWithSearch(
               department: department,
-              onQueryChanged: (value) => setState(() => _query = value),
+              onQueryChanged: ref
+                  .read(municipalityQueryProvider.notifier)
+                  .setQuery,
             ),
           ),
           SliverToBoxAdapter(
@@ -92,19 +84,14 @@ class _MunicipalitySelectorPageState
                               label: 'common.retry'.tr(),
                               onPressed: () => ref.invalidate(
                                 municipalitiesByDepartmentProvider(
-                                  widget.departmentCode,
+                                  departmentCode,
                                 ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      data: (municipalities) {
-                        final filtered = searchMunicipalities(
-                          municipalities,
-                          _query,
-                        );
-
+                      data: (filtered) {
                         if (filtered.isEmpty) {
                           return Padding(
                             padding: const EdgeInsets.all(AppSpacing.xl),
