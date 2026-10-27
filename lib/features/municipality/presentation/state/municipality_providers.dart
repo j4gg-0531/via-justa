@@ -16,6 +16,13 @@ final municipalitiesByDepartmentProvider =
   return repository.getByDepartment(departmentCode);
 });
 
+/// Municipio resuelto por código (funciona aunque la ruta se abra directo).
+final municipalityByCodeProvider =
+    FutureProvider.autoDispose.family<Municipality?, String>((ref, code) {
+  final repository = ref.watch(municipalityRepositoryProvider);
+  return repository.getByCode(code);
+});
+
 /// Notificador del municipio seleccionado (para "ubicación actual").
 class _SelectedMunicipalityNotifier extends Notifier<Municipality?> {
   @override
@@ -57,3 +64,19 @@ final filteredMunicipalitiesProvider = Provider.autoDispose
   );
   return municipalities.whenData((all) => searchMunicipalities(all, query));
 });
+
+/// Códigos de municipios en los que el usuario pidió ser notificado.
+/// Solo en memoria: no hay persistencia ni notificaciones en el avance.
+class _MunicipalityInterestNotifier extends Notifier<Set<String>> {
+  @override
+  Set<String> build() => const <String>{};
+
+  void register(String municipalityCode) {
+    state = {...state, municipalityCode};
+  }
+}
+
+final municipalityInterestProvider =
+    NotifierProvider<_MunicipalityInterestNotifier, Set<String>>(
+  _MunicipalityInterestNotifier.new,
+);

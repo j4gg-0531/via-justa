@@ -1,0 +1,175 @@
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:via_justa/core/router/app_router.dart';
+import 'package:via_justa/core/theme/app_colors.dart';
+import 'package:via_justa/core/theme/app_spacing.dart';
+import 'package:via_justa/core/widgets/vj_button.dart';
+import 'package:via_justa/core/widgets/vj_text_field.dart';
+import 'package:via_justa/features/auth/presentation/state/register_form_provider.dart';
+import 'package:via_justa/features/auth/presentation/widgets/auth_error_texts.dart';
+import 'package:via_justa/features/auth/presentation/widgets/legal_text.dart';
+import 'package:via_justa/features/auth/presentation/widgets/or_divider.dart';
+
+/// Pantalla de creación de cuenta (interfaz de ejemplo con validación local).
+class RegisterPage extends ConsumerStatefulWidget {
+  const RegisterPage({super.key});
+
+  @override
+  ConsumerState<RegisterPage> createState() => _RegisterPageState();
+}
+
+class _RegisterPageState extends ConsumerState<RegisterPage> {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final isValid = ref.read(registerFormProvider.notifier).submit();
+    if (!isValid) return;
+
+    context.push(AppRoutes.onboarding);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(registerFormProvider);
+    final notifier = ref.read(registerFormProvider.notifier);
+    final textTheme = Theme.of(context).textTheme;
+
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+          child: Column(
+            children: [
+              const SizedBox(height: AppSpacing.sm),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  tooltip: 'common.back'.tr(),
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => context.pop(),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.surface,
+                    foregroundColor: AppColors.textPrimary,
+                    minimumSize: const Size(48, 48),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: AppSpacing.lg),
+                      Text(
+                        'register.title'.tr(),
+                        style: textTheme.headlineMedium,
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      VjTextField(
+                        label: 'auth.name'.tr(),
+                        controller: _nameController,
+                        onChanged: notifier.setName,
+                        errorText: nameErrorText(state.nameError),
+                        keyboardType: TextInputType.name,
+                        textCapitalization: TextCapitalization.words,
+                        textInputAction: TextInputAction.next,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      VjTextField(
+                        label: 'auth.email'.tr(),
+                        controller: _emailController,
+                        onChanged: notifier.setEmail,
+                        errorText: emailErrorText(state.emailError),
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      VjTextField(
+                        label: 'auth.password'.tr(),
+                        controller: _passwordController,
+                        onChanged: notifier.setPassword,
+                        errorText: passwordErrorText(state.passwordError),
+                        obscureText: state.obscurePassword,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _submit(),
+                        suffixIcon: IconButton(
+                          tooltip: state.obscurePassword
+                              ? 'auth.show_password'.tr()
+                              : 'auth.hide_password'.tr(),
+                          icon: Icon(
+                            state.obscurePassword
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                          ),
+                          onPressed: notifier.toggleObscurePassword,
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(48, 48),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      CheckboxListTile(
+                        value: state.termsAccepted,
+                        onChanged: (value) =>
+                            notifier.setTermsAccepted(value ?? false),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                        title: LegalText(prefix: 'register.accept_prefix'.tr()),
+                      ),
+                      if (state.termsError)
+                        Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.xs),
+                          child: Text(
+                            'auth.error.terms_required'.tr(),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: AppSpacing.lg),
+                      VjButton(
+                        label: 'register.submit'.tr(),
+                        onPressed: _submit,
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      const OrDivider(),
+                      const SizedBox(height: AppSpacing.xl),
+                      VjButton(
+                        label: 'login.google'.tr(),
+                        variant: VjButtonVariant.outlined,
+                        onPressed: () => context.push(AppRoutes.onboarding),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      Center(
+                        child: Text(
+                          'auth.demo_note'.tr(),
+                          style: textTheme.bodySmall,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

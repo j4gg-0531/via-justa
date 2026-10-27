@@ -41,6 +41,16 @@ class _FakeMunicipalityRepository implements MunicipalityRepository {
     }
     return Future.value(_municipalities);
   }
+
+  @override
+  Future<Municipality?> getByCode(String code) async {
+    for (final municipality in _municipalities) {
+      if (municipality.code == code) {
+        return municipality;
+      }
+    }
+    return null;
+  }
 }
 
 void main() {
@@ -109,6 +119,22 @@ void main() {
 
       expect(result.isLoading, isTrue);
       expect(result, isA<AsyncLoading<List<Municipality>>>());
+    });
+
+    test('resolves a municipality by code and returns null when unknown',
+        () async {
+      container.listen(municipalityByCodeProvider('20001'), (_, _) {});
+      container.listen(municipalityByCodeProvider('99999'), (_, _) {});
+
+      final existing = await container.read(
+        municipalityByCodeProvider('20001').future,
+      );
+      final missing = await container.read(
+        municipalityByCodeProvider('99999').future,
+      );
+
+      expect(existing, _municipalities[0]);
+      expect(missing, isNull);
     });
   });
 }

@@ -22,7 +22,7 @@ class _SplashPageState extends State<SplashPage> {
     super.initState();
     _timer = Timer(const Duration(milliseconds: 1800), () {
       if (mounted) {
-        context.go(AppRoutes.login);
+        context.go(AppRoutes.welcome);
       }
     });
   }
@@ -61,10 +61,7 @@ class _SplashPageState extends State<SplashPage> {
                 semanticLabel: 'app.name'.tr(),
               ),
               const SizedBox(height: AppSpacing.lg),
-              Text(
-                'app.name'.tr(),
-                style: textTheme.headlineMedium,
-              ),
+              Text('app.name'.tr(), style: textTheme.headlineMedium),
             ],
           ),
         ),
