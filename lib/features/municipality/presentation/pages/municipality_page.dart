@@ -8,7 +8,7 @@ import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
-import 'package:via_justa/features/map_colombia/domain/department.dart';
+import 'package:via_justa/features/map_colombia/presentation/state/map_providers.dart';
 import 'package:via_justa/features/municipality/domain/municipality.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 
@@ -64,7 +64,7 @@ class _MunicipalityScaffold extends StatelessWidget {
                   if (context.canPop()) {
                     context.pop();
                   } else {
-                    context.go(AppRoutes.map);
+                    context.go(AppRoutes.departmentMap);
                   }
                 },
                 style: IconButton.styleFrom(
@@ -105,7 +105,8 @@ class _PilotView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
-    final departmentName = Departments.byCode(municipality.departmentCode)
+    final departmentName = ref
+        .watch(departmentByCodeProvider(municipality.departmentCode))
         ?.name;
 
     return _MunicipalityScaffold(
@@ -166,11 +167,12 @@ class _NotPilotView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
-    final departmentName = Departments.byCode(municipality.departmentCode)
+    final departmentName = ref
+        .watch(departmentByCodeProvider(municipality.departmentCode))
         ?.name;
-    final interested = ref
-        .watch(municipalityInterestProvider)
-        .contains(municipality.code);
+    final interested = ref.watch(
+      isMunicipalityInterestedProvider(municipality.code),
+    );
 
     return _MunicipalityScaffold(
       action: interested
@@ -248,7 +250,7 @@ class _NotFoundView extends StatelessWidget {
                     if (context.canPop()) {
                       context.pop();
                     } else {
-                      context.go(AppRoutes.map);
+                      context.go(AppRoutes.departmentMap);
                     }
                   },
                 ),

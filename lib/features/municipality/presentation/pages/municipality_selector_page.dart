@@ -10,6 +10,7 @@ import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/core/widgets/vj_search_field.dart';
 import 'package:via_justa/features/map_colombia/domain/department.dart';
+import 'package:via_justa/features/map_colombia/presentation/state/map_providers.dart';
 import 'package:via_justa/features/municipality/domain/municipality.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 
@@ -21,7 +22,7 @@ class MunicipalitySelectorPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final department = Departments.byCode(departmentCode);
+    final department = ref.watch(departmentByCodeProvider(departmentCode));
     final textTheme = Theme.of(context).textTheme;
 
     if (department == null) {
@@ -47,7 +48,7 @@ class MunicipalitySelectorPage extends ConsumerWidget {
     final asyncMunicipalities = ref.watch(
       filteredMunicipalitiesProvider(departmentCode),
     );
-    final hasQuery = ref.watch(municipalityQueryProvider).trim().isNotEmpty;
+    final hasQuery = ref.watch(hasMunicipalityQueryProvider);
 
     return Scaffold(
       body: CustomScrollView(

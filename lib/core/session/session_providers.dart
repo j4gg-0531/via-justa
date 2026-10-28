@@ -3,6 +3,8 @@ import 'package:via_justa/core/demo/demo_data.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
+import 'package:via_justa/features/prices/presentation/state/price_map_providers.dart';
+import 'package:via_justa/features/scan/presentation/state/scan_providers.dart';
 
 /// Nombre que el usuario escribió al crear su cuenta (null si no se registró).
 class _UserNameNotifier extends Notifier<String?> {
@@ -24,7 +26,11 @@ final userNameProvider = NotifierProvider<_UserNameNotifier, String?>(
 
 /// Nombre para mostrar: el registrado o, si no hay, el de ejemplo (DEMO).
 final displayNameProvider = Provider<String>((ref) {
-  return ref.watch(userNameProvider) ?? DemoData.userName;
+  final raw = ref.watch(userNameProvider)?.trim();
+  if (raw == null || raw.isEmpty) {
+    return DemoData.userName;
+  }
+  return raw;
 });
 
 /// Controlador centralizado de sesión para gestionar el ciclo de vida del estado de usuario (DEMO).
@@ -42,6 +48,9 @@ class SessionController {
     _ref.read(municipalityInterestProvider.notifier).clear();
     _ref.read(businessSearchQueryProvider.notifier).clear();
     _ref.read(businessCategoryProvider.notifier).clear();
+    _ref.read(priceMapSearchQueryProvider.notifier).clear();
+    _ref.read(priceMapCategoryProvider.notifier).clear();
+    _ref.read(scanModeProvider.notifier).reset();
   }
 }
 

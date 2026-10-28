@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:via_justa/features/scan/presentation/pages/scan_page.dart';
 
 Widget _buildScanPage() {
-  return const MaterialApp(
-    home: ScanPage(),
+  return const ProviderScope(
+    child: MaterialApp(
+      home: ScanPage(),
+    ),
   );
 }
 

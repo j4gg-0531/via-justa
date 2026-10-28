@@ -10,7 +10,8 @@ import 'package:via_justa/core/widgets/vj_search_field.dart';
 import 'package:via_justa/features/map_colombia/domain/department.dart';
 import 'package:via_justa/features/map_colombia/presentation/state/map_providers.dart';
 
-/// Pantalla 3 · Mapa de departamentos con buscador.
+/// Pantalla 3 (M03) · Mapa de departamentos de Colombia con buscador.
+/// Se muestra en el registro inicial (tras onboarding) o al cambiar de ubicación, sin barra inferior.
 class MapPage extends ConsumerStatefulWidget {
   const MapPage({super.key});
 
@@ -66,14 +67,15 @@ class _MapPageState extends ConsumerState<MapPage> {
 
   @override
   Widget build(BuildContext context) {
-    final query = ref.watch(departmentQueryProvider);
+    final hasQuery = ref.watch(hasDepartmentQueryProvider);
     final suggestions = ref.watch(filteredDepartmentsProvider);
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
+      backgroundColor: AppColors.border,
       body: Stack(
         children: [
-          // Mapa con zoom y pan
+          // Mapa con zoom y pan sobre fondo uniforme
           Semantics(
             label: 'map.semantics'.tr(),
             child: InteractiveViewer(
@@ -129,7 +131,7 @@ class _MapPageState extends ConsumerState<MapPage> {
             ),
           ),
 
-          // Buscador flotante arriba con botón de retorno condicional
+          // Buscador flotante arriba con botón de retorno
           Positioned(
             top: 0,
             left: 0,
@@ -139,19 +141,23 @@ class _MapPageState extends ConsumerState<MapPage> {
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 child: Row(
                   children: [
-                    if (context.canPop()) ...[
-                      IconButton(
-                        tooltip: 'common.back'.tr(),
-                        icon: const Icon(Icons.arrow_back),
-                        onPressed: () => context.pop(),
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppColors.surface,
-                          foregroundColor: AppColors.textPrimary,
-                          minimumSize: const Size(48, 48),
-                        ),
+                    IconButton(
+                      tooltip: 'common.back'.tr(),
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go(AppRoutes.onboarding);
+                        }
+                      },
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.surface,
+                        foregroundColor: AppColors.textPrimary,
+                        minimumSize: const Size(48, 48),
                       ),
-                      const SizedBox(width: AppSpacing.sm),
-                    ],
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: VjSearchField(
                         hint: 'map.search_hint'.tr(),
@@ -166,7 +172,7 @@ class _MapPageState extends ConsumerState<MapPage> {
           ),
 
           // Sugerencias del buscador
-          if (query.trim().isNotEmpty)
+          if (hasQuery)
             Positioned(
               top: 100,
               left: AppSpacing.lg,
@@ -184,17 +190,18 @@ class _MapPageState extends ConsumerState<MapPage> {
                       )
                     : Column(
                         mainAxisSize: MainAxisSize.min,
-                        children: suggestions.map((dept) {
-                          return ListTile(
-                            title: Text(dept.name),
-                            onTap: () {
-                              _onDepartmentTap(dept);
-                              ref
-                                  .read(departmentQueryProvider.notifier)
-                                  .setQuery('');
-                            },
-                          );
-                        }).toList(),
+                        children: [
+                          for (final dept in suggestions)
+                            ListTile(
+                              title: Text(dept.name),
+                              onTap: () {
+                                _onDepartmentTap(dept);
+                                ref
+                                    .read(departmentQueryProvider.notifier)
+                                    .setQuery('');
+                              },
+                            ),
+                        ],
                       ),
               ),
             ),
@@ -203,10 +210,13 @@ class _MapPageState extends ConsumerState<MapPage> {
           Positioned(
             bottom: AppSpacing.lg,
             left: AppSpacing.lg,
-            child: Text(
-              'map.sample_note'.tr(),
-              style: textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
+            child: SafeArea(
+              top: false,
+              child: Text(
+                'map.sample_note'.tr(),
+                style: textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
           ),

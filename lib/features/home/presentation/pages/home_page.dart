@@ -40,13 +40,11 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(profileTypeProvider);
-    final municipality = ref.watch(selectedMunicipalityProvider);
+    final locationLabel = ref.watch(selectedLocationLabelProvider);
     final displayName = ref.watch(displayNameProvider);
     final textTheme = Theme.of(context).textTheme;
 
-    final cityName = municipality != null
-        ? '${municipality.name}, Cesar'
-        : 'home.default_city'.tr();
+    final cityName = locationLabel ?? 'home.default_city'.tr();
 
     return Scaffold(
       body: SafeArea(
@@ -67,7 +65,7 @@ class HomePage extends ConsumerWidget {
                       children: [
                         Text(
                           'home.greeting'.tr(
-                            namedArgs: {'name': displayName.isNotEmpty ? displayName : 'home.default_name'.tr()},
+                            namedArgs: {'name': displayName},
                           ),
                           style: textTheme.headlineMedium,
                         ),
@@ -93,7 +91,7 @@ class HomePage extends ConsumerWidget {
                     ),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => context.push(AppRoutes.map),
+                    onPressed: () => context.push(AppRoutes.departmentMap),
                     icon: const Icon(Icons.swap_horiz, size: 16),
                     label: Text('home.change_city'.tr()),
                     style: OutlinedButton.styleFrom(

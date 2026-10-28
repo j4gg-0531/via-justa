@@ -7,8 +7,9 @@ void main() {
     expect(presentationDir.existsSync(), isTrue, reason: 'lib directory must exist');
 
     final forbiddenPattern = RegExp(
-      r'normalizeForSearch|search[A-Z]\w*\(|\.where\(|\.sort\(|firstWhere|jsonDecode|rootBundle|Timer|Future\.delayed',
+      r'normalizeForSearch|search[A-Z]\w*\(|\.where\(|\.sort\(|firstWhere|jsonDecode|rootBundle|Timer|Future\.delayed|setState\(|Departments\.byCode',
     );
+    final forbiddenImportPattern = RegExp(r"import\s+'package:via_justa/.*/data/");
 
     final violations = <String>[];
 
@@ -30,7 +31,7 @@ void main() {
         final lines = file.readAsLinesSync();
         for (var i = 0; i < lines.length; i++) {
           final line = lines[i];
-          if (forbiddenPattern.hasMatch(line)) {
+          if (forbiddenPattern.hasMatch(line) || forbiddenImportPattern.hasMatch(line)) {
             violations.add('${file.path}:${i + 1}: $line');
           }
         }

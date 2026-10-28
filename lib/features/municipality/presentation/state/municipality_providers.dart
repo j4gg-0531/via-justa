@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:via_justa/features/map_colombia/presentation/state/map_providers.dart';
 import 'package:via_justa/features/municipality/data/local_municipality_repository.dart';
 import 'package:via_justa/features/municipality/domain/municipality.dart';
 import 'package:via_justa/features/municipality/domain/municipality_repository.dart';
@@ -43,6 +44,25 @@ final selectedMunicipalityProvider =
   _SelectedMunicipalityNotifier.new,
 );
 
+/// Etiqueta formateada de ubicación activa ("Municipio, Departamento") o null si aún no se ha elegido.
+final selectedLocationLabelProvider = Provider<String?>((ref) {
+  final municipality = ref.watch(selectedMunicipalityProvider);
+  if (municipality == null) return null;
+  final department = ref.watch(
+    departmentByCodeProvider(municipality.departmentCode),
+  );
+  if (department != null) {
+    return '${municipality.name}, ${department.name}';
+  }
+  return municipality.name;
+});
+
+/// Nombre corto del municipio activo (por defecto "Valledupar" como ciudad piloto).
+final activeCityNameProvider = Provider<String>((ref) {
+  final municipality = ref.watch(selectedMunicipalityProvider);
+  return municipality?.name ?? 'Valledupar';
+});
+
 /// Texto de búsqueda del selector de municipios.
 class _MunicipalityQueryNotifier extends Notifier<String> {
   @override
@@ -63,6 +83,11 @@ final municipalityQueryProvider =
   _MunicipalityQueryNotifier.new,
 );
 
+/// Indica si el usuario escribió texto válido en el buscador de municipios.
+final hasMunicipalityQueryProvider = Provider.autoDispose<bool>((ref) {
+  return ref.watch(municipalityQueryProvider).trim().isNotEmpty;
+});
+
 /// Municipios de un departamento ya filtrados por la búsqueda actual.
 final filteredMunicipalitiesProvider = Provider.autoDispose
     .family<AsyncValue<List<Municipality>>, String>((ref, departmentCode) {
@@ -74,7 +99,7 @@ final filteredMunicipalitiesProvider = Provider.autoDispose
 });
 
 /// Códigos de municipios en los que el usuario pidió ser notificado.
-/// Solo en memoria: no hay persistencia ni notificaciones en el avance.
+/// Solo en memoria: preparado para conectar con `public.interest_registrations` en Supabase.
 class _MunicipalityInterestNotifier extends Notifier<Set<String>> {
   @override
   Set<String> build() => const <String>{};
@@ -92,3 +117,11 @@ final municipalityInterestProvider =
     NotifierProvider<_MunicipalityInterestNotifier, Set<String>>(
   _MunicipalityInterestNotifier.new,
 );
+
+/// Indica si el usuario ya registró interés de apertura para un municipio específico.
+final isMunicipalityInterestedProvider = Provider.family<bool, String>((
+  ref,
+  municipalityCode,
+) {
+  return ref.watch(municipalityInterestProvider).contains(municipalityCode);
+});
