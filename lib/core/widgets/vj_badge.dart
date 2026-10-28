@@ -31,12 +31,14 @@ class VjBadge extends StatelessWidget {
             Icon(icon, size: 12, color: AppColors.primary),
             const SizedBox(width: AppSpacing.xs),
           ],
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

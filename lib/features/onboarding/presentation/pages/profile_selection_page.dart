@@ -92,7 +92,7 @@ class ProfileSelectionPage extends ConsumerWidget {
                 trailingIcon: Icons.arrow_forward,
                 onPressed: selected == null
                     ? null
-                    : () => context.push(AppRoutes.map),
+                    : () => context.push(AppRoutes.departmentMap),
               ),
               const SizedBox(height: AppSpacing.xl),
             ],
