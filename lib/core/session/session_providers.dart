@@ -4,6 +4,7 @@ import 'package:via_justa/features/businesses/presentation/state/business_provid
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
 import 'package:via_justa/features/prices/presentation/state/price_map_providers.dart';
+import 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart';
 import 'package:via_justa/features/scan/presentation/state/scan_providers.dart';
 
 /// Nombre que el usuario escribió al crear su cuenta (null si no se registró).
@@ -50,6 +51,7 @@ class SessionController {
     _ref.read(businessCategoryProvider.notifier).clear();
     _ref.read(priceMapSearchQueryProvider.notifier).clear();
     _ref.read(priceMapCategoryProvider.notifier).clear();
+    _ref.read(priceScanProvider.notifier).reset();
     _ref.read(scanModeProvider.notifier).reset();
   }
 }

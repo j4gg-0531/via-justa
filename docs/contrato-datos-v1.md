@@ -8,8 +8,8 @@
 
 ## 1. Convenciones y Tipos Generales
 
-1. **Identificadores primarios:** UUID v4 (`id UUID PRIMARY KEY DEFAULT gen_random_uuid()`), excepto en tablas de referencia geográfica oficial donde se utiliza el código DANE DIVIPOLA (`VARCHAR(5)`).
-2. **Nombres:** Tablas en plural y snake_case (`price_reports`, `businesses`). Columnas en snake_case (`created_at`, `amount_cop`).
+1. **Identificadores primarios:** UUID v4 (`id UUID PRIMARY KEY DEFAULT gen_random_uuid()`), excepto en tablas de referencia geográfica oficial donde se utiliza el código DANE DIVIPOLA (`VARCHAR(5)`) y en los catálogos técnicos (`price_categories`, `municipality_zones`) donde se emplean claves estables (`VARCHAR(50)`).
+2. **Nombres:** Tablas en plural y snake_case (`price_reports`, `municipality_zones`, `businesses`). Columnas en snake_case (`created_at`, `amount_cop`, `zone_id`).
 3. **Moneda:** Pesos colombianos (COP) almacenados como enteros positivos (`INTEGER` o `BIGINT`), sin centavos.
 4. **Fechas:** Con zona horaria estricta (`TIMESTAMPTZ`), por defecto `now()`.
 5. **Tipos Enumerados y Restricciones de Dominio:**
@@ -126,6 +126,24 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 
 ---
 
+### 2.4.1 `municipality_zones`
+- **Finalidad:** Subdivisión zonal dentro de cada municipio piloto para segmentar las medianas estadísticas de precios por sectores reales (p. ej., en Valledupar `'20001'`: `vup_norte`, `vup_centro`, `vup_sur`, `vup_oriente`, `vup_occidente`), evitando mezclar zonas con dinámicas de costo distintas en una sola cifra municipal.
+- **Estructura:**
+  | Columna | Tipo | Restricciones | Descripción |
+  |---|---|---|---|
+  | `id` | `VARCHAR(50)` | PK | Identificador técnico de la zona (ej. `'vup_norte'`, `'vup_centro'`, `'vup_sur'`, `'vup_oriente'`, `'vup_occidente'`) |
+  | `municipality_code` | `TEXT` | NOT NULL, FK -> `municipalities(code)` ON DELETE CASCADE | Municipio al que pertenece la zona |
+  | `name_es` | `VARCHAR(100)` | NOT NULL | Nombre de la zona en español (ej. `"Zona Norte"`) |
+  | `name_en` | `VARCHAR(100)` | NOT NULL | Nombre de la zona en inglés (ej. `"North Zone"`) |
+  | `sector_hint_es` | `VARCHAR(150)` | NOT NULL DEFAULT '' | Barrios o puntos de referencia en español (ej. `"Novalito, San Joaquín, CC Guatapurí"`) |
+  | `sector_hint_en` | `VARCHAR(150)` | NOT NULL DEFAULT '' | Barrios o puntos de referencia en inglés (ej. `"Novalito, San Joaquín, Guatapurí Mall"`) |
+  | `sort_order` | `INTEGER` | NOT NULL DEFAULT 0 | Orden de visualización en selectores |
+  | `is_active` | `BOOLEAN` | NOT NULL DEFAULT true | Si la zona está activa para consultas y reportes |
+- **Índices:** `CREATE INDEX idx_municipality_zones_mun ON public.municipality_zones(municipality_code, sort_order);`
+- **Políticas RLS:** `SELECT` público (`anon`, `authenticated`). Modificaciones solo `admin`.
+
+---
+
 ### 2.5 `price_categories`
 - **Finalidad:** Catálogo estructurado de categorías de precios comparables.
 - **Estructura:**
@@ -144,7 +162,7 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 ---
 
 ### 2.6 `price_reports`
-- **Finalidad:** Almacenar los reportes ciudadanos de precios observados en el terreno.
+- **Finalidad:** Almacenar los reportes ciudadanos de precios observados en el terreno, segmentados por zona del municipio.
 - **Estructura:**
   | Columna | Tipo | Restricciones | Descripción |
   |---|---|---|---|
@@ -152,6 +170,7 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
   | `user_id` | `UUID` | NULL, FK -> `auth.users(id)` ON DELETE SET NULL | Usuario que reporta (se desvincula si borra su cuenta) |
   | `category_id` | `VARCHAR(50)` | NOT NULL, FK -> `price_categories(id)` | Categoría comparable específica |
   | `municipality_code` | `TEXT` | NOT NULL, FK -> `municipalities(code)` | Municipio del reporte |
+  | `zone_id` | `VARCHAR(50)` | NOT NULL, FK -> `municipality_zones(id)` | Zona del municipio donde se observó el precio (ej. `'vup_norte'`, `'vup_centro'`, `'vup_sur'`) |
   | `amount_cop` | `INTEGER` | NOT NULL, CHECK (amount_cop > 0) | Monto observado en pesos colombianos |
   | `location` | `GEOGRAPHY(Point, 4326)` | NULL | Coordenadas aproximadas del reporte (PostGIS) |
   | `place_name` | `VARCHAR(150)` | NULL | Nombre descriptivo del lugar o sector |
@@ -171,7 +190,7 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 >    - Se valida que el llamador autenticado coincida con el usuario objetivo (`auth.uid() = p_user_id`).
 >    - Dentro de una transacción atómica de base de datos:
 >      - **Depuración de texto libre e identificadores:** Se vacían `source_note = NULL` y `place_name = NULL` (`UPDATE price_reports SET source_note = NULL, place_name = NULL WHERE user_id = p_user_id;`), erradicando nombres comerciales atípicos, referencias domiciliarias o comentarios con PII.
->      - **Saneamiento espacial:** Si el reporte contiene coordenadas GPS de alta precisión (`location`) asociadas a domicilios privados o rutas personales, se disocian fijándolas en `NULL` (`UPDATE price_reports SET location = NULL WHERE user_id = p_user_id;`), conservando únicamente `municipality_code` y `category_id`.
+>      - **Saneamiento espacial:** Si el reporte contiene coordenadas GPS de alta precisión (`location`) asociadas a domicilios privados o rutas personales, se disocian fijándolas en `NULL` (`UPDATE price_reports SET location = NULL WHERE user_id = p_user_id;`), conservando únicamente `municipality_code`, `zone_id` y `category_id` (macro-zona del municipio sin coordenadas exactas).
 >      - **Eliminación de registros personales directos:** Se suprimen los registros en `consents` y solicitudes en `interest_registrations`.
 > 2. **Fase 2: Supresión del usuario en `auth.users`:**
 >    - Una vez saneados los datos contextuales, se invoca la eliminación en el subsistema de autenticación (`supabase.auth.admin.deleteUser(p_user_id)`).
@@ -182,7 +201,7 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 > 4. **Aclaración sobre el nivel de privacidad:**
 >    - No se califica este procedimiento como "anonimización irreversible absoluta", ya que el riesgo residual de reidentificación depende del tamaño de la muestra comunitaria ($k$-anonimato) y de correlaciones externas. Se clasifica formalmente como una **estrategia de minimización de datos y disociación seudónima reforzada** conforme a la Ley 1581 de 2012 y las directrices de la SIC, sujeta a auditoría de privacidad empírica.
 - **Índices obligatorios:**
-  - `CREATE INDEX idx_price_reports_stat ON price_reports(municipality_code, category_id, created_at) WHERE is_hidden = false AND is_demo = false;`
+  - `CREATE INDEX idx_price_reports_stat ON price_reports(municipality_code, zone_id, category_id, created_at) WHERE is_hidden = false AND is_demo = false;`
   - `CREATE INDEX idx_price_reports_location ON price_reports USING GIST(location);`
   - `CREATE INDEX idx_price_reports_user ON price_reports(user_id);`
 - **Políticas RLS:**
@@ -339,7 +358,7 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 
 ---
 
-## 3. Contrato de la Función RPC del Semáforo de Precios
+## 3. Contrato de la Función RPC del Semáforo de Precios por Zona
 
 > **Principio de Fuente Única de Verdad:** La regla de justicia de precios **se calcula exclusivamente en la base de datos** mediante una función SQL (`calculate_price_verdict`), garantizando consistencia, auditoría y seguridad. El cliente Flutter únicamente presenta el veredicto visualmente. Para el primer avance, Flutter usará un espejo en Dart rotulado explícitamente como `DEMO`.
 
@@ -348,6 +367,7 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 CREATE OR REPLACE FUNCTION calculate_price_verdict(
     p_category_id VARCHAR,
     p_municipality_code VARCHAR,
+    p_zone_id VARCHAR,
     p_amount_cop INTEGER
 )
 RETURNS JSONB
@@ -357,12 +377,12 @@ AS $$ ... $$;
 ```
 
 ### 3.2 Lógica Estadística y Reglas de Negocio
-1. **Filtro de reportes válidos:** Se consultan reportes de la misma categoría y municipio dentro de una ventana de **60 días** (`created_at >= now() - INTERVAL '60 days'`), excluyendo reportes ocultos (`is_hidden = false`) y demos (`is_demo = false`).
-2. **Muestra mínima ($N \ge 3$):**
-   - Si la cantidad de reportes válidos $N < 3$, la función retorna `level: "insufficient"`. No se asigna color de semáforo ni recomendación cuantitativa.
-3. **Cálculo de la referencia (Mediana):**
-   - La referencia se calcula como la mediana estadística exacta: `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount_cop)`.
-   - Se prohíbe el uso de promedios simples para evitar sesgo por cobros atípicos extremos.
+1. **Filtro de reportes válidos por zona del municipio:** Se consultan reportes de la misma categoría, municipio y **zona del municipio** (`zone_id = p_zone_id`, p. ej. Norte, Centro, Sur, Oriente u Occidente en Valledupar) dentro de una ventana de **60 días** (`created_at >= now() - INTERVAL '60 days'`), excluyendo reportes ocultos (`is_hidden = false`) y demos (`is_demo = false`).
+2. **Muestra mínima en la zona ($N \ge 3$):**
+   - Si la cantidad de reportes válidos en la zona $N < 3$, la función retorna `level: "insufficient"`. No se asigna color de semáforo ni recomendación cuantitativa.
+3. **Cálculo de la referencia zonal (Mediana):**
+   - La referencia de la zona se calcula como la mediana estadística exacta: `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount_cop)`.
+   - Se prohíbe el uso de promedios simples o de medianas globales de todo el municipio para evitar sesgo por diferencias de costo entre sectores y cobros atípicos extremos.
 4. **Desviación Porcentual:**
    $$\text{desv} = \frac{\text{precio} - \text{ref}}{\text{ref}} \times 100$$
 5. **Niveles del Semáforo:**
@@ -373,14 +393,15 @@ AS $$ ... $$;
    - Si $\text{desv} < -40.0\%$, el nivel es `green`, pero se activa el flag booleano `underpriced_alert: true` con mensaje informativo (posible estafa, servicio incompleto o baja calidad).
 7. **Contexto de Evento Activo:**
    - Se verifica si el municipio tiene un evento activo hoy (`now() BETWEEN starts_at AND ends_at`).
-   - Si existe evento y cuenta con $\ge 3$ reportes dentro de sus fechas, se calcula la mediana del evento (`ref_event`) y su respectiva desviación. El resultado entrega ambas referencias para contraste transparente.
-8. **Tope Recomendado:**
+   - Si existe evento y la zona cuenta con $\ge 3$ reportes dentro de sus fechas, se calcula la mediana de la zona en el evento (`ref_event`) y su respectiva desviación. El resultado entrega ambas referencias para contraste transparente.
+8. **Tope Recomendado en la Zona:**
    $$\text{tope\_recomendado} = \text{referencia\_vigente} \times 1.15$$
 
 ### 3.3 Esquema JSON de Respuesta
 ```json
 {
   "level": "green" | "yellow" | "red" | "insufficient",
+  "zone_id": "vup_centro",
   "amount_cop": 15000,
   "reference_cop": 12000,
   "deviation_percent": 25.0,
@@ -390,7 +411,7 @@ AS $$ ... $$;
   "window_days": 60,
   "is_event_context": false,
   "event_details": null,
-  "disclaimer": "Este cálculo es una referencia estadística comunitaria orientativa y no constituye una tarifa legalmente vinculante."
+  "disclaimer": "Este cálculo es una referencia estadística comunitaria orientativa para la zona seleccionada y no constituye una tarifa legalmente vinculante."
 }
 ```
 
@@ -400,10 +421,10 @@ AS $$ ... $$;
 3. **$\text{desv} = 15.01\%$:** Nivel `yellow` (inicio amarillo).
 4. **$\text{desv} = 40.0\%$:** Nivel `yellow` (límite superior amarillo).
 5. **$\text{desv} = 40.01\%$:** Nivel `red` (inicio rojo).
-6. **$N < 3$ reportes:** Nivel `insufficient` (estado neutro).
+6. **$N < 3$ reportes en la zona:** Nivel `insufficient` (estado neutro).
 7. **$\text{desv} = -40.01\%$:** Nivel `green` con `underpriced_alert = true`.
-8. **Evento activo con $N \ge 3$:** Retorna referencias base y de evento.
-9. **Evento activo con $N < 3$:** Retorna advertencia de evento pero evalúa sobre histórico de 60 días.
+8. **Evento activo con $N \ge 3$ en la zona:** Retorna referencias base y de evento.
+9. **Evento activo con $N < 3$ en la zona:** Retorna advertencia de evento pero evalúa sobre histórico zonal de 60 días.
 
 ---
 
