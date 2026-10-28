@@ -20,8 +20,9 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
 | **D10**| Repositorio único, ramas cortas por tarea y PR revisado | **ACORDADA** | Ambos | 19 de octubre de 2026 |
 | **D11**| Tercer perfil de usuario: Local / Residente (`resident`) | **PROPUESTA** | Backend / Ambos | 25 de octubre de 2026 |
 | **D12**| Barra inferior fija de cinco pestañas | **ACORDADA** | Frontend | 27 de octubre de 2026 |
-| **D13**| Categorías de precio estrictamente comparables | **PENDIENTE** | Ambos | — |
+| **D13**| Categorías de precio estrictamente comparables | **PROPUESTA** | Ambos | 28 de octubre de 2026 |
 | **D14**| Política de contraseñas y confirmación de correo | **PENDIENTE** | Backend | — |
+| **D15**| Medianas de precios por zonas del municipio y selección híbrida (GPS / Mapa) | **ACORDADA** | Ambos | 28 de octubre de 2026 |
 
 ---
 
@@ -176,15 +177,17 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
 ---
 
 ## D13 · Categorías de precio estrictamente comparables
-- **Estado:** **PENDIENTE** *(Requiere consenso de catálogo entre frontend y backend)*
+- **Estado:** **PROPUESTA** *(Implementadas en el catálogo DEMO de Valledupar; pendiente de ratificación final en seed SQL)*
 - **Responsable:** Ambos integrantes.
-- **Descripción:** Definir la lista de categorías y subcategorías obligatorias para el reporte de precios.
-- **Justificación técnica:** Una regla estadística de mediana pierde validez si compara magnitudes heterogéneas. Por ejemplo, en "Transporte" debe compararse "Carrera mínima de taxi diurna" vs "Carrera mínima", sin mezclar tarifas de buses intermunicipales o transporte informal.
-- **Propuesta base:**
-  1. `transport_taxi_minimal`: Carrera mínima urbana de taxi.
-  2. `food_lunch_executive`: Almuerzo ejecutivo / menú del día.
-  3. `lodging_hotel_standard`: Noche de hotel habitación estándar individual.
-  4. `housing_rent_apartment_2b`: Arriendo mensual apartamento 2 habitaciones.
+- **Fecha de evidencia:** 28 de octubre de 2026 (`VJ-04` y `VJ-05`).
+- **Descripción:** Definir la lista de categorías y subcategorías obligatorias para el reporte y consulta de precios con unidades explícitas.
+- **Justificación técnica:** Una regla estadística de mediana pierde validez si compara magnitudes heterogéneas. Por ejemplo, en "Transporte" debe compararse "Carrera mínima urbana de taxi" frente a la misma unidad.
+- **Catálogo implementado en el piloto de Valledupar (`DemoPriceVerdictRepository`):**
+  1. `taxi_urbano_corto`: Carrera urbana corta en taxi (trayecto urbano estándar 3–5 km).
+  2. `almuerzo_corriente`: Almuerzo corriente / ejecutivo (plato del día con sopa, seco y bebida).
+  3. `hotel_estandar_noche`: Habitación estándar (1 noche, acomodación sencilla/doble).
+  4. `arriendo_estudio_mes`: Arriendo mensual apartaestudio (1 habitación, estrato medio).
+  5. `consulta_medica_particular`: Consulta médica general particular (1 consulta presencial).
 
 ---
 
@@ -195,3 +198,18 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
   1. Longitud mínima de contraseña: 8 caracteres (validada en `auth_validators.dart`).
   2. Confirmación de correo por enlace o token: Definir si el usuario debe confirmar obligatoriamente su correo antes de acceder al sistema o si se permite un estado de gracia inicial.
 - **Recomendación arquitectónica:** En el MVP, habilitar auto-confirmación o modo tolerante en desarrollo para facilitar las pruebas del evaluador sin depender de servidores SMTP reales.
+
+---
+
+## D15 · Medianas de precios segmentadas por zonas del municipio y selección híbrida (GPS / Mapa)
+- **Estado:** **ACORDADA**
+- **Responsable:** Ambos integrantes (Frontend y Contrato de Datos v1.1).
+- **Fecha de evidencia:** 28 de octubre de 2026 (`VJ-04`, `VJ-05`, `docs/contrato-datos-v1.md` y `docs/modelo-er.puml`).
+- **Descripción:**
+  1. Las medianas estadísticas de precios no se calculan de forma plana para todo el municipio, sino segmentadas por **zonas dentro del municipio** (`public.municipality_zones`). En el piloto de Valledupar (`20001`), se definen 5 zonas: Zona Norte (`vup_norte`), Zona Centro (`vup_centro`), Zona Sur (`vup_sur`), Zona Oriente (`vup_oriente`) y Zona Occidente (`vup_occidente`).
+  2. Para elegir la zona sin fricción manual, la app ofrece un **selector híbrido**:
+     - **Modo automático (GPS)**: solicita permiso de ubicación al usuario para detectar automáticamente la zona en la que se encuentra.
+     - **Modo manual en mapa interactivo**: si el usuario decide no conceder permiso de ubicación (o desea consultar/aportar en otra zona de la ciudad), puede tocar cualquier punto o marcador directamente sobre el mapa por zonas del municipio, y la función pura de dominio `resolveNearestZoneByNormalizedPoint` selecciona la zona correspondiente.
+- **Justificación técnica:** En una misma ciudad como Valledupar, los costos de restaurantes, taxis y hospedaje varían significativamente entre sectores comerciales/turísticos (Zona Norte / Novalito) y sectores populares o terminales (Zona Sur / Terminal). Segmentar por `(municipality_code, zone_id, category_id)` evita sesgos estadísticos.
+- **Impacto Frontend:** Implementado en `MunicipalityZone`, `ZoneMapPickerCard`, `PriceScanPage` (`M06`), `PriceResultPage` (`M07`/`M20`) y `ContributePricePage` (`M10`).
+- **Impacto Backend:** Conciliado en `docs/contrato-datos-v1.md` y `docs/modelo-er.puml` mediante la tabla `public.municipality_zones`, la llave foránea `zone_id` en `public.price_reports` y el parámetro `p_zone_id` en la RPC `public.evaluate_price_verdict`.
