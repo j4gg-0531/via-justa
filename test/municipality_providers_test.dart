@@ -2,9 +2,14 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:via_justa/features/map_colombia/domain/department.dart';
+import 'package:via_justa/features/map_colombia/domain/department_repository.dart';
+import 'package:via_justa/features/map_colombia/presentation/state/map_providers.dart';
 import 'package:via_justa/features/municipality/domain/municipality.dart';
 import 'package:via_justa/features/municipality/domain/municipality_repository.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
+import 'package:via_justa/features/scan/domain/scan_mode.dart';
+import 'package:via_justa/features/scan/presentation/state/scan_providers.dart';
 
 const _municipalities = <Municipality>[
   Municipality(
@@ -53,6 +58,17 @@ class _FakeMunicipalityRepository implements MunicipalityRepository {
   }
 }
 
+class _FakeDepartmentRepository implements DepartmentRepository {
+  const _FakeDepartmentRepository();
+
+  @override
+  List<Department> getAll() => const [Departments.cesar];
+
+  @override
+  Department? getByCode(String code) =>
+      code == '20' ? Departments.cesar : null;
+}
+
 void main() {
   group('municipality search providers', () {
     late ProviderContainer container;
@@ -62,6 +78,9 @@ void main() {
         overrides: [
           municipalityRepositoryProvider.overrideWithValue(
             _FakeMunicipalityRepository(),
+          ),
+          departmentRepositoryProvider.overrideWithValue(
+            const _FakeDepartmentRepository(),
           ),
         ],
       );
@@ -75,21 +94,23 @@ void main() {
       await container.pump();
     }
 
-    test('empty query returns all municipalities', () async {
+    test('empty query returns all municipalities and hasMunicipalityQuery is false', () async {
       await loadMunicipalities();
 
       final result = container.read(filteredMunicipalitiesProvider('20'));
 
       expect(result.value, _municipalities);
+      expect(container.read(hasMunicipalityQueryProvider), isFalse);
     });
 
-    test('filters by query without accents', () async {
+    test('filters by query without accents and updates hasMunicipalityQuery', () async {
       await loadMunicipalities();
       container.read(municipalityQueryProvider.notifier).setQuery('agustin');
 
       final result = container.read(filteredMunicipalitiesProvider('20'));
 
       expect(result.value, [_municipalities[1]]);
+      expect(container.read(hasMunicipalityQueryProvider), isTrue);
     });
 
     test('returns an empty list when there are no matches', () async {
@@ -135,6 +156,36 @@ void main() {
 
       expect(existing, _municipalities[0]);
       expect(missing, isNull);
+    });
+
+    test('formats selectedLocationLabelProvider and activeCityNameProvider via departmentRepository', () {
+      expect(container.read(selectedLocationLabelProvider), isNull);
+      expect(container.read(activeCityNameProvider), 'Valledupar');
+
+      container
+          .read(selectedMunicipalityProvider.notifier)
+          .select(_municipalities[2]);
+
+      expect(container.read(selectedLocationLabelProvider), 'Aguachica, Cesar');
+      expect(container.read(activeCityNameProvider), 'Aguachica');
+    });
+
+    test('tracks municipality interest via isMunicipalityInterestedProvider', () {
+      expect(container.read(isMunicipalityInterestedProvider('20011')), isFalse);
+
+      container.read(municipalityInterestProvider.notifier).register('20011');
+
+      expect(container.read(isMunicipalityInterestedProvider('20011')), isTrue);
+    });
+
+    test('scanModeProvider switches and resets mode without view setState', () {
+      expect(container.read(scanModeProvider), ScanMode.price);
+
+      container.read(scanModeProvider.notifier).selectMode(ScanMode.contract);
+      expect(container.read(scanModeProvider), ScanMode.contract);
+
+      container.read(scanModeProvider.notifier).reset();
+      expect(container.read(scanModeProvider), ScanMode.price);
     });
   });
 }

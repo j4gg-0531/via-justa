@@ -79,7 +79,7 @@ class ProfilePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final displayName = ref.watch(displayNameProvider);
     final profile = ref.watch(profileTypeProvider);
-    final municipality = ref.watch(selectedMunicipalityProvider);
+    final locationLabel = ref.watch(selectedLocationLabelProvider);
     final textTheme = Theme.of(context).textTheme;
     Locale currentLocale;
     try {
@@ -89,9 +89,7 @@ class ProfilePage extends ConsumerWidget {
           Localizations.maybeLocaleOf(context) ?? const Locale('es');
     }
 
-    final cityName = municipality != null
-        ? '${municipality.name}, Cesar'
-        : 'home.default_city'.tr();
+    final cityName = locationLabel ?? 'home.default_city'.tr();
 
     final String profileName;
     final IconData profileIcon;
@@ -153,9 +151,7 @@ class ProfilePage extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            displayName.isNotEmpty
-                                ? displayName
-                                : 'profile.user_default_name'.tr(),
+                            displayName,
                             style: textTheme.titleMedium,
                           ),
                           const SizedBox(height: 2),
@@ -251,7 +247,7 @@ class ProfilePage extends ConsumerWidget {
                           ),
                         ),
                         TextButton(
-                          onPressed: () => context.push(AppRoutes.map),
+                          onPressed: () => context.push(AppRoutes.departmentMap),
                           style: TextButton.styleFrom(
                             foregroundColor: AppColors.primary,
                             minimumSize: const Size(48, 48),

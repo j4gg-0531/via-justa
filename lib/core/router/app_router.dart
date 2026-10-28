@@ -11,6 +11,7 @@ import 'package:via_justa/features/map_colombia/presentation/pages/map_page.dart
 import 'package:via_justa/features/municipality/presentation/pages/municipality_page.dart';
 import 'package:via_justa/features/municipality/presentation/pages/municipality_selector_page.dart';
 import 'package:via_justa/features/onboarding/presentation/pages/profile_selection_page.dart';
+import 'package:via_justa/features/prices/presentation/pages/price_map_page.dart';
 import 'package:via_justa/features/profile/presentation/pages/profile_page.dart';
 import 'package:via_justa/features/scan/presentation/pages/scan_page.dart';
 import 'package:via_justa/features/splash/presentation/pages/splash_page.dart';
@@ -26,10 +27,13 @@ class AppRoutes {
   static const login = '/login';
   static const register = '/register';
   static const onboarding = '/onboarding';
+
+  /// Mapa de departamentos de Colombia (M03) — sin barra inferior (flujo inicial o cambio de ubicación).
+  static const departmentMap = '/departments';
   static const department = '/department/:code';
   static const municipality = '/municipality/:code';
 
-  // Rutas de las 5 ramas de la barra inferior persistente
+  // Rutas de las 5 ramas de la barra inferior persistente (experiencia dentro del municipio)
   static const home = '/home';
   static const map = '/map';
   static const scan = '/scan';
@@ -45,7 +49,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.splash,
     routes: [
-      // Rutas raíz (fuera de la barra de navegación)
+      // Rutas raíz (fuera de la barra de navegación inferior)
       GoRoute(
         path: AppRoutes.splash,
         builder: (context, state) => const SplashPage(),
@@ -67,6 +71,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ProfileSelectionPage(),
       ),
       GoRoute(
+        path: AppRoutes.departmentMap,
+        builder: (context, state) => const MapPage(),
+      ),
+      GoRoute(
         path: AppRoutes.department,
         builder: (context, state) => MunicipalitySelectorPage(
           departmentCode: state.pathParameters['code']!,
@@ -78,7 +86,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             MunicipalityPage(code: state.pathParameters['code']!),
       ),
 
-      // Experiencia principal: StatefulShellRoute con 5 ramas y estado independiente
+      // Experiencia principal dentro del municipio: StatefulShellRoute con 5 ramas y estado independiente
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AppScaffold(navigationShell: navigationShell),
@@ -93,12 +101,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
 
-          // Rama 1: Mapa (M03 y navegación geográfica)
+          // Rama 1: Mapa local de precios, negocios y servicios del municipio (M08)
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: AppRoutes.map,
-                builder: (context, state) => const MapPage(),
+                builder: (context, state) => const PriceMapPage(),
               ),
             ],
           ),

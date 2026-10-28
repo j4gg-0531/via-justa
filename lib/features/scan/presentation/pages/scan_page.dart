@@ -1,26 +1,19 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
-
-/// Modo de análisis seleccionado en la pantalla de escaneo.
-enum _ScanMode { price, contract }
+import 'package:via_justa/features/scan/domain/scan_mode.dart';
+import 'package:via_justa/features/scan/presentation/state/scan_providers.dart';
 
 /// Pantalla 6 (M06) · Escanear precio o contrato con selector interactivo y visor ilustrado.
-class ScanPage extends StatefulWidget {
+class ScanPage extends ConsumerWidget {
   const ScanPage({super.key});
 
-  @override
-  State<ScanPage> createState() => _ScanPageState();
-}
-
-class _ScanPageState extends State<ScanPage> {
-  _ScanMode _selectedMode = _ScanMode.price;
-
-  void _showInfoDialog() {
+  void _showInfoDialog(BuildContext context) {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -37,7 +30,9 @@ class _ScanPageState extends State<ScanPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedMode = ref.watch(scanModeProvider);
+    final modeNotifier = ref.read(scanModeProvider.notifier);
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -75,24 +70,16 @@ class _ScanPageState extends State<ScanPage> {
                       child: _ScanModeTab(
                         label: 'scan.tab_price'.tr(),
                         icon: Icons.receipt_long_outlined,
-                        selected: _selectedMode == _ScanMode.price,
-                        onTap: () {
-                          setState(() {
-                            _selectedMode = _ScanMode.price;
-                          });
-                        },
+                        selected: selectedMode == ScanMode.price,
+                        onTap: () => modeNotifier.selectMode(ScanMode.price),
                       ),
                     ),
                     Expanded(
                       child: _ScanModeTab(
                         label: 'scan.tab_contract'.tr(),
                         icon: Icons.assignment_outlined,
-                        selected: _selectedMode == _ScanMode.contract,
-                        onTap: () {
-                          setState(() {
-                            _selectedMode = _ScanMode.contract;
-                          });
-                        },
+                        selected: selectedMode == ScanMode.contract,
+                        onTap: () => modeNotifier.selectMode(ScanMode.contract),
                       ),
                     ),
                   ],
@@ -110,7 +97,7 @@ class _ScanPageState extends State<ScanPage> {
                     Row(
                       children: [
                         Icon(
-                          _selectedMode == _ScanMode.price
+                          selectedMode == ScanMode.price
                               ? Icons.price_check
                               : Icons.gavel_outlined,
                           color: AppColors.primary,
@@ -119,7 +106,7 @@ class _ScanPageState extends State<ScanPage> {
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: Text(
-                            _selectedMode == _ScanMode.price
+                            selectedMode == ScanMode.price
                                 ? 'scan.price_header'.tr()
                                 : 'scan.contract_header'.tr(),
                             style: textTheme.titleMedium,
@@ -130,7 +117,7 @@ class _ScanPageState extends State<ScanPage> {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      _selectedMode == _ScanMode.price
+                      selectedMode == ScanMode.price
                           ? 'scan.price_description'.tr()
                           : 'scan.contract_description'.tr(),
                       style: textTheme.bodyMedium,
@@ -169,7 +156,7 @@ class _ScanPageState extends State<ScanPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            _selectedMode == _ScanMode.price
+                            selectedMode == ScanMode.price
                                 ? Icons.receipt
                                 : Icons.description,
                             size: 48,
@@ -219,13 +206,13 @@ class _ScanPageState extends State<ScanPage> {
                     child: VjButton(
                       label: 'scan.action_photo'.tr(),
                       leadingIcon: Icons.camera_alt_outlined,
-                      onPressed: _showInfoDialog,
+                      onPressed: () => _showInfoDialog(context),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _showInfoDialog,
+                      onPressed: () => _showInfoDialog(context),
                       icon: const Icon(Icons.file_upload_outlined, size: 20),
                       label: Text('scan.action_gallery'.tr()),
                       style: OutlinedButton.styleFrom(
