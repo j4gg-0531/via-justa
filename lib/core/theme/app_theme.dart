@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
+import 'package:via_justa/core/theme/semantic_status_colors.dart';
 
 class AppTheme {
   AppTheme._();
@@ -15,6 +16,9 @@ class AppTheme {
         onSurface: AppColors.textPrimary,
       ),
       scaffoldBackgroundColor: AppColors.background,
+      extensions: <ThemeExtension<dynamic>>[
+        SemanticStatusColors.light(),
+      ],
       textTheme: const TextTheme(
         headlineLarge: TextStyle(
           fontSize: 32,
