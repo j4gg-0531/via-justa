@@ -347,7 +347,12 @@ class _PriceScanSection extends ConsumerWidget {
                   style: textTheme.bodySmall,
                 ),
                 data: (zones) => ZoneMapPickerCard(
-                  scanState: scanState,
+                  selectedZoneId: scanState.selectedZoneId,
+                  locationPermission: scanState.locationPermission,
+                  isManualMapOpen: scanState.isManualMapOpen,
+                  shouldShowMapPicker: scanState.shouldShowMapPicker,
+                  pinAlignmentX: scanState.pinAlignmentX,
+                  pinAlignmentY: scanState.pinAlignmentY,
                   zones: zones,
                   activeZone: activeZone,
                   cityName: cityName,

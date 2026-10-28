@@ -158,11 +158,17 @@ class HomePage extends ConsumerWidget {
                 title: 'home.contribute_action_title'.tr(),
                 subtitle: 'home.contribute_action_desc'.tr(),
                 badge: 'common.demo_badge'.tr(),
-                onTap: () => _showComingSoonDialog(
-                  context,
-                  title: 'home.contribute_dialog_title'.tr(),
-                  body: 'home.contribute_dialog_body'.tr(),
-                ),
+                onTap: () {
+                  if (GoRouter.maybeOf(context) != null) {
+                    context.push(AppRoutes.priceContribute);
+                  } else {
+                    _showComingSoonDialog(
+                      context,
+                      title: 'home.contribute_dialog_title'.tr(),
+                      body: 'home.contribute_dialog_body'.tr(),
+                    );
+                  }
+                },
               ),
 
               const SizedBox(height: AppSpacing.xxl),

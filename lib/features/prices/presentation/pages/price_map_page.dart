@@ -172,11 +172,18 @@ class PriceMapPage extends ConsumerWidget {
                               constraints: const BoxConstraints(maxWidth: 280),
                               child: _ContributeMapButton(
                                 label: 'price_map.contribute_cta'.tr(),
-                                onTap: () => _showDemoDialog(
-                                  context,
-                                  title: 'home.contribute_dialog_title'.tr(),
-                                  body: 'home.contribute_dialog_body'.tr(),
-                                ),
+                                onTap: () {
+                                  if (GoRouter.maybeOf(context) != null) {
+                                    context.push(AppRoutes.priceContribute);
+                                  } else {
+                                    _showDemoDialog(
+                                      context,
+                                      title:
+                                          'home.contribute_dialog_title'.tr(),
+                                      body: 'home.contribute_dialog_body'.tr(),
+                                    );
+                                  }
+                                },
                               ),
                             ),
                           ),

@@ -11,6 +11,7 @@ import 'package:via_justa/features/map_colombia/presentation/pages/map_page.dart
 import 'package:via_justa/features/municipality/presentation/pages/municipality_page.dart';
 import 'package:via_justa/features/municipality/presentation/pages/municipality_selector_page.dart';
 import 'package:via_justa/features/onboarding/presentation/pages/profile_selection_page.dart';
+import 'package:via_justa/features/prices/presentation/pages/contribute_price_page.dart';
 import 'package:via_justa/features/prices/presentation/pages/price_map_page.dart';
 import 'package:via_justa/features/prices/presentation/pages/price_result_page.dart';
 import 'package:via_justa/features/profile/presentation/pages/profile_page.dart';
@@ -36,6 +37,9 @@ class AppRoutes {
 
   /// Resultado del semáforo de precios (M07 / M20).
   static const priceResult = '/prices/result';
+
+  /// Flujo en 4 pasos para aportar un precio (M10).
+  static const priceContribute = '/prices/contribute';
 
   // Rutas de las 5 ramas de la barra inferior persistente (experiencia dentro del municipio)
   static const home = '/home';
@@ -92,6 +96,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.priceResult,
         builder: (context, state) => const PriceResultPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.priceContribute,
+        builder: (context, state) => const ContributePricePage(),
       ),
 
       // Experiencia principal dentro del municipio: StatefulShellRoute con 5 ramas y estado independiente
