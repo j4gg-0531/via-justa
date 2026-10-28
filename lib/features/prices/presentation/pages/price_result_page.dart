@@ -15,7 +15,11 @@ import 'package:via_justa/features/prices/presentation/widgets/price_verdict_car
 class PriceResultPage extends ConsumerWidget {
   const PriceResultPage({super.key});
 
-  void _showContributeDialog(BuildContext context) {
+  void _openContributeFlow(BuildContext context) {
+    if (GoRouter.maybeOf(context) != null) {
+      context.push(AppRoutes.priceContribute);
+      return;
+    }
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -198,7 +202,7 @@ class PriceResultPage extends ConsumerWidget {
                       VjButton(
                         label: 'price_verdict.contribute_from_result_cta'.tr(),
                         leadingIcon: Icons.add_chart_outlined,
-                        onPressed: () => _showContributeDialog(context),
+                        onPressed: () => _openContributeFlow(context),
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       VjButton(

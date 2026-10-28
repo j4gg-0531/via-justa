@@ -5,16 +5,20 @@ import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
-import 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart';
 
-/// Selector híbrido de zona del municipio:
+/// Selector híbrido de zona del municipio reutilizable (M06 y M10):
 /// 1) Solicita permiso de ubicación del teléfono para autodetectar la zona por GPS.
-/// 2) Si el usuario no permite la ubicación (o desea consultar otro punto), despliega un mapa
+/// 2) Si el usuario no permite la ubicación (o desea consultar/reportar otro punto), despliega un mapa
 ///    interactivo estilo M08 donde puede tocar cualquier sector o marcador de zona.
 class ZoneMapPickerCard extends StatelessWidget {
   const ZoneMapPickerCard({
     super.key,
-    required this.scanState,
+    required this.selectedZoneId,
+    required this.locationPermission,
+    required this.isManualMapOpen,
+    required this.shouldShowMapPicker,
+    required this.pinAlignmentX,
+    required this.pinAlignmentY,
     required this.zones,
     required this.activeZone,
     required this.cityName,
@@ -26,7 +30,12 @@ class ZoneMapPickerCard extends StatelessWidget {
     required this.onMapPointTapped,
   });
 
-  final PriceScanState scanState;
+  final String selectedZoneId;
+  final LocationPermissionStatus locationPermission;
+  final bool isManualMapOpen;
+  final bool shouldShowMapPicker;
+  final double pinAlignmentX;
+  final double pinAlignmentY;
   final List<MunicipalityZone> zones;
   final MunicipalityZone? activeZone;
   final String cityName;
@@ -83,32 +92,30 @@ class ZoneMapPickerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final zoneTitle =
-        activeZone?.localizedName(languageCode) ?? scanState.selectedZoneId;
+        activeZone?.localizedName(languageCode) ?? selectedZoneId;
     final zoneSectors = activeZone?.localizedSectorHint(languageCode) ?? '';
+    final isGpsActive =
+        locationPermission == LocationPermissionStatus.granted &&
+        !isManualMapOpen;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Encabezado del campo de zona
-        Row(
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Expanded(
-              child: Text(
-                'price_verdict.zone_field_label'.tr(),
-                style: textTheme.titleMedium?.copyWith(fontSize: 14),
-              ),
+            Text(
+              'price_verdict.zone_field_label'.tr(),
+              style: textTheme.titleMedium?.copyWith(fontSize: 14),
             ),
             VjBadge(
-              label: scanState.locationPermission ==
-                          LocationPermissionStatus.granted &&
-                      !scanState.isManualMapOpen
+              label: isGpsActive
                   ? 'price_verdict.zone_mode_gps_badge'.tr()
                   : 'price_verdict.zone_mode_map_badge'.tr(),
-              icon: scanState.locationPermission ==
-                          LocationPermissionStatus.granted &&
-                      !scanState.isManualMapOpen
-                  ? Icons.my_location
-                  : Icons.map_outlined,
+              icon: isGpsActive ? Icons.my_location : Icons.map_outlined,
             ),
           ],
         ),
@@ -137,11 +144,7 @@ class ZoneMapPickerCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 child: Icon(
-                  scanState.locationPermission ==
-                              LocationPermissionStatus.granted &&
-                          !scanState.isManualMapOpen
-                      ? Icons.gps_fixed
-                      : Icons.place,
+                  isGpsActive ? Icons.gps_fixed : Icons.place,
                   color: Colors.white,
                   size: 22,
                 ),
@@ -174,8 +177,8 @@ class ZoneMapPickerCard extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
 
         // Estado 1: Aún no ha respondido el permiso de ubicación (prompt)
-        if (scanState.locationPermission == LocationPermissionStatus.prompt &&
-            !scanState.isManualMapOpen)
+        if (locationPermission == LocationPermissionStatus.prompt &&
+            !isManualMapOpen)
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
@@ -213,8 +216,8 @@ class ZoneMapPickerCard extends StatelessWidget {
               ],
             ),
           )
-        // Estado 2: Permiso GPS concedido y mapa cerrado -> botón para abrir mapa si desea consultar otro sector
-        else if (!scanState.shouldShowMapPicker)
+        // Estado 2: Permiso GPS concedido y mapa cerrado -> botón para abrir mapa si desea otro sector
+        else if (!shouldShowMapPicker)
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
@@ -227,9 +230,9 @@ class ZoneMapPickerCard extends StatelessWidget {
         else ...[
           _InteractiveZoneMapCanvas(
             zones: zones,
-            selectedZoneId: scanState.selectedZoneId,
-            pinAlignmentX: scanState.pinAlignmentX,
-            pinAlignmentY: scanState.pinAlignmentY,
+            selectedZoneId: selectedZoneId,
+            pinAlignmentX: pinAlignmentX,
+            pinAlignmentY: pinAlignmentY,
             languageCode: languageCode,
             onZoneTapped: onZoneTapped,
             onMapPointTapped: onMapPointTapped,
@@ -259,7 +262,6 @@ class ZoneMapPickerCard extends StatelessWidget {
 }
 
 /// Lienzo interactivo del mapa de zonas del municipio (mismo estilo visual del mapa de precios M08).
-/// Al tocar cualquier parte del lienzo o un pin de zona, ubica el marcador y selecciona la zona más cercana.
 class _InteractiveZoneMapCanvas extends StatelessWidget {
   const _InteractiveZoneMapCanvas({
     required this.zones,
@@ -301,12 +303,9 @@ class _InteractiveZoneMapCanvas extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Fondo cartográfico urbano (idéntico al estilo M08)
                   CustomPaint(
                     painter: _UrbanZoneMapPainter(),
                   ),
-
-                  // Marcadores interactivos de las zonas del municipio (Norte, Centro, Sur, Oriente, Occidente)
                   for (final zone in zones)
                     Align(
                       alignment: Alignment(zone.alignmentX, zone.alignmentY),
@@ -316,8 +315,6 @@ class _InteractiveZoneMapCanvas extends StatelessWidget {
                         onTap: () => onZoneTapped(zone.id),
                       ),
                     ),
-
-                  // Pin azul móvil de la ubicación seleccionada por el usuario
                   Align(
                     alignment: Alignment(pinAlignmentX, pinAlignmentY),
                     child: IgnorePointer(
@@ -421,14 +418,12 @@ class _ZoneMapMarker extends StatelessWidget {
   }
 }
 
-/// Pintor del lienzo urbano de Valledupar (cuadrícula de vías, río Guatapurí y parque central).
 class _UrbanZoneMapPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final bgPaint = Paint()..color = const Color(0xFFE5E9F0);
     canvas.drawRect(Offset.zero & size, bgPaint);
 
-    // Zona verde oriental (Río Guatapurí / Hurtado)
     final parkPaint = Paint()..color = const Color(0xFFD6EADF);
     canvas.drawOval(
       Rect.fromCenter(
@@ -439,7 +434,6 @@ class _UrbanZoneMapPainter extends CustomPainter {
       parkPaint,
     );
 
-    // Cuadrícula de avenidas principales
     final roadPaint = Paint()
       ..color = const Color(0xFFBCC5D3)
       ..strokeWidth = 2.5
