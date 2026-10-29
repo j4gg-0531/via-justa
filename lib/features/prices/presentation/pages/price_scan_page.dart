@@ -9,6 +9,7 @@ import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/core/widgets/vj_text_field.dart';
+import 'package:via_justa/features/contracts/presentation/widgets/contract_capture_section.dart';
 import 'package:via_justa/features/contracts/presentation/widgets/demo_contract_summary.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
@@ -533,6 +534,8 @@ class _ContractScanSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.md),
+        const ContractCaptureSection(),
+        const SizedBox(height: AppSpacing.lg),
         contractAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (err, st) => Text(

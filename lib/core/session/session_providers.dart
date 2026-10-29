@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:via_justa/core/demo/demo_data.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
+import 'package:via_justa/features/contracts/presentation/state/contract_capture_provider.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
 import 'package:via_justa/features/prices/presentation/state/price_contribution_provider.dart';
@@ -59,6 +60,7 @@ class SessionController {
     _ref.read(priceMapCategoryProvider.notifier).clear();
     _ref.read(priceScanProvider.notifier).reset();
     _ref.read(priceContributionProvider.notifier).resetSession();
+    _ref.read(contractCaptureProvider.notifier).discardDocument();
     _ref.read(scanModeProvider.notifier).reset();
   }
 }

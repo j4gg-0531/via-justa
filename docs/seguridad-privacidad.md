@@ -120,3 +120,10 @@ Todas las tablas de la base de datos deben tener RLS activado de forma obligator
   2. Validación de cuota diaria en `ai_usage` (máximo 5 llamadas/día por usuario).
   3. Sanitización del texto de entrada (máximo 15.000 caracteres).
   4. Instrucción de sistema inyectada por el servidor que ordena al LLM actuar como analizador legal neutral, desestimando cualquier comando que intente alterar su comportamiento (*system prompt defense*).
+
+### 5.3 Permisos de ML Kit y Procesamiento Local de Contratos (VJ-13 / RN-10)
+- **Permisos inyectados en AndroidManifest:** La integración de google_mlkit_text_recognition y sus dependencias (com.google.android.gms:play-services-mlkit-text-recognition-common) inyectan automáticamente en el manifiesto fusionado los permisos:
+  - ndroid.permission.INTERNET
+  - ndroid.permission.ACCESS_NETWORK_STATE
+- **Diagnóstico y advertencia de privacidad:** Aunque el reconocimiento óptico de caracteres (OCR) con el modelo latino opera localmente en el dispositivo sin enviar la imagen del contrato a servidores de Google, **queda PENDIENTE DE VERIFICAR en la documentación oficial de ML Kit** si la biblioteca transmite telemetría, eventos de diagnóstico o estadísticas de uso anónimas a Google. No se da por sentado que la transmisión de red sea nula hasta constatar dicha política en la documentación técnica oficial.
+- **Consentimiento propio en la aplicación:** Para cumplir RN-10 sin invocar permisos intrusivos del sistema operativo (no se solicita el permiso CAMERA ni se utiliza permission_handler), la aplicación presenta un diálogo modal previo de consentimiento informado antes de delegar la captura a la cámara del sistema o abrir el selector de archivos, garantizando transparencia sobre el procesamiento on-device y el borrado de archivos temporales.

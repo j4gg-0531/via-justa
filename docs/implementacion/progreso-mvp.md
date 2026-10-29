@@ -30,7 +30,7 @@
 | **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **PENDIENTE** | VJ-07 |
 | **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **PENDIENTE** | VJ-10 |
 | **VJ-12** | P1 | Frontend | Google Maps de precios, filtros y optimización | **BLOQUEADO-EXTERNO** | VJ-11 |
-| **VJ-13** | P1 | Frontend | Captura de contratos: cámara, archivos y OCR local | **PENDIENTE** | VJ-06 |
+| **VJ-13** | P1 | Frontend | Captura de contratos: cámara, archivos y OCR local | **HECHO — verificado en dispositivo (moto_g22, release); PDF diferido** | VJ-06 |
 | **VJ-14** | P1 | Ambos | Análisis de contratos con Gemini en Edge Function | **BLOQUEADO-EXTERNO** | VJ-13 |
 | **VJ-15** | P2 | Ambos | Vista de ciudad de Valledupar: cultura verificada es/en | **PENDIENTE** | VJ-09 |
 | **VJ-16** | P2 | Ambos | Registro de negocio en 4 pasos, RLS y moderación | **PENDIENTE** | VJ-08 |
@@ -129,7 +129,23 @@
 
 ---
 
-## 6. VJ-07 — Backend Supabase (29 de octubre de 2026)
+## 6. Implementación y Cierre de VJ-13 (Captura y OCR Local de Contratos)
+
+- **Estado:** **HECHO — verificado en dispositivo (moto_g22, release); PDF diferido** en rama `feature/vj-13-captura-contratos-ocr`.
+- **Alcance MVP:**
+  - Soporte de formatos: **JPG, PNG y TXT** (archivos de hasta 10 MB).
+  - **Soporte de PDF diferido:** Marcado honestamente como "Próximamente" (`pdfComingSoon`); ML Kit Text Recognition procesa imágenes (bitmaps).
+  - **OCR Local en el dispositivo:** `google_mlkit_text_recognition` con script latino. Inferencia 100% on-device.
+  - **Texto nativo consolidado de ML Kit (`recognized.text`):** Se utiliza directamente el texto nativo entregado por ML Kit (`recognized.text`), preservando los párrafos, bloques y orden de lectura original generado por el modelo de visión en el dispositivo, sin algoritmos de reordenamiento manual.
+  - **Consentimiento propio en la app (RN-10):** Diálogo de consentimiento antes de invocar la cámara o el selector de archivos, informando que el procesamiento se realiza localmente y no se almacena en servidores. La decisión de exhibición reside íntegramente en el provider (`ContractCaptureNotifier`), sin solicitar permisos intrusivos del sistema operativo (CAMERA).
+  - **Cumplimiento estricto de RN-10 (No retención):** Eliminación inmediata de archivos temporales en caché generados por `image_picker` y `file_picker` en bloque `finally`, tanto tras el OCR exitoso como en caso de falla, cancelación o descarte del documento (`discardDocument()`).
+  - **Reglas mínimas de R8 / Proguard:** Configuración en `android/app/proguard-rules.pro` para preservar los constructores de `ComponentRegistrar` requeridos por la instanciación reflectiva de ML Kit en modo `--release`, suprimiendo advertencias de scripts no empaquetados.
+  - **Editor y límite de 15.000 caracteres:** El texto extraído es editable en memoria sin truncamiento silencioso; se advierte y exige recorte manual si excede el límite máximo.
+  - **Catálogo de contratos sintéticos:** 3 muestras bilingües (ES/EN) sin datos personales reales para pruebas y demostración segura.
+
+---
+
+## 7. VJ-07 — Backend Supabase (29 de octubre de 2026)
 
 - **D4 ratificada:** Supabase es el backend del MVP (ver `docs/decisiones.md`).
 - **Migraciones creadas:**

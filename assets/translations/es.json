@@ -1,4 +1,4 @@
-{
+﻿{
   "app": { "name": "Vía Justa" },
   "common": {
     "back": "Atrás",
@@ -316,5 +316,35 @@
     "dialog_profile_title": "Seleccionar tipo de perfil",
     "legal_dialog_title": "Aviso legal",
     "legal_dialog_body": "Vía Justa es una iniciativa ciudadana para la transparencia de precios y contratos."
+  },
+  "contract_capture": {
+    "title": "Captura y OCR local de contratos",
+    "subtitle": "Toma una foto, selecciona un archivo (JPG, PNG o TXT hasta 10 MB), prueba un contrato sintético o edita el texto antes del análisis.",
+    "formats_badge": "Formatos MVP: JPG, PNG, TXT (máx. 10 MB)",
+    "pdf_coming_soon_chip": "PDF (Próximamente)",
+    "action_camera": "Tomar foto (OCR)",
+    "action_file": "Cargar JPG/PNG/TXT",
+    "action_manual": "Escribir o pegar texto",
+    "samples_title": "Contratos sintéticos de prueba (sin datos reales)",
+    "samples_subtitle": "Toca un caso sintético para cargar su texto extraído en español o inglés.",
+    "status_reading": "Extrayendo texto con OCR local...",
+    "status_ready": "Listo para analizar (texto validado)",
+    "rn10_privacy_banner": "Privacidad RN-10: el archivo temporal se elimina del caché inmediatamente tras el OCR y el texto solo vive en memoria hasta que lo descartes.",
+    "rn10_temp_deleted_badge": "Caché temporal borrado (RN-10)",
+    "editor_label": "Texto del contrato (editable)",
+    "editor_hint": "Pega o edita aquí las cláusulas del contrato (entre 20 y 15.000 caracteres)...",
+    "char_counter": "{count} / {max} caracteres",
+    "discard_cta": "Descartar documento",
+    "analyze_disabled_cta": "Analizar contrato · Próximamente (VJ-14)",
+    "error_unsupported_format": "Formato no admitido. En el MVP solo se aceptan imágenes JPG, PNG o archivos TXT.",
+    "error_pdf_coming_soon": "El soporte para archivos PDF estará disponible próximamente. Por ahora usa fotos (JPG/PNG) o texto (TXT).",
+    "error_file_too_large": "El archivo supera el límite máximo permitido de 10 MB.",
+    "error_empty_or_illegible": "El texto está vacío o es ilegible (mínimo 20 caracteres útiles).",
+    "error_exceeds_max_length": "El texto supera el límite de 15.000 caracteres ({count} actuales). Recorta al menos {excess} caracteres en el editor; no se trunca automáticamente.",
+    "error_read_failed": "No pudimos leer el documento. Intenta con otra imagen o archivo.",
+    "consent_dialog_title": "Privacidad y procesamiento en el dispositivo",
+    "consent_dialog_body": "El documento se procesará exclusivamente en tu teléfono mediante OCR local (RN-10). La imagen no se enviará a ningún servidor y cualquier archivo temporal en caché se borrará inmediatamente después de la lectura.",
+    "consent_cancel": "Cancelar",
+    "consent_continue": "Continuar"
   }
 }

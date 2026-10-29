@@ -38,6 +38,9 @@ dependencies:
   go_router: ^18.1.1
   easy_localization: ^3.0.8
   supabase_flutter: ^2.18.3
+  image_picker: ^1.2.4
+  file_picker: ^13.3.0
+  google_mlkit_text_recognition: ^0.17.1
 
 dev_dependencies:
   flutter_test:
