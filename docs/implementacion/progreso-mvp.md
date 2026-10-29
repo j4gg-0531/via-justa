@@ -1,7 +1,7 @@
 # Progreso y Control de Cambios — Vía Justa MVP
 
-**Última actualización:** 29 de octubre de 2026 (VJ-08 autenticación real contra Supabase Auth, perfil y consentimientos)  
-**Rama base actual:** `main` — PRs #4 a #9 en integración; rama actual `feature/vj-08-auth-supabase`  
+**Última actualización:** 29 de octubre de 2026 (VJ-14 avance parcial app móvil; VJ-07, VJ-08 y VJ-13 integrados en `main`)  
+**Rama base actual:** `main` — PRs #4 a #16 integrados; rama actual `feature/vj-14-analisis-contratos-app`  
 **Repositorio remoto:** `https://github.com/j4gg-0531/via-justa.git`  
 **Entorno de ejecución:** Windows 10/11 x64, PowerShell 5.1  
 **Gradle Wrapper:** 9.3.1 (`android/gradle/wrapper/gradle-wrapper.properties`)  
@@ -9,7 +9,7 @@
 **Kotlin:** 2.4.0 (`android/settings.gradle.kts`)  
 **JVM Target:** Java 17 (`android/app/build.gradle.kts`)  
 **Flutter SDK:** Flutter 3.47.7 (canal `stable`, Dart 3.13.5) instalado en `C:\Users\JUAN\flutter` y añadido al PATH de usuario.  
-**Suite de pruebas:** 173 pruebas automatizadas ejecutadas y 173 aprobadas (100% éxito), incluyendo el recorrido E2E del Primer Avance (`test/first_milestone_walkthrough_test.dart`) y las pruebas nuevas de autenticación (`test/auth_mappers_test.dart`, `test/auth_controller_test.dart`).
+**Suite de pruebas:** 209 pruebas automatizadas ejecutadas y 209 aprobadas (100% éxito), incluyendo el recorrido E2E del Primer Avance (`test/first_milestone_walkthrough_test.dart`), las pruebas de autenticación Supabase (`test/auth_controller_test.dart`) y las pruebas completas de análisis de contratos (`test/contract_analysis_repository_test.dart`, `test/contract_analysis_view_test.dart`).
 
 ---
 
@@ -24,14 +24,14 @@
 | **VJ-04** | P1 | Ambos | Motor visual de semáforo demo por zonas (GPS + mapa): pantallas M06, M07 y M20 | **HECHO-VERIFICADO (`feature/vj-04-semaforo-demo`)** | VJ-03 |
 | **VJ-05** | P1 | Frontend | Pantalla M10: aportar precio en 4 pasos demo por zona | **HECHO-VERIFICADO (`feature/vj-05-aportar-precio-demo`)** | VJ-04 |
 | **VJ-06** | P1 | Ambos | Cierre del primer avance: walkthrough E2E, CI y documentación de sustentación | **HECHO-VERIFICADO (`feature/vj-06-cierre-primer-avance`)** | VJ-03, VJ-04, VJ-05 |
-| **VJ-07** | P0 | Backend | Supabase: migración inicial, RLS, GRANT, seeds y ER | **HECHO-VERIFICADO** (`feature/vj-07-supabase-init`; `supabase db reset` + `supabase test db` en local: 21/21) | VJ-01, VJ-06 |
-| **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos | **HECHO-VERIFICADO (local, modo DEMO disponible)** (`feature/vj-08-auth-supabase`) | VJ-07 |
+| **VJ-07** | P0 | Backend | Supabase: migración inicial, RLS, GRANT, seeds y ER | **INTEGRADO (PR #15)** | VJ-01, VJ-06 |
+| **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos | **INTEGRADO (PR #16)** | VJ-07 |
 | **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **PENDIENTE** | VJ-08 |
 | **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **PENDIENTE** | VJ-07 |
 | **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **PENDIENTE** | VJ-10 |
 | **VJ-12** | P1 | Frontend | Google Maps de precios, filtros y optimización | **BLOQUEADO-EXTERNO** | VJ-11 |
-| **VJ-13** | P1 | Frontend | Captura de contratos: cámara, archivos y OCR local | **HECHO — verificado en dispositivo (moto_g22, release); PDF diferido** | VJ-06 |
-| **VJ-14** | P1 | Ambos | Análisis de contratos con Gemini en Edge Function | **BLOQUEADO-EXTERNO** | VJ-13 |
+| **VJ-13** | P1 | Frontend | Captura de contratos: cámara, archivos y OCR local | **INTEGRADO (PR #14)** | VJ-06 |
+| **VJ-14** | P1 | Ambos | Análisis de contratos con Gemini en Edge Function | **avance parcial (app); backend pendiente** | VJ-13 |
 | **VJ-15** | P2 | Ambos | Vista de ciudad de Valledupar: cultura verificada es/en | **PENDIENTE** | VJ-09 |
 | **VJ-16** | P2 | Ambos | Registro de negocio en 4 pasos, RLS y moderación | **PENDIENTE** | VJ-08 |
 | **VJ-17** | P2 | Frontend | Negocios: catálogo, detalle y acciones externas | **PENDIENTE** | VJ-16 |
@@ -131,7 +131,7 @@
 
 ## 6. Implementación y Cierre de VJ-13 (Captura y OCR Local de Contratos)
 
-- **Estado:** **HECHO — verificado en dispositivo (moto_g22, release); PDF diferido** en rama `feature/vj-13-captura-contratos-ocr`.
+- **Estado:** **HECHO — verificado en dispositivo (moto_g22, release); PDF diferido** en rama `feature/vj-13-captura-contratos-ocr` (PR #14 integrado en `main`).
 - **Alcance MVP:**
   - Soporte de formatos: **JPG, PNG y TXT** (archivos de hasta 10 MB).
   - **Soporte de PDF diferido:** Marcado honestamente como "Próximamente" (`pdfComingSoon`); ML Kit Text Recognition procesa imágenes (bitmaps).
@@ -161,14 +161,13 @@
   - `supabase start` → servicios arriba (PostgreSQL 17, Auth, Storage, Studio).
   - `supabase db reset` → 5 migraciones aplicadas y 6 seeds cargadas (exit 0).
   - `supabase test db` → `Files=1, Tests=21`, `Result: PASS` (21/21 aserciones pgTAP).
-- **Estado:** `HECHO-VERIFICADO` (local). **No se ha aplicado al proyecto remoto** `vjehsjqmwibmiqmxlsou`; requiere aprobación explícita antes de `supabase db push`.
-- **Siguiente paso:** abrir el PR de `feature/vj-07-supabase-init` a `main` y, con aprobación, aplicar las migraciones al proyecto remoto.
+- **Estado:** `HECHO-VERIFICADO` (local; PR #15 integrado en `main`). **No se ha aplicado al proyecto remoto** `vjehsjqmwibmiqmxlsou`; requiere aprobación explícita antes de `supabase db push`.
 
 ---
 
-## 7. VJ-08 — Autenticación real, sesión, perfil y consentimientos (29 de octubre de 2026)
+## 8. VJ-08 — Autenticación real, sesión, perfil y consentimientos (29 de octubre de 2026)
 
-### 7.1 Dependencia y configuración
+### 8.1 Dependencia y configuración
 
 - `supabase_flutter ^2.18.3` agregado con `flutter pub add` (31 dependencias transitivas, incluida `gotrue 2.27.3`). Los registrantes de plugins de `linux/`, `macos/` y `windows/` fueron regenerados automáticamente por la herramienta.
 - Las credenciales se inyectan en tiempo de compilación y **nunca** se versionan:
@@ -182,7 +181,7 @@ flutter run -d <device-id> --no-pub `
 - Solo se usa la clave pública (`anon`/`publishable`). La `service_role` es exclusiva de procesos de servidor y no aparece en la app.
 - Sin `--dart-define`, `SupabaseSettings.fromEnvironment()` devuelve `null`, `supabaseClientProvider` queda en `null` y `authRepositoryProvider` entrega `DemoAuthRepository`: la app sigue funcionando en modo DEMO y las pantallas rotulan el acceso como tal (`auth.demo_note`).
 
-### 7.2 Capas
+### 8.2 Capas
 
 - **`domain/` (Dart puro):** `auth_failure.dart`, `auth_session.dart`, `user_profile.dart`, `consent_document.dart`, `sign_up_result.dart` y el contrato `auth_repository.dart`.
 - **`data/`:** `supabase_auth_repository.dart` (Auth + `profiles` + `consents`), `demo_auth_repository.dart` (memoria), `auth_failure_mapper.dart` (GoTrue/PostgREST → `AuthFailureKind`), `profile_mapper.dart` (fila → entidad).
@@ -190,7 +189,7 @@ flutter run -d <device-id> --no-pub `
 - **`core/supabase/`:** `supabase_settings.dart`, `supabase_bootstrap.dart` y `supabase_providers.dart`; `main.dart` sobreescribe el provider del cliente solo si la inicialización funciona.
 - **Vistas:** `login_page.dart` y `register_page.dart` delegan por completo en `AuthController`; `profile_page.dart` muestra el correo real, permite editar el nombre y persiste idioma y tipo de perfil; `profile_selection_page.dart` persiste la elección del onboarding.
 
-### 7.3 Reglas y decisiones aplicadas
+### 8.3 Reglas y decisiones aplicadas
 
 - **Consentimientos:** al registrarse se insertan las dos filas de `public.consents` (`terms_and_conditions`, `privacy_policy`) con `version = 'v1.0'`, alineadas con el CHECK de la migración `20261027151910_profiles_and_consents.sql`.
 - **D11 (`resident`) sigue PROPUESTA:** el CHECK de `profiles.profile_type` solo admite `visitor` y `settler`, así que `ProfileType.isPersistable` marca `resident` como no persistible. La app lo conserva en memoria y avisa con `auth.error.profile_type_pending`; no se inventó un valor nuevo en la base.
@@ -198,14 +197,14 @@ flutter run -d <device-id> --no-pub `
 - **Errores:** ninguno de los nueve `AuthFailureKind` se resuelve en la vista; `auth_failure_text.dart` solo traduce el enum a `'auth.error.*'.tr()`.
 - **Sincronización local:** `AuthController._syncLocalProfile` hidrata `userNameProvider` y `profileTypeProvider` con lo que el servidor confirmó, pero no los borra al perder la sesión, para no romper `session_lifecycle_test` ni el flujo DEMO del primer avance.
 
-### 7.4 Verificación ejecutada
+### 8.4 Verificación ejecutada
 
 - `flutter analyze` → `No issues found!`.
 - `flutter test` → **173/173 pruebas aprobadas**, incluidas las 23 nuevas de autenticación.
 - Barrido del punto 5.2 sobre `lib/**/presentation/` excluyendo `presentation/state/` → 0 coincidencias de `normalizeForSearch|search[A-Z]\w*\(|\.where\(|\.sort\(|firstWhere|jsonDecode|rootBundle|Timer|Future\.delayed`.
 - **No verificado:** ejecución en dispositivo/emulador Android y `supabase db push` al proyecto remoto. Pendiente de aprobación explícita.
 
-### 7.5 Ruta del código
+### 8.5 Ruta del código
 
 - **Iniciar sesión:** `LoginPage` → `authControllerProvider.signIn()` → `AuthRepository.signIn()` → `SupabaseAuthRepository` → Supabase Auth (GoTrue).
 - **Crear cuenta:** `RegisterPage` → `AuthController.signUp()` → `registerConsents()` + `saveDisplayName()` → `SupabaseAuthRepository` → `consents` / `profiles`.
@@ -213,9 +212,23 @@ flutter run -d <device-id> --no-pub `
 - **Cambiar idioma:** `ProfilePage` → `AuthController.saveLanguage()` → `SupabaseAuthRepository.saveLanguage()` → `profiles.language`.
 - **Elegir tipo de perfil:** `ProfileSelectionPage` → `AuthController.persistProfileType()` → `saveProfileType()` → `profiles.profile_type` (con `resident` bloqueado por D11).
 
-### 7.6 Pendientes de VJ-08
+### 8.6 Pendientes de VJ-08
 
 1. Aprobar y ejecutar `supabase db push` contra `vjehsjqmwibmiqmxlsou` (VJ-07 + VJ-08 comparten backend).
 2. Resolver D11 (`resident`) y D14 (confirmación de correo) en `docs/decisiones.md`.
 3. Probar el recorrido real en emulador Android con `--dart-define` y revisar overflows/logcat.
 4. VJ-09: navegación por sesión en el router.
+
+---
+
+## 9. Avance Parcial de VJ-14 (Análisis de Contratos en la Aplicación Móvil)
+
+- **Estado:** **Avance parcial (app); backend pendiente** en rama `feature/vj-14-analisis-contratos-app`.
+- **Alcance completado en el cliente móvil:**
+  - **Dominio puro y validaciones estrictas:** Entidad `ContractAnalysisResult` (§4.4 de `contrato-datos-v1.md`) con niveles semánticos `green`, `yellow`, `red`, recomendación general, puntos clave y cláusulas analizadas (cita literal, alerta, recomendación y referencia legal nullable). Validación estricta con `FormatException` ante datos incompletos o fuera de límites (máx. 5 puntos clave, máx. 10 cláusulas, textos vacíos). Errores tipados `ContractAnalysisError` (§4.5) con extensiones puras `translationKey` e `isRetryable`.
+  - **Gateway y desacoplamiento de arquitectura:** Interfaz `ContractAnalysisGateway` en `domain/` y `DefaultContractAnalysisRepository` en `data/`. La aplicación móvil no contiene dependencias de red prematuras, claves de Gemini ni SDKs directos de IA. Implementación `DemoContractAnalysisGateway` con simulación local rotulada visiblemente como `[DEMO]` y escenarios controlados de éxito y error con reconocimiento automático de los 3 contratos sintéticos (verde, amarillo y rojo).
+  - **Control de estado y ciclo de vida (`ContractAnalysisNotifier`):** Estados reactivos `idle`, `analyzing`, `result`, `error`. Bloqueo de doble toque, descarte de respuestas tardías u obsoletas mediante identificador secuencial de petición, reinicio automático ante descarte de documento en `contractCaptureProvider` y reinicio con revocación de consentimiento en `SessionController.signOut`.
+  - **Segundo consentimiento informado:** Flujo de consentimiento específico y diferenciado del OCR de RN-10, advirtiendo que el texto saldrá del dispositivo hacia un servicio externo de IA y recomendando el uso de contratos sintéticos en pruebas. La decisión de solicitarlo reside en el provider.
+  - **Interfaz estructurada y accesible (`ContractAnalysisResultView`):** Triple canal semántico (color + ícono + texto traducido) integrado con `SemanticStatusColors`. Ocultamiento estricto de referencias legales nulas. Banner visible de demostración. Reintento seguro ante errores transitorios. Adaptación responsiva verificada en dispositivo real (`moto_g22`), a 360 dp y 1.5x de escala de texto sin desbordamientos.
+- **Pendiente para cierre definitivo:**
+  - Implementación y despliegue de la Edge Function en Supabase con Google Gemini (backend pendiente).

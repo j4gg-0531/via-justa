@@ -6,14 +6,14 @@ import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
+import 'package:via_justa/features/contracts/domain/contract_analysis_result.dart';
 import 'package:via_justa/features/contracts/domain/contract_capture.dart';
+import 'package:via_justa/features/contracts/presentation/state/contract_analysis_provider.dart';
 import 'package:via_justa/features/contracts/presentation/state/contract_capture_provider.dart';
+import 'package:via_justa/features/contracts/presentation/widgets/contract_analysis_result_view.dart';
 
-/// Sección interactiva de captura de contratos, OCR local, contratos sintéticos (ES/EN)
-/// y edición manual de texto (`VJ-13` — Paso A).
-///
-/// El flujo termina en `ContractCaptureStatus.readyForAnalysis` con el botón de análisis
-/// deshabilitado y rotulado como `Próximamente (VJ-14)`.
+/// Sección interactiva de captura de contratos, OCR local, contratos sintéticos (ES/EN),
+/// edición manual de texto y análisis orientativo con IA (`VJ-13` y `VJ-14`).
 class ContractCaptureSection extends ConsumerStatefulWidget {
   const ContractCaptureSection({super.key});
 
@@ -97,11 +97,46 @@ class _ContractCaptureSectionState
     );
   }
 
+  void _showAiConsentDialog(
+    BuildContext context,
+    ContractAnalysisNotifier notifier,
+  ) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        title: Text('contract_analysis.ai_consent_dialog_title'.tr()),
+        content: Text('contract_analysis.ai_consent_dialog_body'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              notifier.cancelAiConsent();
+            },
+            child: Text('contract_analysis.ai_consent_cancel'.tr()),
+          ),
+          VjButton(
+            label: 'contract_analysis.ai_consent_continue'.tr(),
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              notifier.confirmAiConsentAndProceed();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final captureState = ref.watch(contractCaptureProvider);
+    final analysisState = ref.watch(contractAnalysisProvider);
     final samples = ref.watch(syntheticContractSamplesProvider);
-    final notifier = ref.read(contractCaptureProvider.notifier);
+    final captureNotifier = ref.read(contractCaptureProvider.notifier);
+    final analysisNotifier = ref.read(contractAnalysisProvider.notifier);
     final textTheme = Theme.of(context).textTheme;
 
     String languageCode;
@@ -115,7 +150,14 @@ class _ContractCaptureSectionState
     ref.listen<ContractCaptureState>(contractCaptureProvider, (previous, next) {
       if (next.pendingConsentSource != null &&
           previous?.pendingConsentSource == null) {
-        _showConsentDialog(context, notifier, languageCode);
+        _showConsentDialog(context, captureNotifier, languageCode);
+      }
+    });
+
+    ref.listen<ContractAnalysisState>(contractAnalysisProvider, (previous, next) {
+      if (next.isAiConsentDialogVisible &&
+          previous?.isAiConsentDialogVisible != true) {
+        _showAiConsentDialog(context, analysisNotifier);
       }
     });
 
@@ -125,6 +167,9 @@ class _ContractCaptureSectionState
         selection: TextSelection.collapsed(offset: captureState.text.length),
       );
     }
+
+    final isAnalyzeEnabled =
+        captureState.isReadyForAnalysis && !analysisState.isAnalyzing;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,7 +241,7 @@ class _ContractCaptureSectionState
                     onPressed: captureState.status ==
                             ContractCaptureStatus.readingDocument
                         ? null
-                        : () => notifier.requestCameraCapture(
+                        : () => captureNotifier.requestCameraCapture(
                               languageCode: languageCode,
                             ),
                     icon: const Icon(Icons.camera_alt_outlined, size: 18),
@@ -211,7 +256,7 @@ class _ContractCaptureSectionState
                     onPressed: captureState.status ==
                             ContractCaptureStatus.readingDocument
                         ? null
-                        : () => notifier.requestFilePicker(
+                        : () => captureNotifier.requestFilePicker(
                               languageCode: languageCode,
                             ),
                     icon: const Icon(Icons.file_upload_outlined, size: 18),
@@ -223,7 +268,7 @@ class _ContractCaptureSectionState
                     ),
                   ),
                   OutlinedButton.icon(
-                    onPressed: notifier.startManualEntry,
+                    onPressed: captureNotifier.startManualEntry,
                     icon: const Icon(Icons.edit_note_outlined, size: 18),
                     label: Text('contract_capture.action_manual'.tr()),
                     style: OutlinedButton.styleFrom(
@@ -233,7 +278,7 @@ class _ContractCaptureSectionState
                     ),
                   ),
                   OutlinedButton.icon(
-                    onPressed: notifier.notifyPdfComingSoon,
+                    onPressed: captureNotifier.notifyPdfComingSoon,
                     icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
                     label: Text('contract_capture.pdf_coming_soon_chip'.tr()),
                     style: OutlinedButton.styleFrom(
@@ -273,7 +318,7 @@ class _ContractCaptureSectionState
                     sample: sample,
                     languageCode: languageCode,
                     selected: captureState.selectedSampleId == sample.id,
-                    onTap: () => notifier.loadSyntheticSample(
+                    onTap: () => captureNotifier.loadSyntheticSample(
                       sample.id,
                       languageCode: languageCode,
                     ),
@@ -283,7 +328,7 @@ class _ContractCaptureSectionState
           ),
         ),
 
-        // 4. Estado de lectura / Error / Editor de texto y botón Analizar (deshabilitado VJ-14)
+        // 4. Estado de lectura / Error de captura
         if (captureState.status == ContractCaptureStatus.readingDocument) ...[
           const SizedBox(height: AppSpacing.lg),
           VjCard(
@@ -341,6 +386,7 @@ class _ContractCaptureSectionState
           ),
         ],
 
+        // 5. Editor de texto y botón para analizar contrato con IA
         if (captureState.showTextEditor) ...[
           const SizedBox(height: AppSpacing.lg),
           VjCard(
@@ -379,7 +425,7 @@ class _ContractCaptureSectionState
                   controller: _textController,
                   minLines: 5,
                   maxLines: 10,
-                  onChanged: notifier.updateContractText,
+                  onChanged: captureNotifier.updateContractText,
                   decoration: InputDecoration(
                     hintText: 'contract_capture.editor_hint'.tr(),
                     filled: true,
@@ -414,7 +460,7 @@ class _ContractCaptureSectionState
                       ),
                     ),
                     TextButton.icon(
-                      onPressed: notifier.discardDocument,
+                      onPressed: captureNotifier.discardDocument,
                       icon: const Icon(Icons.delete_outline, size: 18),
                       label: Text('contract_capture.discard_cta'.tr()),
                       style: TextButton.styleFrom(
@@ -425,14 +471,124 @@ class _ContractCaptureSectionState
                   ],
                 ),
                 const SizedBox(height: AppSpacing.md),
-                // En VJ-13 el flujo termina en readyForAnalysis; el botón Analizar queda deshabilitado para VJ-14.
                 VjButton(
-                  label: 'contract_capture.analyze_disabled_cta'.tr(),
+                  label: 'contract_analysis.analyze_cta'.tr(),
                   leadingIcon: Icons.auto_awesome_outlined,
-                  onPressed: null,
+                  onPressed: isAnalyzeEnabled
+                      ? () => analysisNotifier.requestAnalysis(
+                            text: captureState.text,
+                            locale: languageCode,
+                          )
+                      : null,
                 ),
               ],
             ),
+          ),
+        ],
+
+        // 6. Estado de análisis en curso
+        if (analysisState.isAnalyzing) ...[
+          const SizedBox(height: AppSpacing.lg),
+          VjCard(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'contract_analysis.analyzing_status'.tr(),
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'contract_analysis.analyzing_hint'.tr(),
+                        style: textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        // 7. Error durante el análisis con IA y acción de reintento si es seguro
+        if (analysisState.hasError && analysisState.error != null) ...[
+          const SizedBox(height: AppSpacing.lg),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: AppColors.semaphoreRed, width: 1.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: AppColors.semaphoreRed,
+                      size: 22,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'contract_analysis.error_title'.tr(),
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            analysisState.error!.translationKey.tr(),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (analysisState.canRetry) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: VjButton(
+                      label: 'contract_analysis.action_retry'.tr(),
+                      leadingIcon: Icons.refresh,
+                      onPressed: analysisNotifier.retryAnalysis,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+
+        // 8. Resultado estructurado del análisis con IA
+        if (analysisState.hasResult) ...[
+          const SizedBox(height: AppSpacing.lg),
+          ContractAnalysisResultView(
+            result: analysisState.result!,
           ),
         ],
       ],

@@ -1,9 +1,15 @@
+import 'package:via_justa/features/contracts/data/demo_contract_analysis_gateway.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis_repository.dart';
+import 'package:via_justa/features/contracts/domain/contract_analysis_result.dart';
 
 /// Implementación DEMO del repositorio de análisis de contratos con dos puntos de ejemplo en ES/EN.
 class DemoContractAnalysisRepository implements ContractAnalysisRepository {
-  const DemoContractAnalysisRepository();
+  const DemoContractAnalysisRepository({
+    this.gateway = const DemoContractAnalysisGateway(),
+  });
+
+  final DemoContractAnalysisGateway gateway;
 
   static const ContractAnalysis demoSample = ContractAnalysis(
     id: 'demo-lease-valledupar-01',
@@ -37,5 +43,17 @@ class DemoContractAnalysisRepository implements ContractAnalysisRepository {
   @override
   Future<ContractAnalysis> getDemoSampleAnalysis() async {
     return demoSample;
+  }
+
+  @override
+  Future<ContractAnalysisResult> analyzeContract({
+    required String text,
+    required String locale,
+  }) async {
+    final raw = await gateway.analyzeContractRaw(
+      text: text,
+      locale: locale,
+    );
+    return ContractAnalysisResult.fromMap(raw, isDemo: true);
   }
 }

@@ -9,6 +9,7 @@ import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/core/widgets/vj_text_field.dart';
+import 'package:via_justa/features/contracts/presentation/state/contract_analysis_provider.dart';
 import 'package:via_justa/features/contracts/presentation/widgets/contract_capture_section.dart';
 import 'package:via_justa/features/contracts/presentation/widgets/demo_contract_summary.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
@@ -172,6 +173,8 @@ class _PriceScanPageState extends ConsumerState<PriceScanPage> {
               else
                 _ContractScanSection(
                   contractAsync: contractAsync,
+                  showDemoSummary:
+                      !ref.watch(contractAnalysisProvider).hasResult,
                   onComingSoonTap: () => _showInfoDialog(context),
                 ),
 
@@ -499,12 +502,14 @@ class _PriceScanSection extends ConsumerWidget {
 /// Sección del modo Contrato: encabezado + DemoContractSummary con dos puntos en ES/EN.
 class _ContractScanSection extends StatelessWidget {
   const _ContractScanSection({
+    this.showDemoSummary = true,
     required this.contractAsync,
     required this.onComingSoonTap,
   });
 
   final AsyncValue contractAsync;
   final VoidCallback onComingSoonTap;
+  final bool showDemoSummary;
 
   @override
   Widget build(BuildContext context) {
@@ -535,6 +540,7 @@ class _ContractScanSection extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.md),
         const ContractCaptureSection(),
+        if (showDemoSummary) ...[
         const SizedBox(height: AppSpacing.lg),
         contractAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -547,6 +553,7 @@ class _ContractScanSection extends StatelessWidget {
             onComingSoonTap: onComingSoonTap,
           ),
         ),
+        ],
       ],
     );
   }
