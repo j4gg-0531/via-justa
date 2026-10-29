@@ -31,7 +31,7 @@
 | **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **HECHO-VERIFICADO** (Backend listo + App en `feature/vj-11-vj-14-precios-y-contratos-reales`) | VJ-10 |
 | **VJ-12** | P1 | Frontend | Google Maps de precios, filtros y optimización | **BLOQUEADO-EXTERNO** | VJ-11 |
 | **VJ-13** | P1 | Frontend | Captura de contratos: cámara, archivos y OCR local | **INTEGRADO (PR #14)** | VJ-06 |
-| **VJ-14** | P1 | Ambos | Análisis de contratos con Gemini en Edge Function | **HECHO-VERIFICADO** (app en PR #17 + backend Edge Function `analyze_contract` y cuota SQL en `feature/vj-14-analisis-contratos-backend`) | VJ-13 |
+| **VJ-14** | P1 | Ambos | Análisis de contratos con Gemini en Edge Function | **HECHO-VERIFICADO** (Backend Edge Function `analyze_contract` + App conectada en `feature/vj-11-vj-14-precios-y-contratos-reales`) | VJ-13 |
 | **VJ-15** | P2 | Ambos | Vista de ciudad de Valledupar: cultura verificada es/en | **PENDIENTE** | VJ-09 |
 | **VJ-16** | P2 | Ambos | Registro de negocio en 4 pasos, RLS y moderación | **PENDIENTE** | VJ-08 |
 | **VJ-17** | P2 | Frontend | Negocios: catálogo, detalle y acciones externas | **PENDIENTE** | VJ-16 |

@@ -1,4 +1,5 @@
 import 'package:via_justa/features/contracts/data/demo_contract_analysis_repository.dart';
+import 'package:via_justa/features/contracts/data/supabase_contract_analysis_gateway.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis_gateway.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis_repository.dart';
@@ -35,7 +36,8 @@ class DefaultContractAnalysisRepository implements ContractAnalysisRepository {
     );
 
     try {
-      return ContractAnalysisResult.fromMap(rawMap, isDemo: true);
+      final isDemo = rawMap['is_demo'] as bool? ?? (gateway is! SupabaseContractAnalysisGateway);
+      return ContractAnalysisResult.fromMap(rawMap, isDemo: isDemo);
     } on FormatException catch (e) {
       throw ContractAnalysisException(
         ContractAnalysisError.aiResponseInvalid,
