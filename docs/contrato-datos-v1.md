@@ -205,10 +205,15 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
   - `CREATE INDEX idx_price_reports_stat ON price_reports(municipality_code, zone_id, category_id, created_at) WHERE is_hidden = false AND is_demo = false;`
   - `CREATE INDEX idx_price_reports_location ON price_reports USING GIST(location);`
   - `CREATE INDEX idx_price_reports_user ON price_reports(user_id);`
-- **Políticas RLS:**
-  - `SELECT`: Visible para todos si `is_hidden = false` y `is_demo = false` (a menos que el usuario esté en modo demo).
-  - `INSERT`: Usuarios autenticados (`auth.uid() = user_id`), validando tope de reportes diarios para prevenir spam.
-  - `UPDATE` / `DELETE`: Solo el autor sobre sus reportes recientes o administradores.
+  - `CREATE INDEX price_reports_user_recent_idx ON price_reports(user_id, created_at DESC);`
+- **Políticas RLS, Reglas de Cuota y RPCs en Servidor (`VJ-11`):**
+  - `SELECT`: Visible para todos si `is_hidden = false` y `is_demo = false`; el autor ve sus propios reportes.
+  - `INSERT`: Usuarios autenticados (`auth.uid() = user_id`), protegido por el trigger `public.enforce_price_report_submission_rules()` y la RPC `public.submit_price_report(...)`:
+    - **Rango de monto y texto:** `amount_cop` entre `$500` y `$20.000.000 COP`; `place_name` limpio hasta 120 caracteres; `source_note` limpio hasta 255 caracteres.
+    - **Vigencia de catálogos:** Exige categoría con `is_active = true` (`[PRICE_CATEGORY_INACTIVE]`), municipio con `is_pilot = true` (`[PRICE_MUNICIPALITY_NOT_PILOT]`) y zona activa del municipio (`[PRICE_ZONE_INACTIVE]`).
+    - **Privacidad geoespacial automática:** Toda coordenada `location` se redondea en servidor a 3 decimales ($\approx 110\text{ m}$ de resolución urbana), impidiendo persistir ubicaciones exactas de domicilios.
+    - **Concurrencia, deduplicación y cuota diaria:** Serializa envíos concurrentes por usuario mediante `pg_advisory_xact_lock`, bloquea reportes idénticos dentro de `duplicate_cooldown_minutes` (`15 min`, error `[PRICE_DUPLICATE_REPORT]`) y limita a `daily_report_limit_per_user` (`10` aportes reales cada 24 horas móviles, error `[PRICE_RATE_LIMITED]`).
+  - `UPDATE` / `DELETE`: Solo el autor sobre sus reportes recientes (`< 24 horas`) sin alterar metadatos ni banderas, o moderación administrativa mediante `public.moderate_price_report(p_report_id, p_is_hidden, p_reason)`.
 
 ---
 
@@ -245,7 +250,11 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
     "threshold_yellow": 40.0,
     "underpriced_alert_threshold": -40.0,
     "recommended_cap_factor": 1.15,
-    "daily_ai_limit_per_user": 5
+    "daily_ai_limit_per_user": 5,
+    "daily_report_limit_per_user": 10,
+    "duplicate_cooldown_minutes": 15,
+    "min_report_amount_cop": 500,
+    "max_report_amount_cop": 20000000
   }
   ```
 - **Políticas RLS:** `SELECT` público a autenticados. Modificación exclusiva de administradores.
@@ -450,11 +459,15 @@ AS $$ ... $$;
 }
 ```
 
-### 4.3 Control de Seguridad y Prompt Defense
-1. **Límite de caracteres:** Máximo 15.000 caracteres de texto plano.
-2. **Validación de cuota:** La función consulta `ai_usage`. Si `count >= 5` en el día actual, rechaza con código HTTP `429 Too Many Requests`.
-3. **Aislamiento de Prompt:** El texto del contrato se trata como dato no confiable (*untrusted input*). El system prompt instruye ignorar instrucciones imperativas embebidas en el contrato.
-4. **Privacidad estricta (RN-10):** El texto del contrato **NUNCA se persiste en la base de datos ni en logs**. Solo se registra el conteo de uso en `ai_usage`.
+### 4.3 Control de Seguridad, Cuota Atómica y Prompt Defense
+1. **Límite de caracteres:** Máximo 15.000 caracteres de texto plano (cuerpo HTTP crudo $\le 128\text{ KB}$).
+2. **Validación atómica de cuota (`public.ai_usage`, zona horaria `America/Bogota`):**
+   - La Edge Function invoca con `service_role` la RPC `public.consume_ai_daily_quota(user_id)` antes de llamar a Gemini (serializada con `pg_advisory_xact_lock`).
+   - Si `count >= 5` en el día calendario actual (`America/Bogota`, `UTC-5`), rechaza inmediatamente con HTTP `429 Too Many Requests` y código `AI_DAILY_LIMIT_EXCEEDED`.
+   - **Política de reintegro ante fallos técnicos:** Si la llamada posterior a Gemini falla por error de proveedor (`502`/`503`), timeout (`504`) o respuesta malformada (`AI_RESPONSE_INVALID`), la función ejecuta `public.refund_ai_daily_quota(user_id)` para que el reintento del usuario no consuma su cuota diaria.
+   - El usuario autenticado puede consultar su saldo diario mediante `public.get_my_ai_quota_status()`.
+3. **Aislamiento de Prompt y Saneamiento de Salida:** El texto del contrato se delimita dentro de `<untrusted_contract_document>` como dato no confiable (*untrusted input*). El validador de salida elimina etiquetas HTML/script y anula a `null` cualquier referencia legal no verificable contra normas reales colombianas (*Ley 820 de 2003*, *Código Civil*, *Código de Comercio*, *Ley 1480 de 2011*, *Ley 1581 de 2012*).
+4. **Privacidad estricta (RN-10):** El texto del contrato **NUNCA se persiste en la base de datos, Storage ni en logs**. Solo se registra el conteo de uso en `ai_usage`.
 
 ### 4.4 Esquema JSON Retornado por Gemini (`responseSchema`)
 ```json

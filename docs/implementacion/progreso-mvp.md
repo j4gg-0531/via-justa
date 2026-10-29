@@ -27,11 +27,11 @@
 | **VJ-07** | P0 | Backend | Supabase: migración inicial, RLS, GRANT, seeds y ER | **INTEGRADO (PR #15)** | VJ-01, VJ-06 |
 | **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos | **INTEGRADO (PR #16)** | VJ-07 |
 | **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **EN CURSO (VJ-09a integrado; faltan municipios remotos y debounce)** | VJ-08 |
-| **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **HECHO-VERIFICADO** (`feature/vj-10-semaforo-sql`; `supabase test db`: 49/49 pgTAP PASS) | VJ-07 |
-| **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **PENDIENTE** | VJ-10 |
+| **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **INTEGRADO (PR #18)** (`supabase test db`: 23/23 pgTAP PASS) | VJ-07 |
+| **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **PARCIAL (Backend listo en `feature/vj-11-reportes-reales-backend`; 18/18 pgTAP PASS; app pendiente)** | VJ-10 |
 | **VJ-12** | P1 | Frontend | Google Maps de precios, filtros y optimización | **BLOQUEADO-EXTERNO** | VJ-11 |
 | **VJ-13** | P1 | Frontend | Captura de contratos: cámara, archivos y OCR local | **INTEGRADO (PR #14)** | VJ-06 |
-| **VJ-14** | P1 | Ambos | Análisis de contratos con Gemini en Edge Function | **avance parcial (app); backend pendiente** | VJ-13 |
+| **VJ-14** | P1 | Ambos | Análisis de contratos con Gemini en Edge Function | **HECHO-VERIFICADO** (app en PR #17 + backend Edge Function `analyze_contract` y cuota SQL en `feature/vj-14-analisis-contratos-backend`) | VJ-13 |
 | **VJ-15** | P2 | Ambos | Vista de ciudad de Valledupar: cultura verificada es/en | **PENDIENTE** | VJ-09 |
 | **VJ-16** | P2 | Ambos | Registro de negocio en 4 pasos, RLS y moderación | **PENDIENTE** | VJ-08 |
 | **VJ-17** | P2 | Frontend | Negocios: catálogo, detalle y acciones externas | **PENDIENTE** | VJ-16 |
@@ -156,11 +156,14 @@
   - `supabase/migrations/20261029102000_businesses_and_content.sql`
 - **Seeds creadas:** 33 departamentos, 25 municipios del Cesar (Valledupar piloto), 5 zonas de Valledupar, 4 categorías de precio, configuración del semáforo y evento DEMO.
 - **RLS/GRANT:** 16 tablas con RLS; catálogos públicos de solo lectura; perfiles y consentimientos privados; `ai_usage` exclusivo de `service_role`; columnas de auditoría no editables por el cliente.
-- **Pruebas:** `supabase/tests/rls.sql` (ampliado a 26 aserciones pgTAP) y `supabase/tests/price_verdict.sql` (23 aserciones pgTAP).
-- **Cierre complementario VJ-07/VJ-08 y ejecución de VJ-10 (`feature/vj-10-semaforo-sql`):**
+- **Pruebas:** `supabase/tests/rls.sql` (26 aserciones pgTAP), `supabase/tests/price_verdict.sql` (23 aserciones pgTAP) y `supabase/tests/price_reports_rls.sql` (18 aserciones pgTAP).
+- **Cierre complementario VJ-07/VJ-08 y ejecución de VJ-10 (`PR #18`):**
   - `supabase/migrations/20261029120000_close_vj07_vj08_d11_and_account_deletion.sql`: ratifica **D11** (`profiles_profile_type_check` admite `'visitor'`, `'settler'`, `'resident'`), blinda privilegios por columna en `public.price_reports` e incorpora la RPC transaccional `public.delete_my_account()` (saneamiento Habeas Data RF-06 / Ley 1581 de 2012).
   - `supabase/migrations/20261029130000_price_verdict_rpc.sql`: implementa `public.calculate_price_verdict` y su alias `public.evaluate_price_verdict` como única fuente de verdad estadística del semáforo por zona (`municipality_code`, `zone_id`, `category_id`), leyendo umbrales de `public.app_config`, calculando la mediana con `percentile_cont(0.5)` y verificando casos borde (`0%`, `15.00%`, `15.01%`, `40.00%`, `40.01%`, `-40.00%`, `-40.01%`, `N<3`, reportes ocultos/caducados y eventos activos).
-  - `supabase test db` → `Files=2, Tests=49`, `Result: PASS` (49/49 aserciones pgTAP aprobadas).
+- **Mitad Backend de VJ-11 (`feature/vj-11-reportes-reales-backend`):**
+  - `supabase/migrations/20261029140000_price_reports_quotas_privacy_and_rpc.sql`: implementa el trigger `public.enforce_price_report_submission_rules()` (`auth.uid()` forzoso, validación de categoría activa, municipio piloto y zona activa, rango `$500..$20.000.000 COP`, ofuscación de coordenadas GPS a 3 decimales $\approx 110\text{ m}$, serialización por usuario con `pg_advisory_xact_lock`, deduplicación en ventana de 15 min `[PRICE_DUPLICATE_REPORT]` y cuota diaria de 10 aportes reales cada 24h `[PRICE_RATE_LIMITED]`), la RPC `public.submit_price_report` y la RPC de moderación `public.moderate_price_report`.
+  - `supabase/seed/07_price_reports_demo.sql`: semilla de reportes DEMO segregados (`is_demo = true`), excluidos estrictamente del cálculo real del semáforo.
+  - `supabase test db` → `Files=3, Tests=67`, `Result: PASS` (67/67 aserciones pgTAP aprobadas).
 - **Verificación local (29 de octubre de 2026, CLI 2.101.0 + Docker 29.5.2):**
   - `supabase start` → servicios arriba (PostgreSQL 17, Auth, Storage, Studio).
   - `supabase db reset` → 5 migraciones aplicadas y 6 seeds cargadas (exit 0).
@@ -225,17 +228,19 @@ flutter run -d <device-id> --no-pub `
 
 ---
 
-## 9. Avance Parcial de VJ-14 (Análisis de Contratos en la Aplicación Móvil)
+## 9. Implementación Completa de VJ-14 (Análisis de Contratos: App Móvil + Edge Function y Cuota SQL)
 
-- **Estado:** **Avance parcial (app); backend pendiente** en rama `feature/vj-14-analisis-contratos-app`.
-- **Alcance completado en el cliente móvil:**
+- **Estado:** **HECHO-VERIFICADO** (cliente móvil integrado en PR #17; mitad backend en rama `feature/vj-14-analisis-contratos-backend`).
+- **Alcance completado en el cliente móvil (`PR #17`):**
   - **Dominio puro y validaciones estrictas:** Entidad `ContractAnalysisResult` (§4.4 de `contrato-datos-v1.md`) con niveles semánticos `green`, `yellow`, `red`, recomendación general, puntos clave y cláusulas analizadas (cita literal, alerta, recomendación y referencia legal nullable). Validación estricta con `FormatException` ante datos incompletos o fuera de límites (máx. 5 puntos clave, máx. 10 cláusulas, textos vacíos). Errores tipados `ContractAnalysisError` (§4.5) con extensiones puras `translationKey` e `isRetryable`.
   - **Gateway y desacoplamiento de arquitectura:** Interfaz `ContractAnalysisGateway` en `domain/` y `DefaultContractAnalysisRepository` en `data/`. La aplicación móvil no contiene dependencias de red prematuras, claves de Gemini ni SDKs directos de IA. Implementación `DemoContractAnalysisGateway` con simulación local rotulada visiblemente como `[DEMO]` y escenarios controlados de éxito y error con reconocimiento automático de los 3 contratos sintéticos (verde, amarillo y rojo).
   - **Control de estado y ciclo de vida (`ContractAnalysisNotifier`):** Estados reactivos `idle`, `analyzing`, `result`, `error`. Bloqueo de doble toque, descarte de respuestas tardías u obsoletas mediante identificador secuencial de petición, reinicio automático ante descarte de documento en `contractCaptureProvider` y reinicio con revocación de consentimiento en `SessionController.signOut`.
   - **Segundo consentimiento informado:** Flujo de consentimiento específico y diferenciado del OCR de RN-10, advirtiendo que el texto saldrá del dispositivo hacia un servicio externo de IA y recomendando el uso de contratos sintéticos en pruebas. La decisión de solicitarlo reside en el provider.
   - **Interfaz estructurada y accesible (`ContractAnalysisResultView`):** Triple canal semántico (color + ícono + texto traducido) integrado con `SemanticStatusColors`. Ocultamiento estricto de referencias legales nulas. Banner visible de demostración. Reintento seguro ante errores transitorios. Adaptación responsiva verificada en dispositivo real (`moto_g22`), a 360 dp y 1.5x de escala de texto sin desbordamientos.
-- **Pendiente para cierre definitivo:**
-  - Implementación y despliegue de la Edge Function en Supabase con Google Gemini (backend pendiente).
+- **Alcance completado en el Backend (`feature/vj-14-analisis-contratos-backend`):**
+  - **Cuota diaria atómica en SQL (`supabase/migrations/20261029150000_ai_usage_quota_rpc.sql`):** RPCs `public.consume_ai_daily_quota(uuid)` y `public.refund_ai_daily_quota(uuid)` (exclusivas de `service_role`, serializadas con `pg_advisory_xact_lock` en zona horaria `America/Bogota`, límite de 5 análisis/día con reintegro automático ante fallos 502/timeout) y `public.get_my_ai_quota_status()` para `authenticated`.
+  - **Edge Function `analyze_contract` (`supabase/functions/analyze_contract/`):** Validación JWT obligatoria (`verify_jwt = true` + `auth.getUser`), adaptador desacoplado `ContractModelClient` / `GeminiContractModelClient` (`responseSchema` JSON), defensa contra *Prompt Injection* (`<untrusted_contract_document>`), limpieza de HTML ejecutable, lista blanca de referencias normativas colombianas (`Ley 820 de 2003`) y cumplimiento estricto de no retención (`RN-10`).
+  - **Pruebas automatizadas de backend:** `supabase/tests/ai_usage_quota.sql` (12 aserciones pgTAP en PASS) y `supabase/functions/analyze_contract/contract_analyzer_test.ts` (pruebas unitarias y de handler HTTP en Deno).
 
 ---
 
@@ -252,4 +257,3 @@ flutter run -d <device-id> --no-pub `
   - Persistencia remota del perfil seleccionado (`ProfileType`) en Supabase.
   - Repositorio remoto de municipios (reemplazo o complemento de datos locales).
   - Debounce en el campo de búsqueda de municipios.
-
