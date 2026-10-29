@@ -96,3 +96,12 @@ panel web de Supabase. Todo cambio debe ser una migración versionada e inmutabl
 - Montos COP como `integer` positivo; fechas con `timestamptz`.
 - Códigos DANE/DIVIPOLA como `text` para preservar ceros.
 - Toda regla de negocio del semáforo vive en SQL (VJ-10), nunca en el cliente.
+
+## Edge Function `analyze_contract` y Cuota Diaria (VJ-14)
+
+- **Ubicación:** `supabase/functions/analyze_contract/` (`index.ts`, `contract_analyzer.ts`, `contract_analyzer_test.ts`, `deno.json`).
+- **Migración de cuota:** `supabase/migrations/20261029150000_ai_usage_quota_rpc.sql` (`consume_ai_daily_quota`, `refund_ai_daily_quota` y `get_my_ai_quota_status` en zona horaria `America/Bogota`).
+- **Pruebas:** `supabase/tests/ai_usage_quota.sql` (12 aserciones pgTAP) y pruebas unitarias en `contract_analyzer_test.ts`.
+- **Variables de entorno requeridas en Supabase Secrets (nunca versionadas):**
+  - `GEMINI_API_KEY`: clave privada de Google AI Studio / Gemini.
+  - `GEMINI_MODEL` (opcional, por defecto `gemini-2.5-flash`).
