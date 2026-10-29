@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:via_justa/features/auth/domain/auth_failure.dart';
 import 'package:via_justa/features/auth/domain/auth_repository.dart';
 import 'package:via_justa/features/auth/domain/auth_session.dart';
 import 'package:via_justa/features/auth/domain/consent_document.dart';
@@ -95,10 +94,17 @@ class DemoAuthRepository implements AuthRepository {
 
   @override
   Future<void> saveProfileType(String userId, ProfileType type) async {
-    if (!type.isPersistable) {
-      throw const AuthFailure(AuthFailureKind.profileTypeNotSupported);
-    }
     _profile = (_profile ?? UserProfile(id: userId)).copyWith(profileType: type);
+  }
+
+  @override
+  Future<void> saveCurrentMunicipality(
+    String userId,
+    String municipalityCode,
+  ) async {
+    _profile = (_profile ?? UserProfile(id: userId)).copyWith(
+      currentMunicipalityCode: municipalityCode,
+    );
   }
 
   @override

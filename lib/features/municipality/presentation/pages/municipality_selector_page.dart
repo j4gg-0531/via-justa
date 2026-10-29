@@ -59,7 +59,7 @@ class MunicipalitySelectorPage extends ConsumerWidget {
               department: department,
               onQueryChanged: ref
                   .read(municipalityQueryProvider.notifier)
-                  .setQuery,
+                  .setDebouncedQuery,
             ),
           ),
           SliverToBoxAdapter(

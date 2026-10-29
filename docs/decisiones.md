@@ -170,6 +170,7 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
 - **Reglas críticas:**
   1. **Seguridad:** El perfil de usuario (`profile_type`) **NUNCA confiere privilegios administrativos**. La autorización administrativa no reside en `profiles` (se descarta la columna `role`) sino en la tabla independiente `public.admin_users` mediante la función `public.is_admin()`, preservando el principio de mínimo privilegio y separando el tipo de perfil de la autorización de administración.
   2. **Compatibilidad:** En la migración `20261029120000_close_vj07_vj08_d11_and_account_deletion.sql` se actualizó la restricción `profiles_profile_type_check` a `check (profile_type in ('visitor', 'settler', 'resident'))`, habilitando a nivel de base de datos la persistencia de los tres perfiles.
+  3. **Implementación Frontend (VJ-09b):** En `ProfileType.isPersistable` se habilitó `resident` para persistir junto con `visitor` y `settler` en `public.profiles.profile_type`. En `MunicipalityPage`, al presionar `Entrar a...`, se persiste `current_municipality_code` en `public.profiles.current_municipality_code`, permitiendo la hidratación completa de sesión y redirección directa a `/home` al reiniciar la aplicación sin repetir el onboarding ni la selección de municipio.
 
 ---
 
