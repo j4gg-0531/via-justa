@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_theme.dart';
+import 'package:via_justa/features/auth/data/demo_auth_repository.dart';
 import 'package:via_justa/features/auth/presentation/pages/welcome_page.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/businesses/presentation/pages/businesses_page.dart';
@@ -234,4 +235,43 @@ void main() {
     expect(find.byType(WelcomePage), findsOneWidget);
     expect(container.read(authControllerProvider).isAuthenticated, isFalse);
   });
+
+  testWidgets(
+    'restoring session with profile and municipality redirects directly to HomePage',
+    (tester) async {
+      final repository = DemoAuthRepository();
+      addTearDown(repository.dispose);
+      await repository.signIn(email: 'user@test.com', password: 'password123');
+      await repository.saveProfileType('demo-user', ProfileType.visitor);
+      await repository.saveCurrentMunicipality('demo-user', '20001');
+
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: Consumer(
+            builder: (context, ref, _) {
+              final router = ref.watch(routerProvider);
+              return MaterialApp.router(
+                routerConfig: router,
+              );
+            },
+          ),
+        ),
+      );
+
+      // Run pending microtasks / async profile hydration
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      // Lands directly on HomePage
+      expect(find.byType(HomePage), findsOneWidget);
+      expect(container.read(profileTypeProvider), ProfileType.visitor);
+      expect(container.read(selectedMunicipalityProvider)?.code, '20001');
+    },
+  );
 }

@@ -1,12 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:via_justa/core/supabase/supabase_providers.dart';
 import 'package:via_justa/features/map_colombia/presentation/state/map_providers.dart';
 import 'package:via_justa/features/municipality/data/local_municipality_repository.dart';
+import 'package:via_justa/features/municipality/data/supabase_municipality_repository.dart';
 import 'package:via_justa/features/municipality/domain/municipality.dart';
 import 'package:via_justa/features/municipality/domain/municipality_repository.dart';
 import 'package:via_justa/features/municipality/domain/municipality_search.dart';
 
 /// Proveedor del repositorio de municipios (único lugar que conoce la implementación concreta).
 final municipalityRepositoryProvider = Provider<MunicipalityRepository>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  if (client != null) {
+    return SupabaseMunicipalityRepository(client);
+  }
   return LocalMunicipalityRepository();
 });
 
@@ -65,14 +73,34 @@ final activeCityNameProvider = Provider<String>((ref) {
 
 /// Texto de búsqueda del selector de municipios.
 class _MunicipalityQueryNotifier extends Notifier<String> {
-  @override
-  String build() => '';
+  Timer? _debounceTimer;
 
+  @override
+  String build() {
+    ref.onDispose(() => _debounceTimer?.cancel());
+    return '';
+  }
+
+  /// Actualización directa de la consulta (utilizada en pruebas o reseteos).
   void setQuery(String value) {
+    _debounceTimer?.cancel();
     state = value;
   }
 
+  /// Actualización reactiva con debounce de 300 ms (utilizada en la UI para
+  /// optimizar la fluidez de escritura sin sobrecargar el filtrado).
+  void setDebouncedQuery(
+    String value, {
+    Duration duration = const Duration(milliseconds: 300),
+  }) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(duration, () {
+      state = value;
+    });
+  }
+
   void clear() {
+    _debounceTimer?.cancel();
     state = '';
   }
 }

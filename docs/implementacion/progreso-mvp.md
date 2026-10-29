@@ -26,7 +26,7 @@
 | **VJ-06** | P1 | Ambos | Cierre del primer avance: walkthrough E2E, CI y documentación de sustentación | **HECHO-VERIFICADO (`feature/vj-06-cierre-primer-avance`)** | VJ-03, VJ-04, VJ-05 |
 | **VJ-07** | P0 | Backend | Supabase: migración inicial, RLS, GRANT, seeds y ER | **INTEGRADO (PR #15)** | VJ-01, VJ-06 |
 | **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos | **INTEGRADO (PR #16)** | VJ-07 |
-| **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **EN CURSO (VJ-09a integrado; faltan municipios remotos y debounce)** | VJ-08 |
+| **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **HECHO-VERIFICADO** (PR #21 + VJ-09b) | VJ-08 |
 | **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **INTEGRADO (PR #18)** (`supabase test db`: 23/23 pgTAP PASS) | VJ-07 |
 | **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **PARCIAL (Backend listo en `feature/vj-11-reportes-reales-backend`; 18/18 pgTAP PASS; app pendiente)** | VJ-10 |
 | **VJ-12** | P1 | Frontend | Google Maps de precios, filtros y optimización | **BLOQUEADO-EXTERNO** | VJ-11 |
@@ -244,8 +244,8 @@ flutter run -d <device-id> --no-pub `
 
 ---
 
-## 10. Avance de VJ-09a (Navegación Reactiva por Sesión y Protección de Rutas con GoRouter)
-- **Estado:** **HECHO-VERIFICADO** en rama `feature/vj-09a-navegacion-sesion-router`.
+## 10. Implementación y Cierre de VJ-09 (Navegación Reactiva por Sesión, Municipios y Perfil Persistido)
+- **Estado:** **HECHO-VERIFICADO** (VJ-09a integrado en PR #21; VJ-09b verificado en `feature/vj-09b-persistencia-perfil-municipio`).
 - **Alcance completado:**
   - **Regla pura de redirección tri-estado (`session_navigation_rule.dart`):** Enums `SessionNavigationStatus` (`unknown`, `unauthenticated`, `authenticated`), `classifyRoute`, `resolveFirstIncompleteStep` y `resolveNavigationRedirect`. Cero dependencias de Flutter o Riverpod; cobertura al 100% con matriz exhaustiva en `test/session_navigation_rule_test.dart`.
   - **Integración reactiva en el enrutador (`app_router.dart`):** `_AuthSessionListenable` como puente entre `authControllerProvider` y `GoRouter`. Solo reacciona a cambios reales de sesión (`isAuthenticated` e `isRestoring`), protegiendo la UI de saltos intempestivos al seleccionar opciones intermedias de perfil o municipio antes de confirmar.
@@ -253,7 +253,13 @@ flutter run -d <device-id> --no-pub `
   - **Limpieza de navegación imperativa en vistas:** Eliminación de `context.go()` y `context.push()` en `LoginPage`, `RegisterPage` y `ProfilePage`. El enrutador maneja declarativamente el acceso tras login/registro y la salida tras cierre de sesión (`SessionController.signOut`).
   - **Desactivación segura del botón de Google en demo:** En `LoginPage` y `RegisterPage`, el botón "Continuar con Google" muestra `'common.coming_soon'.tr()` para impedir accesos no autenticados sin registro previo en base de datos.
   - **Batería de pruebas y cumplimiento de arquitectura:** 252 pruebas unitarias y de widgets en verde (`flutter test`), 0 advertencias en `flutter analyze`, 0 violaciones a la Regla 5.2 en vistas.
-- **Pendiente para cierre completo de VJ-09 (en sub-tareas posteriores):**
-  - Persistencia remota del perfil seleccionado (`ProfileType`) en Supabase.
-  - Repositorio remoto de municipios (reemplazo o complemento de datos locales).
-  - Debounce en el campo de búsqueda de municipios.
+- **Alcance completado en VJ-09b (`feature/vj-09b-persistencia-perfil-municipio`):**
+  - **Persistencia de Perfil (`ProfileType`):** Con la ratificación de D11 en la base de datos (migración `20261029120000_close_vj07_vj08_d11_and_account_deletion.sql`), `ProfileType.isPersistable` retorna `true` para los 3 perfiles (`visitor`, `settler`, `resident`). Al continuar desde `ProfileSelectionPage`, el perfil se persiste atómicamente en `public.profiles.profile_type`.
+  - **Persistencia de Municipio:** En `MunicipalityPage`, al presionar `Entrar a [Municipio]`, se invoca `authControllerProvider.notifier.saveCurrentMunicipality(code)`, persistiendo `current_municipality_code` en `public.profiles`.
+  - **Hidratación y redirección directa a `/home`:** En `AuthController`, la restauración asíncrona de sesión (`_restoreSession`) sincroniza el perfil remoto y resuelve el municipio (`_syncLocalProfile`) antes de finalizar `isRestoring: false`. Esto permite que el enrutador detecte los 3 requisitos cumplidos y dirija directamente al usuario a `/home` sin volver a solicitar perfil ni ciudad en reinicios.
+  - **Repositorio remoto de municipios (`SupabaseMunicipalityRepository`):** Consulta directa a `public.municipalities` en Supabase con ordenamiento (`is_pilot DESC, name ASC`) y fallback transparente a `LocalMunicipalityRepository` ante ausencia de red o claves.
+  - **Debounce reactivo en búsqueda:** Temporizador reactivo de 300 ms en `_MunicipalityQueryNotifier.setDebouncedQuery(value)` con liberación adecuada de recursos y sin lógica en la vista.
+- **Batería de pruebas y verificación de higiene:**
+  - 257 pruebas automatizadas aprobadas (`flutter test` 100% PASS).
+  - Análisis estático sin advertencias ni errores (`flutter analyze` No issues found!).
+  - Verificación estricta de Regla 5.2 sobre `lib/**/presentation/` (excluyendo `state/`): 0 ocurrencias de lógica prohibida o llamadas a datos.

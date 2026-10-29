@@ -111,11 +111,18 @@ class SupabaseAuthRepository implements AuthRepository {
 
   @override
   Future<void> saveProfileType(String userId, ProfileType type) async {
-    if (!type.isPersistable) {
-      // D11 sigue PROPUESTA: el CHECK de la tabla rechazaría 'resident'.
-      throw const AuthFailure(AuthFailureKind.profileTypeNotSupported);
-    }
     await _updateProfile(userId, {'profile_type': type.wireValue});
+  }
+
+  @override
+  Future<void> saveCurrentMunicipality(
+    String userId,
+    String municipalityCode,
+  ) async {
+    await _updateProfile(
+      userId,
+      {'current_municipality_code': municipalityCode},
+    );
   }
 
   @override

@@ -45,8 +45,11 @@ abstract class AuthRepository {
   /// Guarda el idioma preferido (`es` / `en`).
   Future<void> saveLanguage(String userId, String language);
 
-  /// Guarda el tipo de perfil. `resident` puede no estar habilitado (D11).
+  /// Guarda el tipo de perfil.
   Future<void> saveProfileType(String userId, ProfileType type);
+
+  /// Guarda el municipio activo del usuario (`public.profiles.current_municipality_code`).
+  Future<void> saveCurrentMunicipality(String userId, String municipalityCode);
 
   /// Registra la aceptación de los documentos legales.
   Future<void> registerConsents({
