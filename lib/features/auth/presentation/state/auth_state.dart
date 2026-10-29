@@ -9,6 +9,7 @@ class AuthState {
     this.session,
     this.profile,
     this.isBusy = false,
+    this.isRestoring = false,
     this.failure,
     this.usesDemoData = false,
   });
@@ -18,6 +19,10 @@ class AuthState {
 
   /// `true` mientras se espera al servidor (login, registro, guardado).
   final bool isBusy;
+
+  /// `true` durante el arranque de la app mientras se verifica si hay una
+  /// sesión previa persistida en el almacenamiento local.
+  final bool isRestoring;
 
   /// Último fallo tipado; la vista lo traduce a texto.
   final AuthFailure? failure;
@@ -33,6 +38,7 @@ class AuthState {
     AuthSession? session,
     UserProfile? profile,
     bool? isBusy,
+    bool? isRestoring,
     AuthFailure? failure,
     bool clearFailure = false,
     bool? usesDemoData,
@@ -41,6 +47,7 @@ class AuthState {
       session: session ?? this.session,
       profile: profile ?? this.profile,
       isBusy: isBusy ?? this.isBusy,
+      isRestoring: isRestoring ?? this.isRestoring,
       failure: clearFailure ? null : (failure ?? this.failure),
       usesDemoData: usesDemoData ?? this.usesDemoData,
     );

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_theme.dart';
 import 'package:via_justa/features/auth/presentation/pages/welcome_page.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/businesses/presentation/pages/businesses_page.dart';
 import 'package:via_justa/features/home/presentation/pages/home_page.dart';
 import 'package:via_justa/features/map_colombia/presentation/pages/map_page.dart';
@@ -89,6 +90,12 @@ void main() {
       router.go(AppRoutes.welcome);
       await tester.pumpAndSettle();
       expect(find.byType(WelcomePage), findsOneWidget);
+
+      // Inicia sesión para avanzar a Onboarding (requisito de VJ-09a)
+      await container
+          .read(authControllerProvider.notifier)
+          .signIn(email: 'carlos@viajusta.co', password: 'password123');
+      await tester.pumpAndSettle();
 
       router.go(AppRoutes.onboarding);
       await tester.pumpAndSettle();

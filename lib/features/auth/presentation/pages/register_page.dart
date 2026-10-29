@@ -2,7 +2,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
@@ -52,7 +51,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     if (!mounted) return;
 
     if (succeeded) {
-      context.push(AppRoutes.onboarding);
+      // El router redirige reactivamente al cambiar el estado de autenticación.
       return;
     }
 
@@ -62,6 +61,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
     }
+  }
+
+  void _showComingSoon() {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('common.coming_soon'.tr())));
   }
 
   @override
@@ -176,7 +180,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       VjButton(
                         label: 'login.google'.tr(),
                         variant: VjButtonVariant.outlined,
-                        onPressed: () => context.push(AppRoutes.onboarding),
+                        onPressed: _showComingSoon,
                       ),
                       if (authState.usesDemoData) ...[
                         const SizedBox(height: AppSpacing.xl),

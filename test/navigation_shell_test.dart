@@ -3,13 +3,38 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_theme.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/businesses/presentation/pages/businesses_page.dart';
 import 'package:via_justa/features/home/presentation/pages/home_page.dart';
 import 'package:via_justa/features/map_colombia/presentation/pages/map_page.dart';
+import 'package:via_justa/features/municipality/domain/municipality.dart';
+import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
+import 'package:via_justa/features/onboarding/domain/profile_type.dart';
+import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
 import 'package:via_justa/features/prices/presentation/pages/price_map_page.dart';
 import 'package:via_justa/features/profile/presentation/pages/profile_page.dart';
 import 'package:via_justa/features/scan/presentation/pages/scan_page.dart';
 import 'package:via_justa/features/splash/presentation/pages/splash_page.dart';
+
+Future<void> _setupAuthenticatedState(
+  ProviderContainer container, {
+  bool withMunicipality = true,
+}) async {
+  await container
+      .read(authControllerProvider.notifier)
+      .signIn(email: 'user@test.com', password: 'password123');
+  container.read(profileTypeProvider.notifier).select(ProfileType.visitor);
+  if (withMunicipality) {
+    container.read(selectedMunicipalityProvider.notifier).select(
+          const Municipality(
+            code: '20001',
+            name: 'Valledupar',
+            departmentCode: '20',
+            isPilot: true,
+          ),
+        );
+  }
+}
 
 void main() {
   testWidgets('renders all five navigation destinations in bottom bar', (
@@ -17,6 +42,7 @@ void main() {
   ) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
+    await _setupAuthenticatedState(container);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -53,6 +79,7 @@ void main() {
   ) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
+    await _setupAuthenticatedState(container);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -103,6 +130,7 @@ void main() {
   ) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
+    await _setupAuthenticatedState(container, withMunicipality: false);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -130,6 +158,7 @@ void main() {
   ) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
+    await _setupAuthenticatedState(container);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
