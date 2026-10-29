@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_theme.dart';
+import 'package:via_justa/features/auth/presentation/pages/welcome_page.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/businesses/presentation/pages/businesses_page.dart';
 import 'package:via_justa/features/home/presentation/pages/home_page.dart';
@@ -198,5 +199,39 @@ void main() {
 
     expect(find.byType(SplashPage), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('sign out in ProfilePage declaratively redirects to WelcomePage', (
+    tester,
+  ) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await _setupAuthenticatedState(container);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: Consumer(
+          builder: (context, ref, _) {
+            final router = ref.watch(routerProvider);
+            return MaterialApp.router(
+              routerConfig: router,
+            );
+          },
+        ),
+      ),
+    );
+
+    final router = container.read(routerProvider);
+    router.go(AppRoutes.profile);
+    await tester.pumpAndSettle();
+    expect(find.byType(ProfilePage), findsOneWidget);
+
+    await tester.ensureVisible(find.byIcon(Icons.logout));
+    await tester.tap(find.byIcon(Icons.logout));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(WelcomePage), findsOneWidget);
+    expect(container.read(authControllerProvider).isAuthenticated, isFalse);
   });
 }
