@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:via_justa/core/supabase/supabase_providers.dart';
 import 'package:via_justa/features/prices/data/demo_price_contribution_repository.dart';
+import 'package:via_justa/features/prices/data/supabase_price_contribution_repository.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_category.dart';
 import 'package:via_justa/features/prices/domain/price_contribution.dart';
@@ -10,6 +12,10 @@ import 'package:via_justa/features/prices/presentation/state/price_scan_provider
 /// Proveedor del repositorio de aportes de precio (único punto que referencia la clase concreta).
 final priceContributionRepositoryProvider =
     Provider<PriceContributionRepository>((ref) {
+      final client = ref.watch(supabaseClientProvider);
+      if (client != null) {
+        return SupabasePriceContributionRepository(client);
+      }
       return DemoPriceContributionRepository();
     });
 

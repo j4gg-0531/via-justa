@@ -28,7 +28,7 @@
 | **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos | **INTEGRADO (PR #16)** | VJ-07 |
 | **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **HECHO-VERIFICADO** (PR #21 + VJ-09b) | VJ-08 |
 | **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **INTEGRADO (PR #18)** (`supabase test db`: 23/23 pgTAP PASS) | VJ-07 |
-| **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **PARCIAL (Backend listo en `feature/vj-11-reportes-reales-backend`; 18/18 pgTAP PASS; app pendiente)** | VJ-10 |
+| **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **HECHO-VERIFICADO** (Backend listo + App en `feature/vj-11-vj-14-precios-y-contratos-reales`) | VJ-10 |
 | **VJ-12** | P1 | Frontend | Google Maps de precios, filtros y optimización | **BLOQUEADO-EXTERNO** | VJ-11 |
 | **VJ-13** | P1 | Frontend | Captura de contratos: cámara, archivos y OCR local | **INTEGRADO (PR #14)** | VJ-06 |
 | **VJ-14** | P1 | Ambos | Análisis de contratos con Gemini en Edge Function | **HECHO-VERIFICADO** (app en PR #17 + backend Edge Function `analyze_contract` y cuota SQL en `feature/vj-14-analisis-contratos-backend`) | VJ-13 |

@@ -1,8 +1,10 @@
-﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:via_justa/core/supabase/supabase_providers.dart';
 import 'package:via_justa/features/contracts/presentation/state/contract_analysis_provider.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/data/demo_price_verdict_repository.dart';
+import 'package:via_justa/features/prices/data/supabase_price_verdict_repository.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_category.dart';
 import 'package:via_justa/features/prices/domain/price_verdict.dart';
@@ -10,6 +12,10 @@ import 'package:via_justa/features/prices/domain/price_verdict_repository.dart';
 
 /// Proveedor del repositorio de veredictos de precio (Ãºnico lugar que conoce la implementaciÃ³n concreta).
 final priceVerdictRepositoryProvider = Provider<PriceVerdictRepository>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  if (client != null) {
+    return SupabasePriceVerdictRepository(client);
+  }
   return const DemoPriceVerdictRepository();
 });
 
