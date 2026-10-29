@@ -18,7 +18,7 @@ create extension if not exists pgtap with schema extensions;
 -- Rutas de búsqueda deterministas (pgTAP y PostGIS viven en `extensions`).
 set local search_path = public, extensions;
 
-select plan(21);
+select plan(26);
 
 -- ---------------------------------------------------------------------------
 -- Datos de referencia mínimos (independientes de las seeds)
@@ -407,6 +407,153 @@ select is(
   (select value from rls_results where label = 'alice_consents'),
   1::bigint,
   'alice can insert and read her own consent'
+);
+
+-- ---------------------------------------------------------------------------
+-- 22 · D11 ratificada: el perfil `resident` es aceptado en `public.profiles`
+-- ---------------------------------------------------------------------------
+set local role authenticated;
+set local request.jwt.claims =
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+update public.profiles
+set profile_type = 'resident'
+where id = auth.uid();
+
+insert into rls_results (label, value)
+select 'alice_resident_ok', count(*)
+from public.profiles
+where id = auth.uid() and profile_type = 'resident';
+
+reset role;
+
+select is(
+  (select value from rls_results where label = 'alice_resident_ok'),
+  1::bigint,
+  'D11: profile_type accepts resident'
+);
+
+-- ---------------------------------------------------------------------------
+-- 23-24 · Defensa por columnas en `price_reports`: bloquea `is_seed` e `is_hidden`
+-- ---------------------------------------------------------------------------
+set local role authenticated;
+set local request.jwt.claims =
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+begin
+  insert into public.price_reports (
+    user_id,
+    category_id,
+    municipality_code,
+    zone_id,
+    amount_cop,
+    is_seed
+  )
+  values (
+    auth.uid(),
+    'transport_taxi_minimal',
+    '20001',
+    'vup_centro',
+    10000,
+    true
+  );
+
+  insert into rls_results (label, value)
+  values ('seed_insert_blocked', 0);
+exception
+  when insufficient_privilege then
+    insert into rls_results (label, value)
+    values ('seed_insert_blocked', 1);
+end;
+$$;
+
+do $$
+begin
+  update public.price_reports
+  set is_hidden = true
+  where user_id = auth.uid();
+
+  insert into rls_results (label, value)
+  values ('hidden_update_blocked', 0);
+exception
+  when insufficient_privilege then
+    insert into rls_results (label, value)
+    values ('hidden_update_blocked', 1);
+end;
+$$;
+
+reset role;
+
+select is(
+  (select value from rls_results where label = 'seed_insert_blocked'),
+  1::bigint,
+  'authenticated user cannot set is_seed on price_reports'
+);
+
+select is(
+  (select value from rls_results where label = 'hidden_update_blocked'),
+  1::bigint,
+  'authenticated user cannot update is_hidden on price_reports'
+);
+
+-- ---------------------------------------------------------------------------
+-- 25-26 · RF-06 / Ley 1581: `delete_my_account()` sanea reportes y borra cuenta
+-- ---------------------------------------------------------------------------
+insert into public.price_reports (
+  id,
+  user_id,
+  category_id,
+  municipality_code,
+  zone_id,
+  amount_cop,
+  location,
+  place_name,
+  source_note
+)
+values (
+  '99999999-9999-9999-9999-999999999999',
+  '22222222-2222-2222-2222-222222222222',
+  'transport_taxi_minimal',
+  '20001',
+  'vup_centro',
+  14000,
+  ST_SetSRID(ST_MakePoint(-73.25, 10.46), 4326)::geography,
+  'Casa privada de Bob',
+  'Nota personal de Bob'
+);
+
+set local role authenticated;
+set local request.jwt.claims =
+  '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+select public.delete_my_account();
+
+reset role;
+
+select is(
+  (
+    select count(*)::int
+    from public.profiles
+    where id = '22222222-2222-2222-2222-222222222222'
+  ),
+  0,
+  'delete_my_account removes user profile via cascade'
+);
+
+select is(
+  (
+    select count(*)::int
+    from public.price_reports
+    where id = '99999999-9999-9999-9999-999999999999'
+      and user_id is null
+      and place_name is null
+      and source_note is null
+      and location is null
+      and amount_cop = 14000
+  ),
+  1,
+  'delete_my_account anonymizes and sanitizes price_reports while keeping statistical amount'
 );
 
 select * from finish();
