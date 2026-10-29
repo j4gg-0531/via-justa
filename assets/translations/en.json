@@ -1,4 +1,4 @@
-{
+﻿{
   "app": { "name": "Vía Justa" },
   "common": {
     "back": "Back",
@@ -303,5 +303,35 @@
     "dialog_profile_title": "Select profile type",
     "legal_dialog_title": "Legal notice",
     "legal_dialog_body": "Vía Justa is a civic initiative for price and contract transparency."
+  },
+  "contract_capture": {
+    "title": "Local contract capture & OCR",
+    "subtitle": "Take a photo, pick a file (JPG, PNG, or TXT up to 10 MB), try a synthetic sample, or edit the text before analysis.",
+    "formats_badge": "MVP formats: JPG, PNG, TXT (max 10 MB)",
+    "pdf_coming_soon_chip": "PDF (Coming soon)",
+    "action_camera": "Take photo (OCR)",
+    "action_file": "Upload JPG/PNG/TXT",
+    "action_manual": "Type or paste text",
+    "samples_title": "Synthetic test contracts (no real personal data)",
+    "samples_subtitle": "Tap a synthetic case to load its extracted text in Spanish or English.",
+    "status_reading": "Extracting text with local OCR...",
+    "status_ready": "Ready for analysis (validated text)",
+    "rn10_privacy_banner": "RN-10 Privacy: the temporary file is deleted from cache immediately after OCR and the text only lives in memory until you discard it.",
+    "rn10_temp_deleted_badge": "Temp cache deleted (RN-10)",
+    "editor_label": "Contract text (editable)",
+    "editor_hint": "Paste or edit the contract clauses here (between 20 and 15,000 characters)...",
+    "char_counter": "{count} / {max} characters",
+    "discard_cta": "Discard document",
+    "analyze_disabled_cta": "Analyze contract · Coming soon (VJ-14)",
+    "error_unsupported_format": "Unsupported format. Only JPG, PNG images or TXT files are accepted in the MVP.",
+    "error_pdf_coming_soon": "PDF file support is coming soon. For now, please use photos (JPG/PNG) or text (TXT).",
+    "error_file_too_large": "The file exceeds the maximum allowed size of 10 MB.",
+    "error_empty_or_illegible": "The text is empty or illegible (at least 20 readable characters required).",
+    "error_exceeds_max_length": "The text exceeds the 15,000-character limit ({count} current). Please trim at least {excess} characters in the editor; it is not truncated automatically.",
+    "error_read_failed": "We couldn't read the document. Try another image or file.",
+    "consent_dialog_title": "Privacy & on-device processing",
+    "consent_dialog_body": "The document will be processed solely on your phone using on-device OCR (RN-10). The image will not be sent to any server, and any temporary cache file will be deleted immediately after reading.",
+    "consent_cancel": "Cancel",
+    "consent_continue": "Continue"
   }
 }

@@ -1,4 +1,4 @@
-# Registro de Decisiones de Arquitectura y Producto (ADRs)
+﻿# Registro de Decisiones de Arquitectura y Producto (ADRs)
 
 Este documento formaliza el registro de decisiones técnicas y de producto para el proyecto **Vía Justa MVP**, estableciendo su estado, justificación, alternativas e impacto entre frontend y backend.
 
@@ -24,6 +24,9 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
 | **D14**| Política de contraseñas y confirmación de correo | **PENDIENTE** | Backend | — |
 | **D15**| Medianas de precios por zonas del municipio y selección híbrida (GPS / Mapa) | **ACORDADA** | Ambos | 28 de octubre de 2026 |
 | **D16**| Geometría del mapa de departamentos desde SVG de Simplemaps convertido a JSON por script | **ACORDADA** | Frontend | 28 de octubre de 2026 |
+| **D17**| Reglas mínimas de R8 / Proguard para OCR en Release (ComponentRegistrar) | **ACORDADA** | Frontend | 28 de octubre de 2026 |
+| **D18**| Formatos de contrato en MVP (JPG, PNG, TXT) y diferimiento de PDF | **ACORDADA** | Ambos | 28 de octubre de 2026 |
+| **D19**| Texto nativo de ML Kit (recognized.text) sin reordenamiento manual | **ACORDADA** | Frontend | 28 de octubre de 2026 |
 
 ---
 
@@ -231,3 +234,52 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
   - Polígonos aproximados escritos a mano: descartados por baja fidelidad visual.
 - **Impacto Frontend:** `DepartmentShape`, `DepartmentShapeRepository`, `LocalDepartmentShapeRepository`, `findDepartmentAtPoint` y renderizado `CustomPainter` en `MapPage` con crédito explícito a Simplemaps (aclarando que no es cartografía oficial DANE).
 - **Impacto Backend:** Ninguno; la geometría es un recurso estático del cliente móvil y no se almacena en `public.departments`.
+
+---
+
+## D17 · Reglas mínimas de R8 / Proguard para OCR en Release (ComponentRegistrar)
+- **Estado:** **ACORDADA**
+- **Responsable:** Frontend.
+- **Fecha de evidencia:** 28 de octubre de 2026 (VJ-13).
+- **Descripción:** Inclusión en ndroid/app/proguard-rules.pro de la regla mínima:
+  `proguard
+  -keep class * implements com.google.firebase.components.ComponentRegistrar {
+      public <init>();
+  }
+  `
+  y supresión puntual con -dontwarn de los constructores de opciones para scripts no empaquetados (chino, devanagari, japonés y coreano).
+- **Justificación técnica:**
+  1. google_mlkit_text_recognition utiliza internamente el contenedor de inyección de dependencias de Firebase/ML Kit (ComponentDiscovery), el cual instancia por reflexión las clases declaradas como <meta-data> en el manifiesto fusionado (CommonComponentRegistrar, VisionCommonRegistrar, TextRegistrar).
+  2. En compilaciones --release, el optimizador R8 eliminaba el constructor público sin argumentos <init>() de dichas clases por considerarlo no referenciado estáticamente, provocando un fallo en tiempo de ejecución (java.lang.NullPointerException: Attempt to invoke virtual method 'java.lang.Class java.lang.Object.getClass()' on a null object reference) al resolver SharedPrefManager.
+  3. La regla acota la preservación exclusivamente a las clases que implementan ComponentRegistrar, evitando reglas genéricas permisivas sobre la totalidad del SDK de ML Kit.
+- **Impacto Frontend:** ndroid/app/proguard-rules.pro resuelve el fallo de R8 en --release sin alterar uild.gradle.kts ni el pplicationId.
+- **Impacto Backend:** Ninguno.
+
+---
+
+## D18 · Formatos de contrato en MVP (JPG, PNG, TXT) y diferimiento de PDF para Fase 2
+- **Estado:** **ACORDADA**
+- **Responsable:** Ambos integrantes.
+- **Fecha de evidencia:** 28 de octubre de 2026 (VJ-13).
+- **Descripción:** El MVP de captura de contratos admite exclusivamente imágenes en formato **JPG (JPEG)** y **PNG**, así como archivos de texto plano **TXT**, con un tamaño máximo de 10 MB. La carga de archivos PDF queda explícitamente marcada como "Próximamente" (pdfComingSoon).
+- **Justificación técnica:**
+  1. El motor de OCR on-device google_mlkit_text_recognition procesa mapas de bits individuales (InputImage), no documentos vectoriales ni archivos PDF multipágina.
+  2. Rasterizar PDFs localmente en Flutter requeriría dependencias pesadas de renderizado nativo (pdfx, pdf_render, 
+ative_pdf_renderer) o procesamiento en backend que aumentaría sustancialmente el peso del APK y la complejidad de memoria en dispositivos de gama media/baja.
+  3. Para el caso de uso principal en terreno (fotografiar un contrato impreso en papel o cargar una foto/captura de pantalla), JPG y PNG cubren la necesidad inmediata, complementados con TXT para contratos digitales copiados.
+  4. El selector de archivos incluye la extensión .pdf para que, en caso de que el usuario seleccione un PDF, el sistema lo identifique amigablemente y muestre el aviso educativo "Próximamente" en lugar de fallar o ignorar la selección.
+- **Impacto Frontend:** alidateContractFileExtension en domain/contract_capture.dart retorna ContractCaptureError.pdfComingSoon.
+- **Impacto Backend:** Preparación para que en VJ-14, la Edge Function de Gemini reciba directamente el texto UTF-8 normalizado y consolidado por ML Kit (hasta 15.000 caracteres), sin necesidad de parsear PDFs binarios en el servidor.
+---
+
+## D19 · Texto nativo de ML Kit (recognized.text) sin reordenamiento manual
+- **Estado:** **ACORDADA**
+- **Responsable:** Frontend.
+- **Fecha de evidencia:** 28 de octubre de 2026 (VJ-13).
+- **Descripción:** La extracción OCR mediante `google_mlkit_text_recognition` utiliza directamente el texto consolidado por la librería (`recognized.text`) en lugar de algoritmos de ordenamiento geométrico propios basados en cajas delimitadoras (`top`/`left`).
+- **Justificación técnica:**
+  1. El modelo de visión de ML Kit agrupa internamente las palabras en líneas, párrafos y bloques de lectura según la orientación, densidad y flujo textual del documento.
+  2. Los algoritmos manuales de reordenamiento basados en coordenadas absolutas pueden descomponer columnas, invertir el orden en capturas con inclinación angular leve o fragmentar oraciones contiguas.
+  3. `recognized.text` entrega un resultado significativamente más robusto y fiel en documentos reales capturados con la cámara del dispositivo móvil.
+- **Impacto Frontend:** `DeviceContractOcrRepository` retorna directamente `recognized.text`. Se eliminaron de `domain/contract_capture.dart` las funciones y clases geométricas no utilizadas (`OcrTextLine`, `sortOcrTextLines`, `composeSortedOcrText`).
+- **Impacto Backend:** Ninguno.
