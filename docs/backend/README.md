@@ -79,10 +79,11 @@ panel web de Supabase. Todo cambio debe ser una migración versionada e inmutabl
 - Seeds 01–06 creadas (33 departamentos, 25 municipios del Cesar, 5 zonas de
   Valledupar, 4 categorías, configuración del semáforo y evento DEMO).
 - Pruebas pgTAP en `supabase/tests/rls.sql` (21 aserciones).
-- **Verificación local pendiente:** el daemon de Docker no estaba disponible en
-  el entorno del 29/10/2026. Ejecutar `supabase db reset` y `supabase test db`
-  antes de declarar VJ-07 como `HECHO-VERIFICADO`.
-- **No se ha aplicado al proyecto remoto.**
+- **Verificado en local el 29/10/2026** (CLI 2.101.0 + Docker 29.5.2):
+  `supabase start` OK, `supabase db reset` OK (5 migraciones + 6 seeds) y
+  `supabase test db` con `Files=1, Tests=21, Result: PASS`.
+- **No se ha aplicado al proyecto remoto** (`vjehsjqmwibmiqmxlsou`). Requiere
+  aprobación explícita del equipo antes de ejecutar `supabase db push`.
 
 ## Convenciones
 
