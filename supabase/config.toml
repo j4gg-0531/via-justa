@@ -88,5 +88,10 @@ policy = "per_worker"
 inspector_port = 8083
 deno_version = 2
 
+[functions.analyze_contract]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/analyze_contract/index.ts"
+
 [analytics]
 enabled = false
