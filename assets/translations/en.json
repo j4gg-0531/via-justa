@@ -9,6 +9,7 @@
     "retry": "Retry",
     "coming_soon": "Coming soon",
     "demo_badge": "DEMO",
+    "save": "Save",
     "close": "Close"
   },
   "nav": {
@@ -47,6 +48,15 @@
     "show_password": "Show password",
     "hide_password": "Hide password",
     "error": {
+      "invalid_credentials": "The email or password is incorrect.",
+      "email_registered": "An account already exists with this email. Sign in instead.",
+      "email_not_confirmed": "You must confirm your email before signing in.",
+      "weak_password": "The password does not meet the security policy.",
+      "rate_limited": "Too many attempts. Wait a moment and try again.",
+      "network": "We could not reach the server. Check your connection.",
+      "email_confirmation_required": "We sent you an email to confirm your account before signing in.",
+      "profile_type_pending": "This profile type is not saved on the server yet; it stays only on this device.",
+      "unknown": "Something went wrong. Please try again.",
       "name_empty": "Enter your name.",
       "email_empty": "Enter your email.",
       "email_invalid": "Enter a valid email, for example name@mail.com.",
@@ -285,6 +295,9 @@
     "no_results": "No businesses found with the current filter."
   },
   "profile": {
+    "edit_name_title": "Edit name",
+    "edit_name_hint": "First and last name",
+    "name_updated": "Name updated.",
     "title": "Profile & Settings",
     "subtitle": "Manage your profile, location, and language.",
     "user_default_name": "Vía Justa User",

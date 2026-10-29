@@ -7,11 +7,16 @@ import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_text_field.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/auth/presentation/state/login_form_provider.dart';
 import 'package:via_justa/features/auth/presentation/widgets/auth_error_texts.dart';
+import 'package:via_justa/features/auth/presentation/widgets/auth_failure_text.dart';
 import 'package:via_justa/features/auth/presentation/widgets/or_divider.dart';
 
-/// Pantalla de inicio de sesión (interfaz de ejemplo con validación local).
+/// Pantalla de inicio de sesión.
+///
+/// Con Supabase configurado autentica contra el backend real; sin credenciales
+/// compiladas funciona en modo DEMO (el aviso se muestra al pie).
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
@@ -30,11 +35,26 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     super.dispose();
   }
 
-  void _submit() {
-    final isValid = ref.read(loginFormProvider.notifier).submit();
-    if (!isValid) return;
+  Future<void> _submit() async {
+    if (!ref.read(loginFormProvider.notifier).submit()) return;
 
-    context.push(AppRoutes.onboarding);
+    final form = ref.read(loginFormProvider);
+    final succeeded = await ref
+        .read(authControllerProvider.notifier)
+        .signIn(email: form.email, password: form.password);
+    if (!mounted) return;
+
+    if (succeeded) {
+      context.push(AppRoutes.onboarding);
+      return;
+    }
+
+    final message = authFailureText(ref.read(authControllerProvider).failure);
+    if (message != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   void _showComingSoon() {
@@ -46,6 +66,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(loginFormProvider);
     final notifier = ref.read(loginFormProvider.notifier);
+    final authState = ref.watch(authControllerProvider);
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -126,7 +147,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       const SizedBox(height: AppSpacing.sm),
                       VjButton(
                         label: 'common.continue'.tr(),
-                        onPressed: _submit,
+                        onPressed: authState.isBusy ? null : _submit,
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       const OrDivider(),
@@ -136,14 +157,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         variant: VjButtonVariant.outlined,
                         onPressed: () => context.push(AppRoutes.onboarding),
                       ),
-                      const SizedBox(height: AppSpacing.xl),
-                      Center(
-                        child: Text(
-                          'auth.demo_note'.tr(),
-                          style: textTheme.bodySmall,
-                          textAlign: TextAlign.center,
+                      if (authState.usesDemoData) ...[
+                        const SizedBox(height: AppSpacing.xl),
+                        Center(
+                          child: Text(
+                            'auth.demo_note'.tr(),
+                            style: textTheme.bodySmall,
+                            textAlign: TextAlign.center,
+                          ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: AppSpacing.xl),
                     ],
                   ),

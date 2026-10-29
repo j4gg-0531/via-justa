@@ -7,6 +7,7 @@ import 'package:via_justa/core/session/session_providers.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/onboarding/domain/profile_type.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
@@ -15,8 +16,11 @@ import 'package:via_justa/features/onboarding/presentation/state/profile_type_pr
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
 
-  void _showProfileSelectionDialog(BuildContext context, WidgetRef ref) {
-    showDialog<void>(
+  Future<void> _showProfileSelectionDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text('profile.dialog_profile_title'.tr()),
@@ -27,30 +31,51 @@ class ProfilePage extends ConsumerWidget {
               leading: const Icon(Icons.luggage_outlined, color: AppColors.primary),
               title: Text('onboarding.visitor.title'.tr()),
               onTap: () {
-                ref.read(profileTypeProvider.notifier).select(ProfileType.visitor);
-                Navigator.of(dialogContext).pop();
+                _selectProfile(ref, dialogContext, ProfileType.visitor);
               },
             ),
             ListTile(
               leading: const Icon(Icons.home_work_outlined, color: AppColors.primary),
               title: Text('onboarding.settler.title'.tr()),
               onTap: () {
-                ref.read(profileTypeProvider.notifier).select(ProfileType.settler);
-                Navigator.of(dialogContext).pop();
+                _selectProfile(ref, dialogContext, ProfileType.settler);
               },
             ),
             ListTile(
               leading: const Icon(Icons.storefront_outlined, color: AppColors.primary),
               title: Text('onboarding.resident.title'.tr()),
               onTap: () {
-                ref.read(profileTypeProvider.notifier).select(ProfileType.resident);
-                Navigator.of(dialogContext).pop();
+                _selectProfile(ref, dialogContext, ProfileType.resident);
               },
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Selecciona el perfil en local y lo persiste cuando el backend lo admite.
+  ///
+  /// `resident` sigue PROPUESTA (D11): se conserva en memoria y se avisa que
+  /// todavía no se guarda en el servidor.
+  Future<void> _selectProfile(
+    WidgetRef ref,
+    BuildContext dialogContext,
+    ProfileType type,
+  ) async {
+    ref.read(profileTypeProvider.notifier).select(type);
+    final persisted = await ref
+        .read(authControllerProvider.notifier)
+        .persistProfileType(type);
+    if (!dialogContext.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(dialogContext);
+    Navigator.of(dialogContext).pop();
+    if (!persisted) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('auth.error.profile_type_pending'.tr())),
+      );
+    }
   }
 
   void _showLegalDialog(BuildContext context, String title) {
@@ -69,16 +94,66 @@ class ProfilePage extends ConsumerWidget {
     );
   }
 
-  void _changeLocale(BuildContext context, Locale newLocale) {
+  void _changeLocale(BuildContext context, WidgetRef ref, Locale newLocale) {
     try {
       context.setLocale(newLocale);
     } catch (_) {}
+    ref.read(authControllerProvider.notifier).saveLanguage(
+      newLocale.languageCode,
+    );
+  }
+
+  /// Permite editar el nombre visible y lo guarda en `public.profiles`.
+  Future<void> _showEditNameDialog(BuildContext context, WidgetRef ref) async {
+    var value = ref.read(displayNameProvider);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('profile.edit_name_title'.tr()),
+        content: TextFormField(
+          initialValue: value,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(
+            labelText: 'auth.name'.tr(),
+            hintText: 'profile.edit_name_hint'.tr(),
+          ),
+          onChanged: (next) => value = next,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text('common.close'.tr()),
+          ),
+          TextButton(
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(dialogContext);
+              final saved = await ref
+                  .read(authControllerProvider.notifier)
+                  .saveDisplayName(value);
+              if (!dialogContext.mounted) return;
+              Navigator.of(dialogContext).pop();
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text(
+                    saved
+                        ? 'profile.name_updated'.tr()
+                        : 'auth.error.unknown'.tr(),
+                  ),
+                ),
+              );
+            },
+            child: Text('common.save'.tr()),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final displayName = ref.watch(displayNameProvider);
     final profile = ref.watch(profileTypeProvider);
+    final authState = ref.watch(authControllerProvider);
     final locationLabel = ref.watch(selectedLocationLabelProvider);
     final textTheme = Theme.of(context).textTheme;
     Locale currentLocale;
@@ -156,10 +231,21 @@ class ProfilePage extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'profile.user_email'.tr(),
+                            authState.email ?? 'profile.user_email'.tr(),
                             style: textTheme.bodySmall,
                           ),
                         ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'profile.edit_name_title'.tr(),
+                      icon: const Icon(
+                        Icons.edit_outlined,
+                        color: AppColors.primary,
+                      ),
+                      onPressed: () => _showEditNameDialog(context, ref),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(48, 48),
                       ),
                     ),
                   ],
@@ -278,7 +364,7 @@ class ProfilePage extends ConsumerWidget {
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () {
-                              _changeLocale(context, const Locale('es'));
+                              _changeLocale(context, ref, const Locale('es'));
                             },
                             style: OutlinedButton.styleFrom(
                               backgroundColor: currentLocale.languageCode == 'es'
@@ -309,7 +395,7 @@ class ProfilePage extends ConsumerWidget {
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () {
-                              _changeLocale(context, const Locale('en'));
+                              _changeLocale(context, ref, const Locale('en'));
                             },
                             style: OutlinedButton.styleFrom(
                               backgroundColor: currentLocale.languageCode == 'en'

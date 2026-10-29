@@ -137,6 +137,8 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
   | `name_en` | `VARCHAR(100)` | NOT NULL | Nombre de la zona en inglés (ej. `"North Zone"`) |
   | `sector_hint_es` | `VARCHAR(150)` | NOT NULL DEFAULT '' | Barrios o puntos de referencia en español (ej. `"Novalito, San Joaquín, CC Guatapurí"`) |
   | `sector_hint_en` | `VARCHAR(150)` | NOT NULL DEFAULT '' | Barrios o puntos de referencia en inglés (ej. `"Novalito, San Joaquín, Guatapurí Mall"`) |
+  | `normalized_x` | `NUMERIC(5,4)` | NOT NULL DEFAULT 0.5, CHECK (0..1) | Posición X normalizada en el lienzo del mapa local (consumida por `MunicipalityZone.fromMap`) |
+  | `normalized_y` | `NUMERIC(5,4)` | NOT NULL DEFAULT 0.5, CHECK (0..1) | Posición Y normalizada en el lienzo del mapa local (consumida por `MunicipalityZone.fromMap`) |
   | `sort_order` | `INTEGER` | NOT NULL DEFAULT 0 | Orden de visualización en selectores |
   | `is_active` | `BOOLEAN` | NOT NULL DEFAULT true | Si la zona está activa para consultas y reportes |
 - **Índices:** `CREATE INDEX idx_municipality_zones_mun ON public.municipality_zones(municipality_code, sort_order);`
