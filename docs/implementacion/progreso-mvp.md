@@ -1,6 +1,6 @@
 # Progreso y Control de Cambios — Vía Justa MVP
 
-**Última actualización:** 28 de octubre de 2026 (Cierre del Primer Avance — `VJ-06`)  
+**Última actualización:** 29 de octubre de 2026 (VJ-07 backend: migraciones, RLS, GRANT y seeds; prueba local pendiente por Docker)  
 **Rama base actual:** `main` — PRs #4 a #9 en integración; rama actual `feature/vj-06-cierre-primer-avance`  
 **Repositorio remoto:** `https://github.com/j4gg-0531/via-justa.git`  
 **Entorno de ejecución:** Windows 10/11 x64, PowerShell 5.1  
@@ -24,7 +24,7 @@
 | **VJ-04** | P1 | Ambos | Motor visual de semáforo demo por zonas (GPS + mapa): pantallas M06, M07 y M20 | **HECHO-VERIFICADO (`feature/vj-04-semaforo-demo`)** | VJ-03 |
 | **VJ-05** | P1 | Frontend | Pantalla M10: aportar precio en 4 pasos demo por zona | **HECHO-VERIFICADO (`feature/vj-05-aportar-precio-demo`)** | VJ-04 |
 | **VJ-06** | P1 | Ambos | Cierre del primer avance: walkthrough E2E, CI y documentación de sustentación | **HECHO-VERIFICADO (`feature/vj-06-cierre-primer-avance`)** | VJ-03, VJ-04, VJ-05 |
-| **VJ-07** | P0 | Backend | Supabase: migración inicial, RLS, GRANT, seeds y ER | **BLOQUEADO-EXTERNO** | VJ-01, VJ-06 |
+| **VJ-07** | P0 | Backend | Supabase: migración inicial, RLS, GRANT, seeds y ER | **HECHO-SIN-PRUEBA** (migraciones/seeds/RLS creados; `supabase test db` pendiente por Docker) | VJ-01, VJ-06 |
 | **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos | **PENDIENTE** | VJ-07 |
 | **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **PENDIENTE** | VJ-08 |
 | **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **PENDIENTE** | VJ-07 |
@@ -126,3 +126,20 @@
 - **Gitleaks Scan:** 0 leaks detectados.
 - **Rastreo de extensiones sensibles:** Sin `.env`, `.key`, `*.jks`, `*.keystore` en el repositorio.
 - **Configuración de Gradle:** `android/app/build.gradle.kts` utiliza firma release con clave debug para desarrollo local (deuda técnica VJ-20).
+
+---
+
+## 6. VJ-07 — Backend Supabase (29 de octubre de 2026)
+
+- **D4 ratificada:** Supabase es el backend del MVP (ver `docs/decisiones.md`).
+- **Migraciones creadas:**
+  - `supabase/migrations/20261027151907_extensions_and_geography.sql`
+  - `supabase/migrations/20261027151910_profiles_and_consents.sql`
+  - `supabase/migrations/20261029100000_price_catalog.sql`
+  - `supabase/migrations/20261029101000_price_reports_and_events.sql`
+  - `supabase/migrations/20261029102000_businesses_and_content.sql`
+- **Seeds creadas:** 33 departamentos, 25 municipios del Cesar (Valledupar piloto), 5 zonas de Valledupar, 4 categorías de precio, configuración del semáforo y evento DEMO.
+- **RLS/GRANT:** 16 tablas con RLS; catálogos públicos de solo lectura; perfiles y consentimientos privados; `ai_usage` exclusivo de `service_role`; columnas de auditoría no editables por el cliente.
+- **Pruebas:** `supabase/tests/rls.sql` con 21 aserciones pgTAP.
+- **Estado:** `HECHO-SIN-PRUEBA`. El daemon de Docker no estaba disponible en el entorno local, por lo que `supabase db reset` y `supabase test db` no se pudieron ejecutar. **No se ha aplicado al proyecto remoto.**
+- **Siguiente paso:** levantar Docker Desktop, ejecutar `supabase db reset` y `supabase test db`, corregir cualquier error y luego abrir el PR.
