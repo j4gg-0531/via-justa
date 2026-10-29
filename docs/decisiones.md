@@ -23,6 +23,7 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
 | **D13**| Categorías de precio estrictamente comparables | **PROPUESTA** | Ambos | 28 de octubre de 2026 |
 | **D14**| Política de contraseñas y confirmación de correo | **PENDIENTE** | Backend | — |
 | **D15**| Medianas de precios por zonas del municipio y selección híbrida (GPS / Mapa) | **ACORDADA** | Ambos | 28 de octubre de 2026 |
+| **D16**| Geometría del mapa de departamentos desde SVG de Simplemaps convertido a JSON por script | **ACORDADA** | Frontend | 28 de octubre de 2026 |
 
 ---
 
@@ -213,3 +214,20 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
 - **Justificación técnica:** En una misma ciudad como Valledupar, los costos de restaurantes, taxis y hospedaje varían significativamente entre sectores comerciales/turísticos (Zona Norte / Novalito) y sectores populares o terminales (Zona Sur / Terminal). Segmentar por `(municipality_code, zone_id, category_id)` evita sesgos estadísticos.
 - **Impacto Frontend:** Implementado en `MunicipalityZone`, `ZoneMapPickerCard`, `PriceScanPage` (`M06`), `PriceResultPage` (`M07`/`M20`) y `ContributePricePage` (`M10`).
 - **Impacto Backend:** Conciliado en `docs/contrato-datos-v1.md` y `docs/modelo-er.puml` mediante la tabla `public.municipality_zones`, la llave foránea `zone_id` en `public.price_reports` y el parámetro `p_zone_id` en la RPC `public.evaluate_price_verdict`.
+
+---
+
+## D16 · Geometría del mapa de departamentos desde SVG de Simplemaps convertido a JSON por script
+- **Estado:** **ACORDADA**
+- **Responsable:** Frontend.
+- **Fecha de evidencia:** 28 de octubre de 2026 (`M03` / `VJ-09`).
+- **Descripción:** Reemplazo del mapa provisional de departamentos por la geometría vectorial real de los 33 territorios de Colombia (32 departamentos + Bogotá, D.C.) extraída del archivo `tools/source/co.svg` (Simplemaps.com, licencia comercial gratuita) y convertida mediante `tools/svg_to_geo_json.py` a `assets/data/colombia_departments_geo.json`.
+- **Justificación técnica:**
+  1. Evita coordenadas inventadas a mano y elimina dependencias externas de parseo SVG en tiempo de ejecución.
+  2. Mantiene `DepartmentRepository` síncrono para el catálogo (`Department`: `code`, `name`, `isAvailable`) y aísla la carga asíncrona de anillos poligonales en `DepartmentShapeRepository` (`LocalDepartmentShapeRepository`), uniendo catálogo y geometría únicamente por código DANE de 2 dígitos.
+  3. Soporta múltiples anillos por territorio (islas en San Andrés y Providencia `'88'`, Bolívar `'13'`, Cauca `'19'`, Chocó `'27'` y Nariño `'52'`) y prioriza enclaves como Bogotá, D.C. (`'11'`) sobre Cundinamarca (`'25'`).
+- **Alternativas consideradas:**
+  - Shapefiles completos del Marco Geoestadístico Nacional (MGN) del DANE: peso elevado para empaquetado directo en móvil sin preprocesamiento cartográfico; queda como mejora futura.
+  - Polígonos aproximados escritos a mano: descartados por baja fidelidad visual.
+- **Impacto Frontend:** `DepartmentShape`, `DepartmentShapeRepository`, `LocalDepartmentShapeRepository`, `findDepartmentAtPoint` y renderizado `CustomPainter` en `MapPage` con crédito explícito a Simplemaps (aclarando que no es cartografía oficial DANE).
+- **Impacto Backend:** Ninguno; la geometría es un recurso estático del cliente móvil y no se almacena en `public.departments`.

@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:via_justa/core/router/app_router.dart';
+import 'package:via_justa/core/session/session_navigation_rule.dart';
+import 'package:via_justa/core/theme/app_theme.dart';
 import 'package:via_justa/features/businesses/presentation/pages/businesses_page.dart';
 import 'package:via_justa/features/home/presentation/pages/home_page.dart';
 import 'package:via_justa/features/map_colombia/presentation/pages/map_page.dart';
 import 'package:via_justa/features/prices/presentation/pages/price_map_page.dart';
 import 'package:via_justa/features/profile/presentation/pages/profile_page.dart';
 import 'package:via_justa/features/scan/presentation/pages/scan_page.dart';
+import 'package:via_justa/features/splash/presentation/pages/splash_page.dart';
 
 void main() {
   testWidgets('renders all five navigation destinations in bottom bar', (
@@ -154,5 +157,72 @@ void main() {
 
     // Should return to HomePage
     expect(find.byType(HomePage), findsOneWidget);
+  });
+
+  test('resolveSplashDestination and resolveSessionRedirect route /splash according to session state', () {
+    expect(
+      resolveSplashDestination(
+        isAuthenticated: false,
+        hasSelectedProfile: false,
+        hasSelectedPilotMunicipality: false,
+      ),
+      '/welcome',
+    );
+    expect(
+      resolveSplashDestination(
+        isAuthenticated: true,
+        hasSelectedProfile: false,
+        hasSelectedPilotMunicipality: false,
+      ),
+      '/onboarding',
+    );
+    expect(
+      resolveSplashDestination(
+        isAuthenticated: true,
+        hasSelectedProfile: true,
+        hasSelectedPilotMunicipality: false,
+      ),
+      '/departments',
+    );
+    expect(
+      resolveSplashDestination(
+        isAuthenticated: true,
+        hasSelectedProfile: true,
+        hasSelectedPilotMunicipality: true,
+      ),
+      '/home',
+    );
+
+    expect(
+      resolveSessionRedirect(
+        matchedLocation: '/splash',
+        isAuthenticated: false,
+        hasSelectedProfile: false,
+        hasSelectedPilotMunicipality: false,
+      ),
+      '/welcome',
+    );
+    expect(
+      resolveSessionRedirect(
+        matchedLocation: '/department/20',
+        isAuthenticated: false,
+        hasSelectedProfile: false,
+        hasSelectedPilotMunicipality: false,
+      ),
+      isNull,
+    );
+  });
+
+  testWidgets('SplashPage renders purely without pending Timers', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: const SplashPage(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SplashPage), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

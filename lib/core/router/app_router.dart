@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:via_justa/core/navigation/app_scaffold.dart';
+import 'package:via_justa/core/session/session_navigation_rule.dart';
+import 'package:via_justa/core/session/session_providers.dart';
 import 'package:via_justa/features/auth/presentation/pages/login_page.dart';
 import 'package:via_justa/features/auth/presentation/pages/register_page.dart';
 import 'package:via_justa/features/auth/presentation/pages/welcome_page.dart';
@@ -10,7 +12,9 @@ import 'package:via_justa/features/home/presentation/pages/home_page.dart';
 import 'package:via_justa/features/map_colombia/presentation/pages/map_page.dart';
 import 'package:via_justa/features/municipality/presentation/pages/municipality_page.dart';
 import 'package:via_justa/features/municipality/presentation/pages/municipality_selector_page.dart';
+import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/onboarding/presentation/pages/profile_selection_page.dart';
+import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
 import 'package:via_justa/features/prices/presentation/pages/contribute_price_page.dart';
 import 'package:via_justa/features/prices/presentation/pages/price_map_page.dart';
 import 'package:via_justa/features/prices/presentation/pages/price_result_page.dart';
@@ -56,6 +60,17 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.splash,
+    redirect: (context, state) {
+      final hasUser = ref.read(userNameProvider) != null;
+      final hasProfile = ref.read(profileTypeProvider) != null;
+      final selectedMunicipality = ref.read(selectedMunicipalityProvider);
+      return resolveSessionRedirect(
+        matchedLocation: state.matchedLocation,
+        isAuthenticated: hasUser || hasProfile,
+        hasSelectedProfile: hasProfile,
+        hasSelectedPilotMunicipality: selectedMunicipality?.isPilot ?? false,
+      );
+    },
     routes: [
       // Rutas raíz (fuera de la barra de navegación inferior)
       GoRoute(

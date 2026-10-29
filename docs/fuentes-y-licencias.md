@@ -15,9 +15,11 @@ Este documento certifica las fuentes oficiales de datos, licencias de propiedad 
   - 25 municipios de Cesar catalogados en `assets/data/municipalities_cesar.json`.
 - **Condiciones de uso:** Datos abiertos del Estado colombiano bajo los términos de la Ley 1712 de 2014. Uso libre para consulta y procesamiento con obligación de atribución al DANE.
 
-### 1.2 Geometría y Cartografía
-- **Fase de Avance (Actual):** Trazos vectoriales provisorios (`Path` con formas elípticas de demostración en `map_page.dart`) para ilustrar la interacción táctil. No pretenden reflejar fidelidad geográfica ni se presentan como cartografía oficial.
-- **Fase Real (Semana 2 / VJ-09):** Geometría vectorial simplificada a partir del Marco Geoestadístico Nacional (MGN) del DANE procesada mediante Mapshaper para optimizar el peso del archivo SVG/Path en el dispositivo móvil. Sujeta a verificación de los términos específicos de distribución de la Infraestructura Colombiana de Datos Espaciales (ICDE) previo a su empaquetado final.
+### 1.2 Geometría y Cartografía (Mapa de Departamentos de Colombia — M03)
+- **Fuente real:** **Simplemaps.com** (`tools/source/co.svg`, mapa vectorial de los 33 territorios de Colombia: 32 departamentos, incluido San Andrés y Providencia, más Bogotá, D.C.).
+- **Licencia:** Uso comercial y personal gratuito (*Free for commercial use, attribution appreciated*), disponible en https://simplemaps.com/resources/svg-license.
+- **Procesamiento en el repositorio:** El archivo fuente `tools/source/co.svg` se convierte mediante el script reproducible `tools/svg_to_geo_json.py` al recurso estático `assets/data/colombia_departments_geo.json` (`bounds` y `rings` indexados por código DANE de 2 dígitos).
+- **Alcance y honestidad:** Se trata de un **mapa vectorial simplificado** para selección interactiva en móvil y **NO constituye cartografía oficial del DANE**. Se rotula con atribución explícita a Simplemaps.com en la interfaz (`map.sample_note`) y nunca se presenta como cartografía oficial. El Marco Geoestadístico Nacional (MGN) del DANE queda registrado como mejora futura.
 
 ---
 

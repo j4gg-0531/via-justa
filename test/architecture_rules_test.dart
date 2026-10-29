@@ -23,11 +23,6 @@ void main() {
 
       // Solo evaluamos archivos en presentation/, excluyendo presentation/state/
       if (normalizedPath.contains('/presentation/') && !normalizedPath.contains('/presentation/state/')) {
-        // Excepción temporal aceptada en AGENTS.md: Timer de splash_page.dart
-        if (normalizedPath.endsWith('splash_page.dart')) {
-          continue;
-        }
-
         final lines = file.readAsLinesSync();
         for (var i = 0; i < lines.length; i++) {
           final line = lines[i];

@@ -1,37 +1,12 @@
-import 'dart:async';
-
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 
 /// Pantalla de splash con logo y animación de entrada.
-class SplashPage extends StatefulWidget {
+/// La redirección hacia `/welcome`, `/onboarding`, `/departments` o `/home`
+/// ocurre de forma declarativa en `routerProvider` (`lib/core/router/app_router.dart`).
+class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
-
-  @override
-  State<SplashPage> createState() => _SplashPageState();
-}
-
-class _SplashPageState extends State<SplashPage> {
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer(const Duration(milliseconds: 1800), () {
-      if (mounted) {
-        context.go(AppRoutes.welcome);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
