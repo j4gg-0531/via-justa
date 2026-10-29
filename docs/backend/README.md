@@ -17,15 +17,18 @@ supabase/
 │   ├── 20261029101000_price_reports_and_events.sql
 │   ├── 20261029102000_businesses_and_content.sql
 │   ├── 20261029120000_close_vj07_vj08_d11_and_account_deletion.sql
-│   └── 20261029130000_price_verdict_rpc.sql
+│   ├── 20261029130000_price_verdict_rpc.sql
+│   └── 20261029140000_price_reports_quotas_privacy_and_rpc.sql
 ├── seed/                        # Datos iniciales idempotentes
 │   ├── 01_departments.sql
 │   ├── 02_municipalities.sql
 │   ├── 03_municipality_zones.sql
 │   ├── 04_price_categories.sql
 │   ├── 05_app_config.sql
-│   └── 06_events_demo.sql
+│   ├── 06_events_demo.sql
+│   └── 07_price_reports_demo.sql
 └── tests/
+    ├── price_reports_rls.sql    # Pruebas pgTAP de aportes, cuotas y privacidad (18 aserciones)
     ├── price_verdict.sql        # Pruebas pgTAP del semáforo SQL (23 aserciones)
     └── rls.sql                  # Pruebas pgTAP de RLS y constraints (26 aserciones)
 ```
@@ -76,17 +79,18 @@ panel web de Supabase. Todo cambio debe ser una migración versionada e inmutabl
 - RLS activo en las 16 tablas de `public`; los catálogos son de solo lectura para
   `anon`/`authenticated`.
 
-## Estado VJ-07, VJ-08 y VJ-10
+## Estado VJ-07, VJ-08, VJ-10 y VJ-11 (Backend)
 
-- Migraciones 0001–0007 creadas:
+- Migraciones 0001–0008 creadas:
   - `0001`–`0005`: esquema base de 16 tablas, RLS y GRANTs.
   - `0006`: ratificación de D11 (`resident` en `profiles.profile_type`), defensa por columnas en `price_reports` y función RPC transaccional `delete_my_account()` (Ley 1581 / RF-06).
   - `0007`: función SQL `calculate_price_verdict` (y alias `evaluate_price_verdict`) como única fuente de verdad estadística del semáforo por zona (`VJ-10`).
-- Seeds 01–06 creadas (33 departamentos, 25 municipios del Cesar, 5 zonas de Valledupar, 4 categorías, configuración del semáforo y evento DEMO).
-- Pruebas pgTAP en `supabase/tests/rls.sql` (26 aserciones) y `supabase/tests/price_verdict.sql` (23 aserciones) -> **49/49 PASS**.
+  - `0008`: validaciones de servidor en `price_reports`, ofuscación de privacidad GPS a 3 decimales (~110 m), control de concurrencia (`pg_advisory_xact_lock`), anti-duplicado (15 min), cuota diaria (10 aportes/24h) y funciones RPC `submit_price_report` y `moderate_price_report` (`VJ-11`).
+- Seeds 01–07 creadas (33 departamentos, 25 municipios del Cesar, 5 zonas de Valledupar, 4 categorías, configuración del semáforo/cuotas, evento DEMO y reportes DEMO segregados).
+- Pruebas pgTAP en `supabase/tests/rls.sql` (26 aserciones), `supabase/tests/price_verdict.sql` (23 aserciones) y `supabase/tests/price_reports_rls.sql` (18 aserciones) -> **67/67 PASS**.
 - **Verificado en local el 29/10/2026** (CLI 2.101.0 + Docker 29.5.2):
-  `supabase start` OK, `supabase db reset` OK (7 migraciones + 6 seeds) y
-  `supabase test db` con `Files=2, Tests=49, Result: PASS`.
+  `supabase start` OK, `supabase db reset` OK (8 migraciones + 7 seeds) y
+  `supabase test db` con `Files=3, Tests=67, Result: PASS`.
 - **No se ha aplicado al proyecto remoto** (`vjehsjqmwibmiqmxlsou`). Requiere
   aprobación explícita del equipo antes de ejecutar `supabase db push`.
 

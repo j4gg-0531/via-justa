@@ -15,7 +15,11 @@ insert into public.app_config (key, value) values
       "threshold_yellow": 40.0,
       "underpriced_alert_threshold": -40.0,
       "recommended_cap_factor": 1.15,
-      "daily_ai_limit_per_user": 5
+      "daily_ai_limit_per_user": 5,
+      "daily_report_limit_per_user": 10,
+      "duplicate_cooldown_minutes": 15,
+      "min_report_amount_cop": 500,
+      "max_report_amount_cop": 20000000
     }'::jsonb
   )
 on conflict (key) do update

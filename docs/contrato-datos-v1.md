@@ -205,10 +205,15 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
   - `CREATE INDEX idx_price_reports_stat ON price_reports(municipality_code, zone_id, category_id, created_at) WHERE is_hidden = false AND is_demo = false;`
   - `CREATE INDEX idx_price_reports_location ON price_reports USING GIST(location);`
   - `CREATE INDEX idx_price_reports_user ON price_reports(user_id);`
-- **Políticas RLS:**
-  - `SELECT`: Visible para todos si `is_hidden = false` y `is_demo = false` (a menos que el usuario esté en modo demo).
-  - `INSERT`: Usuarios autenticados (`auth.uid() = user_id`), validando tope de reportes diarios para prevenir spam.
-  - `UPDATE` / `DELETE`: Solo el autor sobre sus reportes recientes o administradores.
+  - `CREATE INDEX price_reports_user_recent_idx ON price_reports(user_id, created_at DESC);`
+- **Políticas RLS, Reglas de Cuota y RPCs en Servidor (`VJ-11`):**
+  - `SELECT`: Visible para todos si `is_hidden = false` y `is_demo = false`; el autor ve sus propios reportes.
+  - `INSERT`: Usuarios autenticados (`auth.uid() = user_id`), protegido por el trigger `public.enforce_price_report_submission_rules()` y la RPC `public.submit_price_report(...)`:
+    - **Rango de monto y texto:** `amount_cop` entre `$500` y `$20.000.000 COP`; `place_name` limpio hasta 120 caracteres; `source_note` limpio hasta 255 caracteres.
+    - **Vigencia de catálogos:** Exige categoría con `is_active = true` (`[PRICE_CATEGORY_INACTIVE]`), municipio con `is_pilot = true` (`[PRICE_MUNICIPALITY_NOT_PILOT]`) y zona activa del municipio (`[PRICE_ZONE_INACTIVE]`).
+    - **Privacidad geoespacial automática:** Toda coordenada `location` se redondea en servidor a 3 decimales ($\approx 110\text{ m}$ de resolución urbana), impidiendo persistir ubicaciones exactas de domicilios.
+    - **Concurrencia, deduplicación y cuota diaria:** Serializa envíos concurrentes por usuario mediante `pg_advisory_xact_lock`, bloquea reportes idénticos dentro de `duplicate_cooldown_minutes` (`15 min`, error `[PRICE_DUPLICATE_REPORT]`) y limita a `daily_report_limit_per_user` (`10` aportes reales cada 24 horas móviles, error `[PRICE_RATE_LIMITED]`).
+  - `UPDATE` / `DELETE`: Solo el autor sobre sus reportes recientes (`< 24 horas`) sin alterar metadatos ni banderas, o moderación administrativa mediante `public.moderate_price_report(p_report_id, p_is_hidden, p_reason)`.
 
 ---
 
@@ -245,7 +250,11 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
     "threshold_yellow": 40.0,
     "underpriced_alert_threshold": -40.0,
     "recommended_cap_factor": 1.15,
-    "daily_ai_limit_per_user": 5
+    "daily_ai_limit_per_user": 5,
+    "daily_report_limit_per_user": 10,
+    "duplicate_cooldown_minutes": 15,
+    "min_report_amount_cop": 500,
+    "max_report_amount_cop": 20000000
   }
   ```
 - **Políticas RLS:** `SELECT` público a autenticados. Modificación exclusiva de administradores.

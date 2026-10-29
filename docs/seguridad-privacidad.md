@@ -61,7 +61,7 @@ Los controles de seguridad y privacidad se clasifican rigurosamente según su es
 
 ### 3.2 Privacidad Geoespacial de Precios
 - Los reportes de precios en `price_reports` permiten asociar una ubicación GPS (`location`).
-- **Ofuscación de Privacidad:** Para evitar la trazabilidad de la rutina del usuario, la interfaz solo solicita coordenadas aproximadas a nivel de calle o sector comercial (`place_name`), sin persistir la ruta de desplazamiento ni identificadores de hardware **[PROPUESTO]**.
+- **Ofuscación de Privacidad en Servidor:** Para evitar la trazabilidad de la rutina o domicilio del ciudadano, el trigger `public.enforce_price_report_submission_rules()` redondea automáticamente cualquier coordenada `location` a **3 decimales** ($\approx 110\text{ m}$ de resolución a nivel de cuadra/sector comercial) antes de persistirla, sin almacenar jamás coordenadas exactas de domicilios ni identificadores de hardware **[IMPLEMENTADO EN VJ-11]**.
 
 ---
 
@@ -78,9 +78,9 @@ Todas las tablas de la base de datos deben tener RLS activado de forma obligator
 | `consents` | INSERT | `authenticated` | `auth.uid() = user_id` | **[IMPLEMENTADO EN feature/supabase-init]** |
 | `departments` | SELECT | `anon`, `authenticated`| `true` (lectura pública) | **[IMPLEMENTADO EN feature/supabase-init]** |
 | `municipalities`| SELECT| `anon`, `authenticated`| `true` (lectura pública) | **[IMPLEMENTADO EN feature/supabase-init]** |
-| `price_reports` | SELECT | `anon`, `authenticated` | `is_hidden = false AND is_demo = false` | **[PROPUESTO]** |
-| `price_reports` | INSERT | `authenticated` | `auth.uid() = user_id` | **[PROPUESTO]** |
-| `price_reports` | UPDATE / DELETE | `authenticated` | `auth.uid() = user_id AND created_at > now() - INTERVAL '24 hours'` | **[PROPUESTO]** |
+| `price_reports` | SELECT | `anon`, `authenticated` | `is_hidden = false AND is_demo = false` (o propios `user_id = auth.uid()`) | **[IMPLEMENTADO]** |
+| `price_reports` | INSERT | `authenticated` | `auth.uid() = user_id` + trigger de cuota diaria (10/24h), anti-duplicado (15m) y ofuscación GPS | **[IMPLEMENTADO EN VJ-11]** |
+| `price_reports` | UPDATE / DELETE | `authenticated` | `auth.uid() = user_id AND created_at > now() - INTERVAL '24 hours'` (sin alterar metadatos ni banderas) | **[IMPLEMENTADO EN VJ-11]** |
 | `businesses` | SELECT | `anon`, `authenticated` | `status = 'approved' OR auth.uid() = owner_id` | **[PROPUESTO]** |
 | `businesses` | INSERT | `authenticated` | `auth.uid() = owner_id AND status = 'pending'` | **[PROPUESTO]** |
 | `businesses` | UPDATE | `authenticated` | `auth.uid() = owner_id AND status IN ('pending', 'approved')` *(sin alterar status)* | **[PROPUESTO]** |
