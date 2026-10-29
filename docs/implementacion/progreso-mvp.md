@@ -1,4 +1,4 @@
-﻿# Progreso y Control de Cambios — Vía Justa MVP
+# Progreso y Control de Cambios — Vía Justa MVP
 
 **Última actualización:** 28 de octubre de 2026 (Cierre del Primer Avance — `VJ-06`)  
 **Rama base actual:** `main` — PRs #4 a #9 en integración; rama actual `feature/vj-06-cierre-primer-avance`  
@@ -31,7 +31,7 @@
 | **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **PENDIENTE** | VJ-10 |
 | **VJ-12** | P1 | Frontend | Google Maps de precios, filtros y optimización | **BLOQUEADO-EXTERNO** | VJ-11 |
 | **VJ-13** | P1 | Frontend | Captura de contratos: cámara, archivos y OCR local | **HECHO — verificado en dispositivo (moto_g22, release); PDF diferido** | VJ-06 |
-| **VJ-14** | P1 | Ambos | Análisis de contratos con Gemini en Edge Function | **BLOQUEADO-EXTERNO** | VJ-13 |
+| **VJ-14** | P1 | Ambos | Análisis de contratos con Gemini en Edge Function | **avance parcial (app); backend pendiente** | VJ-13 |
 | **VJ-15** | P2 | Ambos | Vista de ciudad de Valledupar: cultura verificada es/en | **PENDIENTE** | VJ-09 |
 | **VJ-16** | P2 | Ambos | Registro de negocio en 4 pasos, RLS y moderación | **PENDIENTE** | VJ-08 |
 | **VJ-17** | P2 | Frontend | Negocios: catálogo, detalle y acciones externas | **PENDIENTE** | VJ-16 |
@@ -142,3 +142,17 @@
   - **Reglas mínimas de R8 / Proguard:** Configuración en ndroid/app/proguard-rules.pro para preservar los constructores de ComponentRegistrar requeridos por la instanciación reflectiva de ML Kit en modo --release, suprimiendo advertencias de scripts no empaquetados.
   - **Editor y límite de 15.000 caracteres:** El texto extraído es editable en memoria sin truncamiento silencioso; se advierte y exige recorte manual si excede el límite máximo.
   - **Catálogo de contratos sintéticos:** 3 muestras bilingües (ES/EN) sin datos personales reales para pruebas y demostración segura.
+
+---
+
+## 7. Avance Parcial de VJ-14 (Análisis de Contratos en la Aplicación Móvil)
+
+- **Estado:** **Avance parcial (app); backend pendiente** en rama `feature/vj-14-analisis-contratos-app`.
+- **Alcance completado en el cliente móvil:**
+  - **Dominio puro y validaciones estrictas:** Entidad `ContractAnalysisResult` (§4.4 de `contrato-datos-v1.md`) con niveles semánticos `green`, `yellow`, `red`, recomendación general, puntos clave y cláusulas analizadas (cita literal, alerta, recomendación y referencia legal nullable). Validación estricta con `FormatException` ante datos incompletos o fuera de límites (máx. 5 puntos clave, máx. 10 cláusulas, textos vacíos). Errores tipados `ContractAnalysisError` (§4.5) con extensiones puras `translationKey` e `isRetryable`.
+  - **Gateway y desacoplamiento de arquitectura:** Interfaz `ContractAnalysisGateway` en `domain/` y `DefaultContractAnalysisRepository` en `data/`. La aplicación móvil no contiene dependencias de red prematuras, claves de Gemini ni SDKs directos de IA. Implementación `DemoContractAnalysisGateway` con simulación local rotulada visiblemente como `[DEMO]` y escenarios controlados de éxito y error.
+  - **Control de estado y ciclo de vida (`ContractAnalysisNotifier`):** Estados reactivos `idle`, `analyzing`, `result`, `error`. Bloqueo de doble toque, descarte de respuestas tardías u obsoletas mediante identificador secuencial de petición, reinicio automático ante descarte de documento en `contractCaptureProvider` y reinicio con revocación de consentimiento en `SessionController.signOut`.
+  - **Segundo consentimiento informado:** Flujo de consentimiento específico y diferenciado del OCR de RN-10, advirtiendo que el texto saldrá del dispositivo hacia un servicio externo de IA y recomendando el uso de contratos sintéticos en pruebas. La decisión de solicitarlo reside en el provider.
+  - **Interfaz estructurada y accesible (`ContractAnalysisResultView`):** Triple canal semántico (color + ícono + texto traducido) integrado con `SemanticStatusColors`. Ocultamiento estricto de referencias legales nulas. Banner visible de demostración. Reintento seguro ante errores transitorios. Adaptación responsiva verificada a 360 dp y 1.5x de escala de texto sin desbordamientos.
+- **Pendiente para cierre definitivo:**
+  - Implementación y despliegue de la Edge Function en Supabase con Google Gemini (backend pendiente).

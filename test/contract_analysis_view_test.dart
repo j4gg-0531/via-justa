@@ -69,7 +69,6 @@ class _FakeOcrRepository implements ContractOcrRepository {
 
 class _ControllableGateway implements ContractAnalysisGateway {
   _ControllableGateway({
-    this.responseToReturn,
     this.exceptionToThrow,
   });
 

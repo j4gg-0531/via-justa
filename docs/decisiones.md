@@ -1,4 +1,4 @@
-﻿# Registro de Decisiones de Arquitectura y Producto (ADRs)
+# Registro de Decisiones de Arquitectura y Producto (ADRs)
 
 Este documento formaliza el registro de decisiones técnicas y de producto para el proyecto **Vía Justa MVP**, estableciendo su estado, justificación, alternativas e impacto entre frontend y backend.
 
@@ -283,3 +283,45 @@ ative_pdf_renderer) o procesamiento en backend que aumentaría sustancialmente e
   3. `recognized.text` entrega un resultado significativamente más robusto y fiel en documentos reales capturados con la cámara del dispositivo móvil.
 - **Impacto Frontend:** `DeviceContractOcrRepository` retorna directamente `recognized.text`. Se eliminaron de `domain/contract_capture.dart` las funciones y clases geométricas no utilizadas (`OcrTextLine`, `sortOcrTextLines`, `composeSortedOcrText`).
 - **Impacto Backend:** Ninguno.
+---
+
+## D20 · Gateway abstracto (`ContractAnalysisGateway`) y modelo desacoplado (`ContractAnalysisResult`)
+- **Estado:** **ACORDADA**
+- **Responsable:** Ambos integrantes.
+- **Fecha de evidencia:** 29 de octubre de 2026 (VJ-14).
+- **Descripción:** La interacción de análisis de contratos se estructura mediante una interfaz abstracta en el dominio (`ContractAnalysisGateway`) y un modelo inmutable estricto (`ContractAnalysisResult`), sin dependencias de red prematuras, SDKs de Gemini ni referencias a Supabase en la aplicación móvil.
+- **Justificación técnica:**
+  1. La aplicación móvil jamás debe contener claves de API de Gemini ni comunicarse directamente con Google AI; la llamada real debe ser intermediada por una Edge Function de Supabase con autenticación JWT y validación de cuotas.
+  2. El modelo demo previo (`ContractAnalysis`) se preserva intacto para garantizar la compatibilidad regresiva del catálogo inicial de la pantalla de escaneo.
+  3. `ContractAnalysisResult.fromMap` implementa una deserialización estricta con `FormatException` que valida el nivel (`green`, `yellow`, `red`), campos requeridos no vacíos y máximos seguros (hasta 5 puntos clave y hasta 10 cláusulas analizadas).
+  4. Los errores se modelan de forma tipada y exhaustiva mediante `ContractAnalysisError`, mapeando fallos HTTP y de infraestructura sin exponer información técnica sensible en la vista.
+- **Impacto Frontend:** Creación de `ContractAnalysisGateway`, `DefaultContractAnalysisRepository`, `DemoContractAnalysisGateway`, `ContractAnalysisResult` y `ContractAnalysisNotifier`.
+- **Impacto Backend:** La Edge Function futura de Supabase deberá apegarse estrictamente al contrato de datos JSON definido en `docs/contrato-datos-v1.md` §4.4 y §4.5.
+
+---
+
+## D21 · Reutilización de `SemanticStatusColors` para el nivel de riesgo de contratos
+- **Estado:** **ACORDADA**
+- **Responsable:** Frontend.
+- **Fecha de evidencia:** 29 de octubre de 2026 (VJ-14).
+- **Descripción:** El nivel de riesgo del contrato (`green`, `yellow`, `red`) utiliza la extensión de tema `SemanticStatusColors` (`styleForContractLevel`) para definir los estilos visuales de borde, fondo, texto e ícono.
+- **Justificación técnica:**
+  1. Cumple la directriz de diseño del proyecto: los colores verde, ámbar y rojo se reservan exclusivamente para estados semánticos tipo semáforo.
+  2. Garantiza accesibilidad WCAG AA: el estado del contrato nunca depende únicamente del color, integrando siempre triple canal informativo (color de fondo/borde + ícono temático obligatorio + texto explicativo traducido mediante `.tr()`).
+  3. Mantiene la coherencia visual con los veredictos de precios (`PriceVerdictLevel`).
+- **Impacto Frontend:** Método `styleForContractLevel` en `SemanticStatusColors` e integración en `ContractAnalysisResultView`.
+- **Impacto Backend:** Ninguno.
+
+---
+
+## D22 · Segundo consentimiento informado para análisis con IA de terceros
+- **Estado:** **ACORDADA**
+- **Responsable:** Ambos integrantes.
+- **Fecha de evidencia:** 29 de octubre de 2026 (VJ-14).
+- **Descripción:** Se establece un flujo de consentimiento informado independiente y diferenciado del consentimiento de OCR local (RN-10). Este segundo consentimiento advierte al usuario que el texto del contrato saldrá del teléfono hacia un servicio de IA de terceros para ser analizado, y exige en la etapa de prueba el uso exclusivo de contratos sintéticos o textos anonimizados.
+- **Justificación técnica:**
+  1. Legalmente y según las directrices de privacidad, el procesamiento local de imágenes (on-device) difiere sustancialmente de la transmisión de datos hacia un servicio cloud o LLM de terceros.
+  2. La decisión de solicitar el consentimiento reside en el estado del provider (`ContractAnalysisNotifier`), conservándose durante la sesión activa y revocándose al cerrar sesión (`SessionController.signOut`).
+- **Impacto Frontend:** Estado `hasGivenAiConsent` y diálogo `_showAiConsentDialog` en `ContractCaptureSection`.
+- **Impacto Backend:** Ninguno.
+

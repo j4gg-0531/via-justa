@@ -201,6 +201,28 @@ void main() {
         ),
       );
     });
+
+    test('dynamically maps synthetic contract samples to distinct semaphore levels', () async {
+      const gateway = DemoContractAnalysisGateway();
+
+      final green = await gateway.analyzeContractRaw(
+        text: 'Acuerdo de servicios locales y mantenimiento preventivo',
+        locale: 'es',
+      );
+      expect(green['level'], 'green');
+
+      final red = await gateway.analyzeContractRaw(
+        text: 'Arriendo con reajuste semestral y sanción de tres (3) cánones',
+        locale: 'es',
+      );
+      expect(red['level'], 'red');
+
+      final yellow = await gateway.analyzeContractRaw(
+        text: 'Contrato con depósito en efectivo de garantía',
+        locale: 'es',
+      );
+      expect(yellow['level'], 'yellow');
+    });
   });
 
   group('ContractAnalysisNotifier (presentation/state)', () {

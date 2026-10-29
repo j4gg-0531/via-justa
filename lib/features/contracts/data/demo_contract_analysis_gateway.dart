@@ -128,6 +128,26 @@ class DemoContractAnalysisGateway implements ContractAnalysisGateway {
     if (text.contains('#demo:network_error')) return DemoContractAnalysisScenario.errorNetworkUnavailable;
     if (text.contains('#demo:timeout_error')) return DemoContractAnalysisScenario.errorTimeout;
     if (text.contains('#demo:invalid_json')) return DemoContractAnalysisScenario.errorAiResponseInvalid;
+
+    // Reconocimiento inteligente de los 3 contratos sintéticos de prueba
+    final lower = text.toLowerCase();
+    if (lower.contains('mantenimiento preventivo') ||
+        lower.contains('preventive maintenance') ||
+        lower.contains('servicios locales')) {
+      return DemoContractAnalysisScenario.successGreen;
+    }
+    if (lower.contains('reajuste semestral') ||
+        lower.contains('semi-annual increase') ||
+        lower.contains('tres (3) cánones') ||
+        lower.contains('three (3) monthly rents')) {
+      return DemoContractAnalysisScenario.successRed;
+    }
+    if (lower.contains('depósito en efectivo') ||
+        lower.contains('deposito en efectivo') ||
+        lower.contains('cash security deposit')) {
+      return DemoContractAnalysisScenario.successYellow;
+    }
+
     return null;
   }
 
