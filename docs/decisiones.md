@@ -1,4 +1,4 @@
-﻿# Registro de Decisiones de Arquitectura y Producto (ADRs)
+# Registro de Decisiones de Arquitectura y Producto (ADRs)
 
 Este documento formaliza el registro de decisiones técnicas y de producto para el proyecto **Vía Justa MVP**, estableciendo su estado, justificación, alternativas e impacto entre frontend y backend.
 
@@ -18,10 +18,10 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
 | **D8** | Arquitectura en capas ligeras y reglas en `AGENTS.md` | **ACORDADA** | Ambos | 19 de octubre de 2026 |
 | **D9** | Gemini en Edge Function como proveedor LLM para contratos | **ACORDADA** | Ambos | 19 de octubre de 2026 |
 | **D10**| Repositorio único, ramas cortas por tarea y PR revisado | **ACORDADA** | Ambos | 19 de octubre de 2026 |
-| **D11**| Tercer perfil de usuario: Local / Residente (`resident`) | **PROPUESTA** | Backend / Ambos | 25 de octubre de 2026 |
+| **D11**| Tercer perfil de usuario: Local / Residente (`resident`) | **ACORDADA** | Backend / Ambos | 29 de octubre de 2026 |
 | **D12**| Barra inferior fija de cinco pestañas | **ACORDADA** | Frontend | 27 de octubre de 2026 |
-| **D13**| Categorías de precio estrictamente comparables | **PROPUESTA** | Ambos | 28 de octubre de 2026 |
-| **D14**| Política de contraseñas y confirmación de correo | **PENDIENTE** | Backend | — |
+| **D13**| Categorías de precio estrictamente comparables | **ACORDADA** | Ambos | 29 de octubre de 2026 |
+| **D14**| Política de contraseñas y confirmación de correo | **ACORDADA** | Backend | 29 de octubre de 2026 |
 | **D15**| Medianas de precios por zonas del municipio y selección híbrida (GPS / Mapa) | **ACORDADA** | Ambos | 28 de octubre de 2026 |
 | **D16**| Geometría del mapa de departamentos desde SVG de Simplemaps convertido a JSON por script | **ACORDADA** | Frontend | 28 de octubre de 2026 |
 | **D17**| Reglas mínimas de R8 / Proguard para OCR en Release (ComponentRegistrar) | **ACORDADA** | Frontend | 28 de octubre de 2026 |
@@ -156,17 +156,16 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
 ---
 
 ## D11 · Tercer perfil de usuario: Local / Residente (`resident`)
-- **Estado:** **PROPUESTA** *(Falta confirmación del compañero de backend antes de aplicar la migración SQL 0001)*
+- **Estado:** **ACORDADA** *(Ratificada por Backend en la migración `20261029120000_close_vj07_vj08_d11_and_account_deletion.sql`)*
 - **Responsable:** Compañero de backend y equipo.
-- **Fecha de evidencia:** 25 de octubre de 2026.
+- **Fecha de evidencia:** 25 de octubre de 2026 (propuesta); ratificada el 29 de octubre de 2026.
 - **Descripción:** El onboarding ofrece 3 perfiles: Visitante (`visitor`), Instalación (`settler`) y Residente (`resident`).
 - **Justificación técnica:**
   1. Permite diferenciar las necesidades del turista (eventos, precios de urgencia), del recién llegado (trámites, arriendos) y del habitante establecido (registro de su negocio, precios cotidianos de su barrio).
   2. La solicitud del profesor de permitir el registro de negocios locales por usuarios de la comunidad exige que el residente se sienta representado.
 - **Reglas críticas:**
   1. **Seguridad:** El perfil de usuario (`profile_type`) **NUNCA confiere privilegios administrativos**. La autorización administrativa no reside en `profiles` (se descarta la columna `role`) sino en la tabla independiente `public.admin_users` mediante la función `public.is_admin()`, preservando el principio de mínimo privilegio y separando el tipo de perfil de la autorización de administración.
-  2. **Compatibilidad:** En la migración inicial de backend (`20261027151910_profiles_and_consents.sql`) existe una restricción `check (profile_type in ('visitor', 'settler'))`. La inclusión de 'resident' se mantiene como propuesta formal pendiente de aprobación de Isaac para incorporar la migración complementaria correspondiente.
-  3. **Comportamiento inicial:** Para el primer avance, el perfil `resident` compartirá la experiencia de `settler` con una marca `TODO(D11)` en el dominio.
+  2. **Compatibilidad:** En la migración `20261029120000_close_vj07_vj08_d11_and_account_deletion.sql` se actualizó la restricción `profiles_profile_type_check` a `check (profile_type in ('visitor', 'settler', 'resident'))`, habilitando a nivel de base de datos la persistencia de los tres perfiles.
 
 ---
 
@@ -181,27 +180,27 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
 ---
 
 ## D13 · Categorías de precio estrictamente comparables
-- **Estado:** **PROPUESTA** *(Implementadas en el catálogo DEMO de Valledupar; pendiente de ratificación final en seed SQL)*
+- **Estado:** **ACORDADA** *(Ratificada en `supabase/seed/04_price_categories.sql` y en el catálogo del municipio piloto)*
 - **Responsable:** Ambos integrantes.
-- **Fecha de evidencia:** 28 de octubre de 2026 (`VJ-04` y `VJ-05`).
+- **Fecha de evidencia:** 28 de octubre de 2026 (`VJ-04` y `VJ-05`); ratificada en seed SQL el 29 de octubre de 2026 (`VJ-07` y `VJ-10`).
 - **Descripción:** Definir la lista de categorías y subcategorías obligatorias para el reporte y consulta de precios con unidades explícitas.
 - **Justificación técnica:** Una regla estadística de mediana pierde validez si compara magnitudes heterogéneas. Por ejemplo, en "Transporte" debe compararse "Carrera mínima urbana de taxi" frente a la misma unidad.
-- **Catálogo implementado en el piloto de Valledupar (`DemoPriceVerdictRepository`):**
-  1. `taxi_urbano_corto`: Carrera urbana corta en taxi (trayecto urbano estándar 3–5 km).
-  2. `almuerzo_corriente`: Almuerzo corriente / ejecutivo (plato del día con sopa, seco y bebida).
-  3. `hotel_estandar_noche`: Habitación estándar (1 noche, acomodación sencilla/doble).
-  4. `arriendo_estudio_mes`: Arriendo mensual apartaestudio (1 habitación, estrato medio).
-  5. `consulta_medica_particular`: Consulta médica general particular (1 consulta presencial).
+- **Catálogo implementado en el piloto de Valledupar (`04_price_categories.sql`):**
+  1. `taxi_urbano_corto`: Carrera urbana corta en taxi (trayecto urbano estándar 3–5 km, `min_amount_cop = 4000`, `max_amount_cop = 80000`).
+  2. `almuerzo_corriente`: Almuerzo corriente / ejecutivo (plato del día con sopa, seco y bebida, `min_amount_cop = 8000`, `max_amount_cop = 120000`).
+  3. `hotel_estandar_noche`: Habitación estándar (1 noche, acomodación sencilla/doble, `min_amount_cop = 40000`, `max_amount_cop = 1500000`).
+  4. `arriendo_estudio_mes`: Arriendo mensual apartaestudio (1 habitación, estrato medio, `min_amount_cop = 300000`, `max_amount_cop = 6000000`).
+  *(Nota: el catálogo DEMO local incluye adicionalmente `consulta_medica_particular` para pruebas en memoria).*
 
 ---
 
 ## D14 · Política de contraseñas y confirmación de correo
-- **Estado:** **PENDIENTE** *(Requiere definición del compañero de backend en Supabase Auth)*
+- **Estado:** **ACORDADA** *(Configurada en `supabase/config.toml` para el MVP)*
 - **Responsable:** Compañero de backend.
+- **Fecha de evidencia:** 29 de octubre de 2026 (`VJ-08` / `VJ-10`).
 - **Descripción:** Establecer la política de seguridad para el registro de cuentas:
-  1. Longitud mínima de contraseña: 8 caracteres (validada en `auth_validators.dart`).
-  2. Confirmación de correo por enlace o token: Definir si el usuario debe confirmar obligatoriamente su correo antes de acceder al sistema o si se permite un estado de gracia inicial.
-- **Recomendación arquitectónica:** En el MVP, habilitar auto-confirmación o modo tolerante en desarrollo para facilitar las pruebas del evaluador sin depender de servidores SMTP reales.
+  1. Longitud mínima de contraseña: 8 caracteres (`minimum_password_length = 8` en `supabase/config.toml` y validada en `auth_validators.dart`).
+  2. Confirmación de correo: En el entorno de desarrollo y evaluación del MVP se establece `enable_confirmations = false` en `[auth.email]` (`supabase/config.toml`) para permitir el registro y prueba inmediata por parte del evaluador académico sin depender de entrega SMTP externa, manteniendo en `AuthController` el soporte para `emailConfirmationRequired` si se habilita en producción.
 
 ---
 

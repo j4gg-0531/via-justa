@@ -27,7 +27,7 @@
 | **VJ-07** | P0 | Backend | Supabase: migración inicial, RLS, GRANT, seeds y ER | **HECHO-VERIFICADO** (`feature/vj-07-supabase-init`; `supabase db reset` + `supabase test db` en local: 21/21) | VJ-01, VJ-06 |
 | **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos | **HECHO-VERIFICADO (local, modo DEMO disponible)** (`feature/vj-08-auth-supabase`) | VJ-07 |
 | **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **PENDIENTE** | VJ-08 |
-| **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **PENDIENTE** | VJ-07 |
+| **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **HECHO-VERIFICADO** (`feature/vj-10-semaforo-sql`; `supabase test db`: 49/49 pgTAP PASS) | VJ-07 |
 | **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **PENDIENTE** | VJ-10 |
 | **VJ-12** | P1 | Frontend | Google Maps de precios, filtros y optimización | **BLOQUEADO-EXTERNO** | VJ-11 |
 | **VJ-13** | P1 | Frontend | Captura de contratos: cámara, archivos y OCR local | **HECHO — verificado en dispositivo (moto_g22, release); PDF diferido** | VJ-06 |
@@ -156,7 +156,11 @@
   - `supabase/migrations/20261029102000_businesses_and_content.sql`
 - **Seeds creadas:** 33 departamentos, 25 municipios del Cesar (Valledupar piloto), 5 zonas de Valledupar, 4 categorías de precio, configuración del semáforo y evento DEMO.
 - **RLS/GRANT:** 16 tablas con RLS; catálogos públicos de solo lectura; perfiles y consentimientos privados; `ai_usage` exclusivo de `service_role`; columnas de auditoría no editables por el cliente.
-- **Pruebas:** `supabase/tests/rls.sql` con 21 aserciones pgTAP.
+- **Pruebas:** `supabase/tests/rls.sql` (ampliado a 26 aserciones pgTAP) y `supabase/tests/price_verdict.sql` (23 aserciones pgTAP).
+- **Cierre complementario VJ-07/VJ-08 y ejecución de VJ-10 (`feature/vj-10-semaforo-sql`):**
+  - `supabase/migrations/20261029120000_close_vj07_vj08_d11_and_account_deletion.sql`: ratifica **D11** (`profiles_profile_type_check` admite `'visitor'`, `'settler'`, `'resident'`), blinda privilegios por columna en `public.price_reports` e incorpora la RPC transaccional `public.delete_my_account()` (saneamiento Habeas Data RF-06 / Ley 1581 de 2012).
+  - `supabase/migrations/20261029130000_price_verdict_rpc.sql`: implementa `public.calculate_price_verdict` y su alias `public.evaluate_price_verdict` como única fuente de verdad estadística del semáforo por zona (`municipality_code`, `zone_id`, `category_id`), leyendo umbrales de `public.app_config`, calculando la mediana con `percentile_cont(0.5)` y verificando casos borde (`0%`, `15.00%`, `15.01%`, `40.00%`, `40.01%`, `-40.00%`, `-40.01%`, `N<3`, reportes ocultos/caducados y eventos activos).
+  - `supabase test db` → `Files=2, Tests=49`, `Result: PASS` (49/49 aserciones pgTAP aprobadas).
 - **Verificación local (29 de octubre de 2026, CLI 2.101.0 + Docker 29.5.2):**
   - `supabase start` → servicios arriba (PostgreSQL 17, Auth, Storage, Studio).
   - `supabase db reset` → 5 migraciones aplicadas y 6 seeds cargadas (exit 0).

@@ -31,7 +31,7 @@ package "Núcleo de Usuarios y Consentimiento" {
         * id : UUID <<PK, FK>>
         --
         display_name : TEXT
-        profile_type : TEXT (admitidos: visitor, settler; resident propuesto D11)
+        profile_type : TEXT (visitor | settler | resident - D11)
         origin_country : TEXT
         current_municipality_code : TEXT <<FK>>
         language : TEXT (DEFAULT 'es')

@@ -1,8 +1,8 @@
 # Contrato de Datos v1.0 — Vía Justa MVP
 
-> **Estado del documento:** ESQUEMA PROPUESTO PARA RATIFICACIÓN (Contract-First).  
-> **Fecha:** 27 de octubre de 2026.  
-> **Importante:** Este documento representa el acuerdo de interfaz formal entre Frontend (Flutter) y Backend (Supabase/PostgreSQL). Actualmente **NO se han aplicado migraciones físicas** en la base de datos de producción ni local; este contrato debe ser validado por el compañero de backend antes de ejecutar la migración inicial `0001_initial_schema.sql` (VJ-07).
+> **Estado del documento:** RATIFICADO E IMPLEMENTADO EN MIGRACIONES (`0001` a `0007`).
+> **Fecha:** 29 de octubre de 2026.
+> **Importante:** Este documento representa el acuerdo de interfaz formal entre Frontend (Flutter) y Backend (Supabase/PostgreSQL), sincronizado con las migraciones versionadas en `supabase/migrations/`.
 
 ---
 
@@ -15,8 +15,7 @@
 5. **Tipos Enumerados y Restricciones de Dominio:**
    - En las migraciones reales del backend (`20261027151910_profiles_and_consents.sql`), las restricciones de dominio se implementan mediante columnas `TEXT` con restricciones `CHECK`:
      - `profile_type`:
-       - **Valores admitidos actualmente en base de datos [IMPLEMENTADO]:** `'visitor'` y `'settler'` (mediante `CHECK (profile_type IN ('visitor', 'settler'))`).
-       - **Valor propuesto [PROPUESTA D11]:** `'resident'`, formalmente solicitado para el perfil local/residente, pero pendiente de ratificación de Isaac y de su respectiva migración complementaria.
+       - **Valores admitidos en base de datos [IMPLEMENTADO - D11 RATIFICADA]:** `'visitor'`, `'settler'` y `'resident'` (mediante `CHECK (profile_type IN ('visitor', 'settler', 'resident'))` en la migración `20261029120000_close_vj07_vj08_d11_and_account_deletion.sql`).
      - `language`: `TEXT CHECK (language IN ('es', 'en'))` (implementado con valor por defecto `'es'`).
    - Para entidades posteriores planificadas:
      - `business_status`: `TEXT CHECK (status IN ('pending', 'approved', 'rejected'))` (planificado para VJ-16).
@@ -36,7 +35,7 @@
   |---|---|---|---|
   | `id` | `UUID` | PK, FK -> `auth.users(id)` ON DELETE CASCADE | Identificador unívoco del usuario en Auth |
   | `display_name` | `TEXT` | NULL | Nombre para mostrar (inicializado por trigger desde metadata) |
-  | `profile_type` | `TEXT` | NULL, CHECK (`profile_type IN ('visitor', 'settler')`) [IMPLEMENTADO] / `('visitor', 'settler', 'resident')` [PROPUESTO D11] | Perfil de usuario. Valores admitidos actualmente en base de datos: `'visitor'`, `'settler'`. El valor `'resident'` es una propuesta pendiente de aprobación D11. Campo inicialmente NULL hasta completar onboarding |
+  | `profile_type` | `TEXT` | NULL, CHECK (`profile_type IN ('visitor', 'settler', 'resident')`) [IMPLEMENTADO D11] | Perfil de usuario (`'visitor'`, `'settler'`, `'resident'`). Inicialmente NULL hasta completar onboarding |
   | `origin_country` | `TEXT` | NULL | País de origen (opcional) |
   | `current_municipality_code` | `TEXT` | NULL, FK -> `municipalities(code)` | Municipio seleccionado como residencia/estadía |
   | `language` | `TEXT` | NOT NULL DEFAULT 'es', CHECK (`language IN ('es', 'en')`) | Idioma preferido |
@@ -402,18 +401,23 @@ AS $$ ... $$;
 ### 3.3 Esquema JSON de Respuesta
 ```json
 {
+  "rule_version": "v1.0",
   "level": "green" | "yellow" | "red" | "insufficient",
+  "category_id": "transport_taxi_minimal",
+  "municipality_code": "20001",
   "zone_id": "vup_centro",
   "amount_cop": 15000,
   "reference_cop": 12000,
+  "baseline_reference_cop": 12000,
   "deviation_percent": 25.0,
+  "baseline_deviation_percent": 25.0,
   "sample_count": 8,
   "underpriced_alert": false,
   "recommended_cap_cop": 13800,
   "window_days": 60,
   "is_event_context": false,
   "event_details": null,
-  "disclaimer": "Este cálculo es una referencia estadística comunitaria orientativa para la zona seleccionada y no constituye una tarifa legalmente vinculante."
+  "is_demo": false
 }
 ```
 
