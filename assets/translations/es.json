@@ -1,5 +1,7 @@
-﻿{
-  "app": { "name": "Vía Justa" },
+{
+  "app": {
+    "name": "Vía Justa"
+  },
   "common": {
     "back": "Atrás",
     "continue": "Continuar",
@@ -333,5 +335,39 @@
     "consent_dialog_body": "El documento se procesará exclusivamente en tu teléfono mediante OCR local (RN-10). La imagen no se enviará a ningún servidor y cualquier archivo temporal en caché se borrará inmediatamente después de la lectura.",
     "consent_cancel": "Cancelar",
     "consent_continue": "Continuar"
+  },
+  "contract_analysis": {
+    "analyze_cta": "Analizar contrato con IA",
+    "analyzing_status": "Analizando contrato con IA...",
+    "analyzing_hint": "Evaluando equilibrio de cláusulas, riesgos potenciales y recomendaciones...",
+    "ai_consent_dialog_title": "Consentimiento de análisis con IA",
+    "ai_consent_dialog_body": "El texto del contrato saldrá de este dispositivo hacia un servicio externo de inteligencia artificial para generar el análisis orientativo. En esta versión de prueba, utiliza únicamente contratos sintéticos de ejemplo o textos sin datos personales ni confidenciales. ¿Deseas continuar?",
+    "ai_consent_cancel": "Cancelar",
+    "ai_consent_continue": "Continuar al análisis",
+    "result_title": "Resultado del análisis orientativo",
+    "demo_banner_title": "Demostración; no es un análisis real",
+    "demo_banner_desc": "Este resultado fue generado por un simulador para pruebas de interfaz (VJ-14) y no proviene de un modelo de IA en producción.",
+    "level_green": "Riesgo bajo / Equilibrado",
+    "level_yellow": "Atención requerida",
+    "level_red": "Riesgo alto / Cláusulas desfavorables",
+    "general_recommendation_title": "Recomendación general",
+    "key_points_title": "Puntos clave ({count})",
+    "clauses_title": "Cláusulas analizadas ({count})",
+    "clause_excerpt_label": "Fragmento:",
+    "clause_issue_label": "Alerta o riesgo:",
+    "clause_recommendation_label": "Recomendación:",
+    "clause_legal_ref_label": "Referencia legal:",
+    "disclaimer_title": "Aviso orientativo legal",
+    "disclaimer_body": "Este análisis orientativo es generado automáticamente con fines estrictamente informativos y de educación ciudadana; no constituye asesoría jurídica vinculante ni sustituye el concepto de un profesional del derecho.",
+    "error_title": "No pudimos completar el análisis",
+    "error_auth": "Tu sesión ha expirado o no es válida. Inicia sesión nuevamente para analizar contratos.",
+    "error_empty": "El texto del contrato no contiene caracteres suficientes para ser analizado.",
+    "error_too_long": "El texto supera el límite de 15.000 caracteres. Por favor recórtalo en el editor.",
+    "error_daily_limit": "Has alcanzado el límite diario de análisis de contratos con IA. Inténtalo de nuevo mañana.",
+    "error_service": "El servicio de análisis con IA no se encuentra disponible temporalmente. Inténtalo más tarde.",
+    "error_network": "Sin conexión a internet. Verifica tu red e inténtalo de nuevo.",
+    "error_timeout": "El análisis tardó demasiado tiempo en responder. Inténtalo de nuevo.",
+    "error_invalid_response": "La respuesta del servicio de análisis no tuvo el formato esperado. Inténtalo nuevamente.",
+    "action_retry": "Reintentar análisis"
   }
 }

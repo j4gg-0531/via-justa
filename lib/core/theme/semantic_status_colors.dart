@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
+import 'package:via_justa/features/contracts/domain/contract_analysis_result.dart';
 import 'package:via_justa/features/prices/domain/price_verdict.dart';
 
 /// Paleta accesible (fondo, primer plano, borde e ícono obligatorio) para un estado semántico.
@@ -72,6 +73,17 @@ class SemanticStatusColors extends ThemeExtension<SemanticStatusColors> {
   final StatusVisualStyle eventContext;
 
   /// Mapa tipado que resuelve el estilo visual exclusivamente a partir del enum cerrado `PriceVerdictLevel`.
+  StatusVisualStyle styleForContractLevel(ContractAnalysisLevel level) {
+    switch (level) {
+      case ContractAnalysisLevel.green:
+        return green;
+      case ContractAnalysisLevel.yellow:
+        return yellow;
+      case ContractAnalysisLevel.red:
+        return red;
+    }
+  }
+
   StatusVisualStyle styleForVerdict(PriceVerdictLevel level) {
     switch (level) {
       case PriceVerdictLevel.green:

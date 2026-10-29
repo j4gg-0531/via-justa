@@ -57,7 +57,7 @@ class SessionController {
     _ref.read(priceScanProvider.notifier).reset();
     _ref.read(priceContributionProvider.notifier).resetSession();
     _ref.read(contractCaptureProvider.notifier).discardDocument();
-    _ref.read(contractAnalysisProvider.notifier).reset();
+    _ref.read(contractAnalysisProvider.notifier).reset(clearConsent: true);
     _ref.read(scanModeProvider.notifier).reset();
   }
 }

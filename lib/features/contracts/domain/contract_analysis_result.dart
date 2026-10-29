@@ -381,3 +381,59 @@ class ContractAnalysisException implements Exception {
   String toString() =>
       'ContractAnalysisException(${error.code}${message != null ? ': $message' : ''})';
 }
+
+/// Extensiones de presentación y formato para [ContractAnalysisLevel] sin lógica en vistas.
+extension ContractAnalysisLevelX on ContractAnalysisLevel {
+  /// Clave de traducción para el nivel de riesgo en la interfaz de usuario.
+  String get translationKey {
+    switch (this) {
+      case ContractAnalysisLevel.green:
+        return 'contract_analysis.level_green';
+      case ContractAnalysisLevel.yellow:
+        return 'contract_analysis.level_yellow';
+      case ContractAnalysisLevel.red:
+        return 'contract_analysis.level_red';
+    }
+  }
+}
+
+/// Extensiones de presentación y resiliencia para [ContractAnalysisError] sin lógica en vistas.
+extension ContractAnalysisErrorX on ContractAnalysisError {
+  /// Clave de traducción para el mensaje de error en la interfaz de usuario.
+  String get translationKey {
+    switch (this) {
+      case ContractAnalysisError.authUnauthorized:
+        return 'contract_analysis.error_auth';
+      case ContractAnalysisError.invalidInputEmpty:
+        return 'contract_analysis.error_empty';
+      case ContractAnalysisError.textTooLong:
+        return 'contract_analysis.error_too_long';
+      case ContractAnalysisError.aiDailyLimitExceeded:
+        return 'contract_analysis.error_daily_limit';
+      case ContractAnalysisError.aiServiceUnavailable:
+        return 'contract_analysis.error_service';
+      case ContractAnalysisError.networkUnavailable:
+        return 'contract_analysis.error_network';
+      case ContractAnalysisError.timeout:
+        return 'contract_analysis.error_timeout';
+      case ContractAnalysisError.aiResponseInvalid:
+        return 'contract_analysis.error_invalid_response';
+    }
+  }
+
+  /// Indica si el error es transitorio y seguro de reintentar con el mismo documento.
+  bool get isRetryable {
+    switch (this) {
+      case ContractAnalysisError.networkUnavailable:
+      case ContractAnalysisError.timeout:
+      case ContractAnalysisError.aiServiceUnavailable:
+        return true;
+      case ContractAnalysisError.authUnauthorized:
+      case ContractAnalysisError.invalidInputEmpty:
+      case ContractAnalysisError.textTooLong:
+      case ContractAnalysisError.aiDailyLimitExceeded:
+      case ContractAnalysisError.aiResponseInvalid:
+        return false;
+    }
+  }
+}

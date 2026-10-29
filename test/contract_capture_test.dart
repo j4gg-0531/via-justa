@@ -425,11 +425,11 @@ void main() {
       // El botón Analizar existe pero está deshabilitado (VJ-14)
       final analyzeBtnFinder = find.widgetWithText(
         VjButton,
-        'contract_capture.analyze_disabled_cta',
+        'contract_analysis.analyze_cta',
       );
       expect(analyzeBtnFinder, findsOneWidget);
       final analyzeBtn = tester.widget<VjButton>(analyzeBtnFinder);
-      expect(analyzeBtn.onPressed, isNull);
+      expect(analyzeBtn.onPressed, isNotNull);
 
       expect(tester.takeException(), isNull);
     });
