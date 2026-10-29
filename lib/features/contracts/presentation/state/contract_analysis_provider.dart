@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:via_justa/core/supabase/supabase_providers.dart';
 import 'package:via_justa/features/contracts/data/default_contract_analysis_repository.dart';
 import 'package:via_justa/features/contracts/data/demo_contract_analysis_gateway.dart';
+import 'package:via_justa/features/contracts/data/supabase_contract_analysis_gateway.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis_gateway.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis_repository.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis_result.dart';
@@ -281,6 +283,10 @@ class ContractAnalysisNotifier extends Notifier<ContractAnalysisState> {
 ///
 /// **Regla de arquitectura:** Solo los providers conocen la implementación concreta (`data/`).
 final contractAnalysisGatewayProvider = Provider<ContractAnalysisGateway>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  if (client != null) {
+    return SupabaseContractAnalysisGateway(client);
+  }
   return const DemoContractAnalysisGateway();
 });
 
