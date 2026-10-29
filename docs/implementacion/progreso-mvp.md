@@ -1,7 +1,7 @@
-﻿# Progreso y Control de Cambios — Vía Justa MVP
+# Progreso y Control de Cambios — Vía Justa MVP
 
-**Última actualización:** 28 de octubre de 2026 (Cierre del Primer Avance — `VJ-06`)  
-**Rama base actual:** `main` — PRs #4 a #9 en integración; rama actual `feature/vj-06-cierre-primer-avance`  
+**Última actualización:** 29 de octubre de 2026 (VJ-07 backend verificado en local: migraciones, RLS, GRANT y seeds con 21/21 pruebas pgTAP; VJ-13 integrado desde `main`)  
+**Rama base actual:** `main` — PRs #4 a #9 en integración; rama actual `feature/vj-07-supabase-init`  
 **Repositorio remoto:** `https://github.com/j4gg-0531/via-justa.git`  
 **Entorno de ejecución:** Windows 10/11 x64, PowerShell 5.1  
 **Gradle Wrapper:** 9.3.1 (`android/gradle/wrapper/gradle-wrapper.properties`)  
@@ -24,7 +24,7 @@
 | **VJ-04** | P1 | Ambos | Motor visual de semáforo demo por zonas (GPS + mapa): pantallas M06, M07 y M20 | **HECHO-VERIFICADO (`feature/vj-04-semaforo-demo`)** | VJ-03 |
 | **VJ-05** | P1 | Frontend | Pantalla M10: aportar precio en 4 pasos demo por zona | **HECHO-VERIFICADO (`feature/vj-05-aportar-precio-demo`)** | VJ-04 |
 | **VJ-06** | P1 | Ambos | Cierre del primer avance: walkthrough E2E, CI y documentación de sustentación | **HECHO-VERIFICADO (`feature/vj-06-cierre-primer-avance`)** | VJ-03, VJ-04, VJ-05 |
-| **VJ-07** | P0 | Backend | Supabase: migración inicial, RLS, GRANT, seeds y ER | **BLOQUEADO-EXTERNO** | VJ-01, VJ-06 |
+| **VJ-07** | P0 | Backend | Supabase: migración inicial, RLS, GRANT, seeds y ER | **HECHO-VERIFICADO** (`feature/vj-07-supabase-init`; `supabase db reset` + `supabase test db` en local: 21/21) | VJ-01, VJ-06 |
 | **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos | **PENDIENTE** | VJ-07 |
 | **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **PENDIENTE** | VJ-08 |
 | **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **PENDIENTE** | VJ-07 |
@@ -131,14 +131,35 @@
 
 ## 6. Implementación y Cierre de VJ-13 (Captura y OCR Local de Contratos)
 
-- **Estado:** **HECHO — verificado en dispositivo (moto_g22, release); PDF diferido** en rama eature/vj-13-captura-contratos-ocr.
+- **Estado:** **HECHO — verificado en dispositivo (moto_g22, release); PDF diferido** en rama `feature/vj-13-captura-contratos-ocr`.
 - **Alcance MVP:**
   - Soporte de formatos: **JPG, PNG y TXT** (archivos de hasta 10 MB).
-  - **Soporte de PDF diferido:** Marcado honestamente como "Próximamente" (pdfComingSoon); ML Kit Text Recognition procesa imágenes (bitmaps).
-  - **OCR Local en el dispositivo:** google_mlkit_text_recognition con script latino. Inferencia 100% on-device.
-  - **Texto nativo consolidado de ML Kit (ecognized.text):** Se utiliza directamente el texto nativo entregado por ML Kit (ecognized.text), preservando los párrafos, bloques y orden de lectura original generado por el modelo de visión en el dispositivo, sin algoritmos de reordenamiento manual.
-  - **Consentimiento propio en la app (RN-10):** Diálogo de consentimiento antes de invocar la cámara o el selector de archivos, informando que el procesamiento se realiza localmente y no se almacena en servidores. La decisión de exhibición reside íntegramente en el provider (ContractCaptureNotifier), sin solicitar permisos intrusivos del sistema operativo (CAMERA).
-  - **Cumplimiento estricto de RN-10 (No retención):** Eliminación inmediata de archivos temporales en caché generados por image_picker y ile_picker en bloque inally, tanto tras el OCR exitoso como en caso de falla, cancelación o descarte del documento (discardDocument()).
-  - **Reglas mínimas de R8 / Proguard:** Configuración en ndroid/app/proguard-rules.pro para preservar los constructores de ComponentRegistrar requeridos por la instanciación reflectiva de ML Kit en modo --release, suprimiendo advertencias de scripts no empaquetados.
+  - **Soporte de PDF diferido:** Marcado honestamente como "Próximamente" (`pdfComingSoon`); ML Kit Text Recognition procesa imágenes (bitmaps).
+  - **OCR Local en el dispositivo:** `google_mlkit_text_recognition` con script latino. Inferencia 100% on-device.
+  - **Texto nativo consolidado de ML Kit (`recognized.text`):** Se utiliza directamente el texto nativo entregado por ML Kit (`recognized.text`), preservando los párrafos, bloques y orden de lectura original generado por el modelo de visión en el dispositivo, sin algoritmos de reordenamiento manual.
+  - **Consentimiento propio en la app (RN-10):** Diálogo de consentimiento antes de invocar la cámara o el selector de archivos, informando que el procesamiento se realiza localmente y no se almacena en servidores. La decisión de exhibición reside íntegramente en el provider (`ContractCaptureNotifier`), sin solicitar permisos intrusivos del sistema operativo (CAMERA).
+  - **Cumplimiento estricto de RN-10 (No retención):** Eliminación inmediata de archivos temporales en caché generados por `image_picker` y `file_picker` en bloque `finally`, tanto tras el OCR exitoso como en caso de falla, cancelación o descarte del documento (`discardDocument()`).
+  - **Reglas mínimas de R8 / Proguard:** Configuración en `android/app/proguard-rules.pro` para preservar los constructores de `ComponentRegistrar` requeridos por la instanciación reflectiva de ML Kit en modo `--release`, suprimiendo advertencias de scripts no empaquetados.
   - **Editor y límite de 15.000 caracteres:** El texto extraído es editable en memoria sin truncamiento silencioso; se advierte y exige recorte manual si excede el límite máximo.
   - **Catálogo de contratos sintéticos:** 3 muestras bilingües (ES/EN) sin datos personales reales para pruebas y demostración segura.
+
+---
+
+## 7. VJ-07 — Backend Supabase (29 de octubre de 2026)
+
+- **D4 ratificada:** Supabase es el backend del MVP (ver `docs/decisiones.md`).
+- **Migraciones creadas:**
+  - `supabase/migrations/20261027151907_extensions_and_geography.sql`
+  - `supabase/migrations/20261027151910_profiles_and_consents.sql`
+  - `supabase/migrations/20261029100000_price_catalog.sql`
+  - `supabase/migrations/20261029101000_price_reports_and_events.sql`
+  - `supabase/migrations/20261029102000_businesses_and_content.sql`
+- **Seeds creadas:** 33 departamentos, 25 municipios del Cesar (Valledupar piloto), 5 zonas de Valledupar, 4 categorías de precio, configuración del semáforo y evento DEMO.
+- **RLS/GRANT:** 16 tablas con RLS; catálogos públicos de solo lectura; perfiles y consentimientos privados; `ai_usage` exclusivo de `service_role`; columnas de auditoría no editables por el cliente.
+- **Pruebas:** `supabase/tests/rls.sql` con 21 aserciones pgTAP.
+- **Verificación local (29 de octubre de 2026, CLI 2.101.0 + Docker 29.5.2):**
+  - `supabase start` → servicios arriba (PostgreSQL 17, Auth, Storage, Studio).
+  - `supabase db reset` → 5 migraciones aplicadas y 6 seeds cargadas (exit 0).
+  - `supabase test db` → `Files=1, Tests=21`, `Result: PASS` (21/21 aserciones pgTAP).
+- **Estado:** `HECHO-VERIFICADO` (local). **No se ha aplicado al proyecto remoto** `vjehsjqmwibmiqmxlsou`; requiere aprobación explícita antes de `supabase db push`.
+- **Siguiente paso:** abrir el PR de `feature/vj-07-supabase-init` a `main` y, con aprobación, aplicar las migraciones al proyecto remoto.

@@ -1,0 +1,92 @@
+# ============================================================================
+# Vía Justa MVP · Configuración local de Supabase CLI
+# ============================================================================
+# Este archivo configura el entorno local de desarrollo (Docker).
+# Los secretos reales NO se escriben aquí: se inyectan por variables de entorno
+# (ver .env.example en la raíz del repositorio).
+#
+# Referencia oficial:
+# https://supabase.com/docs/guides/local-development/cli/config
+# ============================================================================
+
+project_id = "via-justa"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+health_timeout = "2m"
+# El proyecto remoto reporta PostgreSQL 17.11; mantener la misma versión mayor.
+major_version = 17
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+enabled = true
+# Los archivos se ejecutan en orden alfabético (por eso el prefijo 01_, 02_, ...).
+sql_paths = ["./seed/*.sql"]
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+# Límite local de archivos. El bucket business-media tendrá su propio límite en VJ-16.
+file_size_limit = "10MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["https://127.0.0.1:3000"]
+jwt_expiry = 3600
+enable_signup = true
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+# Coincide con la validación local del frontend (auth_validators.dart): mínimo 8.
+minimum_password_length = 8
+password_requirements = ""
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+# D14 sigue PENDIENTE. En desarrollo se tolera la auto-confirmación para no
+# depender de SMTP; en producción se activará la confirmación por correo.
+enable_confirmations = false
+secure_password_change = false
+max_frequency = "1s"
+otp_length = 6
+otp_expiry = 3600
+
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+skip_nonce_check = false
+email_optional = false
+
+[edge_runtime]
+enabled = true
+policy = "per_worker"
+inspector_port = 8083
+deno_version = 2
+
+[analytics]
+enabled = false

@@ -11,7 +11,7 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
 | **D1** | Soporte bilingüe español/inglés desde el día 1 | **ACORDADA** | Ambos | 19 de octubre de 2026 |
 | **D2** | Internacionalización con `easy_localization` | **ACORDADA** | Frontend | 19 de octubre de 2026 |
 | **D3** | Google Maps (`google_maps_flutter`) y Places | **ACORDADA** | Ambos | 19 de octubre de 2026 |
-| **D4** | Backend en Supabase (PostgreSQL, PostGIS, Auth, Storage, Edge Functions) | **PROPUESTA** | Backend | 19 de octubre de 2026 |
+| **D4** | Backend en Supabase (PostgreSQL, PostGIS, Auth, Storage, Edge Functions) | **ACORDADA** | Backend | 29 de octubre de 2026 |
 | **D5** | Estado con Riverpod 3 y navegación con `go_router` | **ACORDADA** | Frontend | 19 de octubre de 2026 |
 | **D6** | Negocios sin pedidos internos (enlace externo) | **ACORDADA** | Ambos | 19 de octubre de 2026 |
 | **D7** | Contacto por WhatsApp externo sin chat propio | **ACORDADA** | Ambos | 19 de octubre de 2026 |
@@ -68,9 +68,9 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
 ---
 
 ## D4 · Supabase como plataforma de Backend (BaaS)
-- **Estado:** **PROPUESTA** *(Pendiente de ratificación explícita del compañero de backend)*
-- **Responsable:** Compañero de backend.
-- **Fecha de evidencia:** 19 de octubre de 2026 (registrada como propuesta en el Plan de trabajo).
+- **Estado:** **ACORDADA** *(Ratificada por el responsable de backend el 29 de octubre de 2026)*
+- **Responsable:** Backend (responsable único de Supabase).
+- **Fecha de evidencia:** 19 de octubre de 2026 (registrada como propuesta en el Plan de trabajo); ratificada el 29 de octubre de 2026.
 - **Descripción:** Adopción de Supabase (PostgreSQL 15+, PostGIS, Supabase Auth, Storage y Edge Functions con Deno) como infraestructura única de backend.
 - **Justificación técnica:**
   1. Base de datos relacional robusta con soporte geoespacial PostGIS nativo para radios y cuadrantes de precios.
@@ -82,7 +82,7 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
   - Backend propio en Node.js/Python: Sobrecarga operativa inasumible para un equipo de 2 personas con 6 semanas de plazo.
 - **Impacto Frontend:** Integración de `supabase_flutter` a partir de VJ-07/VJ-08 mediante adaptadores en `data/` controlados por Riverpod.
 - **Impacto Backend:** El compañero de backend gestiona las migraciones SQL numeradas, políticas RLS, roles y la configuración de Edge Functions.
-- **Condición de activación:** No aplicar migraciones ni instanciar clientes de red hasta la confirmación formal del compañero.
+- **Condición de activación:** Cumplida. El proyecto Supabase de desarrollo fue creado y vinculado; a partir de VJ-07 las migraciones se versionan en `supabase/migrations/` y se aplican con el CLI.
 
 ---
 
