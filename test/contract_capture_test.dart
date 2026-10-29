@@ -137,6 +137,7 @@ void main() {
         ContractCaptureError.exceedsMaxLength,
       );
     });
+
   });
 
   group('RN-10 temporary cache file deletion and LocalContractOcrRepository', () {
@@ -326,6 +327,51 @@ void main() {
         contains('SYNTHETIC URBAN RESIDENTIAL LEASE'),
       );
     });
+
+    test('notifier manages consent decision before camera/file capture (RN-10)', () async {
+      final fakeRepo = _FakeContractOcrRepository(
+        nextCameraResult: const ContractDocumentCaptureResult(
+          source: ContractInputSource.cameraPhoto,
+          fileName: 'captura.jpg',
+          fileSizeBytes: 200,
+          extractedText:
+              'CLÁUSULA PRIMERA: Contrato sintético con consentimiento propio verificado.',
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [contractOcrRepositoryProvider.overrideWithValue(fakeRepo)],
+      );
+      addTearDown(container.dispose);
+      final notifier = container.read(contractCaptureProvider.notifier);
+
+      // 1. Antes de tener consentimiento, solicitar cámara no abre la cámara; pide confirmación
+      notifier.requestCameraCapture(languageCode: 'es');
+      expect(
+        container.read(contractCaptureProvider).pendingConsentSource,
+        ContractInputSource.cameraPhoto,
+      );
+      expect(container.read(contractCaptureProvider).hasGivenConsent, isFalse);
+
+      // 2. Si el usuario cancela, se limpia la solicitud
+      notifier.cancelConsent();
+      expect(container.read(contractCaptureProvider).pendingConsentSource, isNull);
+      expect(container.read(contractCaptureProvider).hasGivenConsent, isFalse);
+
+      // 3. Volver a solicitar y confirmar consentimiento -> se ejecuta la cámara y se guarda en sesión
+      notifier.requestCameraCapture(languageCode: 'es');
+      await notifier.confirmConsentAndProceed(languageCode: 'es');
+
+      expect(container.read(contractCaptureProvider).hasGivenConsent, isTrue);
+      expect(container.read(contractCaptureProvider).pendingConsentSource, isNull);
+      expect(
+        container.read(contractCaptureProvider).status,
+        ContractCaptureStatus.readyForAnalysis,
+      );
+
+      // 4. Con consentimiento previo, la siguiente solicitud no vuelve a preguntar
+      await notifier.requestCameraCapture(languageCode: 'es');
+      expect(container.read(contractCaptureProvider).pendingConsentSource, isNull);
+    });
   });
 
   group('ContractCaptureSection widget test (360x780 @ 1.5x text scale)', () {
@@ -386,6 +432,60 @@ void main() {
       expect(analyzeBtn.onPressed, isNull);
 
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('shows on-device consent dialog before camera capture and cancels cleanly',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 780));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final fakeRepo = _FakeContractOcrRepository();
+      final container = ProviderContainer(
+        overrides: [
+          contractOcrRepositoryProvider.overrideWithValue(fakeRepo),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: const Scaffold(
+              body: SingleChildScrollView(
+                child: ContractCaptureSection(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final cameraBtnFinder = find.widgetWithText(
+        OutlinedButton,
+        'contract_capture.action_camera',
+      );
+      expect(cameraBtnFinder, findsOneWidget);
+      await tester.tap(cameraBtnFinder);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(
+        find.text('contract_capture.consent_dialog_title'),
+        findsOneWidget,
+      );
+
+      final cancelBtnFinder = find.widgetWithText(
+        TextButton,
+        'contract_capture.consent_cancel',
+      );
+      expect(cancelBtnFinder, findsOneWidget);
+      await tester.tap(cancelBtnFinder);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(container.read(contractCaptureProvider).pendingConsentSource, isNull);
     });
   });
 }

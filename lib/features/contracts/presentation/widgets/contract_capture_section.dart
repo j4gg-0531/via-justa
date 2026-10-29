@@ -63,6 +63,40 @@ class _ContractCaptureSectionState
     }
   }
 
+  void _showConsentDialog(
+    BuildContext context,
+    ContractCaptureNotifier notifier,
+    String languageCode,
+  ) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        title: Text('contract_capture.consent_dialog_title'.tr()),
+        content: Text('contract_capture.consent_dialog_body'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              notifier.cancelConsent();
+            },
+            child: Text('contract_capture.consent_cancel'.tr()),
+          ),
+          VjButton(
+            label: 'contract_capture.consent_continue'.tr(),
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              notifier.confirmConsentAndProceed(languageCode: languageCode);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final captureState = ref.watch(contractCaptureProvider);
@@ -70,19 +104,26 @@ class _ContractCaptureSectionState
     final notifier = ref.read(contractCaptureProvider.notifier);
     final textTheme = Theme.of(context).textTheme;
 
-    if (_textController.text != captureState.text) {
-      _textController.value = TextEditingValue(
-        text: captureState.text,
-        selection: TextSelection.collapsed(offset: captureState.text.length),
-      );
-    }
-
     String languageCode;
     try {
       languageCode = context.locale.languageCode;
     } catch (_) {
       languageCode =
           Localizations.maybeLocaleOf(context)?.languageCode ?? 'es';
+    }
+
+    ref.listen<ContractCaptureState>(contractCaptureProvider, (previous, next) {
+      if (next.pendingConsentSource != null &&
+          previous?.pendingConsentSource == null) {
+        _showConsentDialog(context, notifier, languageCode);
+      }
+    });
+
+    if (_textController.text != captureState.text) {
+      _textController.value = TextEditingValue(
+        text: captureState.text,
+        selection: TextSelection.collapsed(offset: captureState.text.length),
+      );
     }
 
     return Column(
@@ -155,7 +196,7 @@ class _ContractCaptureSectionState
                     onPressed: captureState.status ==
                             ContractCaptureStatus.readingDocument
                         ? null
-                        : () => notifier.captureFromCamera(
+                        : () => notifier.requestCameraCapture(
                               languageCode: languageCode,
                             ),
                     icon: const Icon(Icons.camera_alt_outlined, size: 18),
@@ -170,7 +211,7 @@ class _ContractCaptureSectionState
                     onPressed: captureState.status ==
                             ContractCaptureStatus.readingDocument
                         ? null
-                        : () => notifier.pickDocumentFile(
+                        : () => notifier.requestFilePicker(
                               languageCode: languageCode,
                             ),
                     icon: const Icon(Icons.file_upload_outlined, size: 18),

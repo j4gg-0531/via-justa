@@ -1,4 +1,4 @@
-{
+﻿{
   "app": { "name": "Vía Justa" },
   "common": {
     "back": "Atrás",
@@ -328,6 +328,10 @@
     "error_file_too_large": "El archivo supera el límite máximo permitido de 10 MB.",
     "error_empty_or_illegible": "El texto está vacío o es ilegible (mínimo 20 caracteres útiles).",
     "error_exceeds_max_length": "El texto supera el límite de 15.000 caracteres ({count} actuales). Recorta al menos {excess} caracteres en el editor; no se trunca automáticamente.",
-    "error_read_failed": "No pudimos leer el documento. Intenta con otra imagen o archivo."
+    "error_read_failed": "No pudimos leer el documento. Intenta con otra imagen o archivo.",
+    "consent_dialog_title": "Privacidad y procesamiento en el dispositivo",
+    "consent_dialog_body": "El documento se procesará exclusivamente en tu teléfono mediante OCR local (RN-10). La imagen no se enviará a ningún servidor y cualquier archivo temporal en caché se borrará inmediatamente después de la lectura.",
+    "consent_cancel": "Cancelar",
+    "consent_continue": "Continuar"
   }
 }

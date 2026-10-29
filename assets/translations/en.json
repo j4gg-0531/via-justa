@@ -1,4 +1,4 @@
-{
+﻿{
   "app": { "name": "Vía Justa" },
   "common": {
     "back": "Back",
@@ -328,6 +328,10 @@
     "error_file_too_large": "The file exceeds the maximum allowed size of 10 MB.",
     "error_empty_or_illegible": "The text is empty or illegible (at least 20 readable characters required).",
     "error_exceeds_max_length": "The text exceeds the 15,000-character limit ({count} current). Please trim at least {excess} characters in the editor; it is not truncated automatically.",
-    "error_read_failed": "We couldn't read the document. Try another image or file."
+    "error_read_failed": "We couldn't read the document. Try another image or file.",
+    "consent_dialog_title": "Privacy & on-device processing",
+    "consent_dialog_body": "The document will be processed solely on your phone using on-device OCR (RN-10). The image will not be sent to any server, and any temporary cache file will be deleted immediately after reading.",
+    "consent_cancel": "Cancel",
+    "consent_continue": "Continue"
   }
 }
