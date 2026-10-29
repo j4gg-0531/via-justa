@@ -27,8 +27,8 @@
 | **VJ-07** | P0 | Backend | Supabase: migración inicial, RLS, GRANT, seeds y ER | **INTEGRADO (PR #15)** | VJ-01, VJ-06 |
 | **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos | **INTEGRADO (PR #16)** | VJ-07 |
 | **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **PENDIENTE** | VJ-08 |
-| **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **HECHO-VERIFICADO** (`feature/vj-10-semaforo-sql`; `supabase test db`: 49/49 pgTAP PASS) | VJ-07 |
-| **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **PENDIENTE** | VJ-10 |
+| **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **INTEGRADO (PR #18)** (`supabase test db`: 23/23 pgTAP PASS) | VJ-07 |
+| **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **PARCIAL (Backend listo en `feature/vj-11-reportes-reales-backend`; 18/18 pgTAP PASS; app pendiente)** | VJ-10 |
 | **VJ-12** | P1 | Frontend | Google Maps de precios, filtros y optimización | **BLOQUEADO-EXTERNO** | VJ-11 |
 | **VJ-13** | P1 | Frontend | Captura de contratos: cámara, archivos y OCR local | **INTEGRADO (PR #14)** | VJ-06 |
 | **VJ-14** | P1 | Ambos | Análisis de contratos con Gemini en Edge Function | **avance parcial (app); backend pendiente** | VJ-13 |
@@ -156,11 +156,14 @@
   - `supabase/migrations/20261029102000_businesses_and_content.sql`
 - **Seeds creadas:** 33 departamentos, 25 municipios del Cesar (Valledupar piloto), 5 zonas de Valledupar, 4 categorías de precio, configuración del semáforo y evento DEMO.
 - **RLS/GRANT:** 16 tablas con RLS; catálogos públicos de solo lectura; perfiles y consentimientos privados; `ai_usage` exclusivo de `service_role`; columnas de auditoría no editables por el cliente.
-- **Pruebas:** `supabase/tests/rls.sql` (ampliado a 26 aserciones pgTAP) y `supabase/tests/price_verdict.sql` (23 aserciones pgTAP).
-- **Cierre complementario VJ-07/VJ-08 y ejecución de VJ-10 (`feature/vj-10-semaforo-sql`):**
+- **Pruebas:** `supabase/tests/rls.sql` (26 aserciones pgTAP), `supabase/tests/price_verdict.sql` (23 aserciones pgTAP) y `supabase/tests/price_reports_rls.sql` (18 aserciones pgTAP).
+- **Cierre complementario VJ-07/VJ-08 y ejecución de VJ-10 (`PR #18`):**
   - `supabase/migrations/20261029120000_close_vj07_vj08_d11_and_account_deletion.sql`: ratifica **D11** (`profiles_profile_type_check` admite `'visitor'`, `'settler'`, `'resident'`), blinda privilegios por columna en `public.price_reports` e incorpora la RPC transaccional `public.delete_my_account()` (saneamiento Habeas Data RF-06 / Ley 1581 de 2012).
   - `supabase/migrations/20261029130000_price_verdict_rpc.sql`: implementa `public.calculate_price_verdict` y su alias `public.evaluate_price_verdict` como única fuente de verdad estadística del semáforo por zona (`municipality_code`, `zone_id`, `category_id`), leyendo umbrales de `public.app_config`, calculando la mediana con `percentile_cont(0.5)` y verificando casos borde (`0%`, `15.00%`, `15.01%`, `40.00%`, `40.01%`, `-40.00%`, `-40.01%`, `N<3`, reportes ocultos/caducados y eventos activos).
-  - `supabase test db` → `Files=2, Tests=49`, `Result: PASS` (49/49 aserciones pgTAP aprobadas).
+- **Mitad Backend de VJ-11 (`feature/vj-11-reportes-reales-backend`):**
+  - `supabase/migrations/20261029140000_price_reports_quotas_privacy_and_rpc.sql`: implementa el trigger `public.enforce_price_report_submission_rules()` (`auth.uid()` forzoso, validación de categoría activa, municipio piloto y zona activa, rango `$500..$20.000.000 COP`, ofuscación de coordenadas GPS a 3 decimales $\approx 110\text{ m}$, serialización por usuario con `pg_advisory_xact_lock`, deduplicación en ventana de 15 min `[PRICE_DUPLICATE_REPORT]` y cuota diaria de 10 aportes reales cada 24h `[PRICE_RATE_LIMITED]`), la RPC `public.submit_price_report` y la RPC de moderación `public.moderate_price_report`.
+  - `supabase/seed/07_price_reports_demo.sql`: semilla de reportes DEMO segregados (`is_demo = true`), excluidos estrictamente del cálculo real del semáforo.
+  - `supabase test db` → `Files=3, Tests=67`, `Result: PASS` (67/67 aserciones pgTAP aprobadas).
 - **Verificación local (29 de octubre de 2026, CLI 2.101.0 + Docker 29.5.2):**
   - `supabase start` → servicios arriba (PostgreSQL 17, Auth, Storage, Studio).
   - `supabase db reset` → 5 migraciones aplicadas y 6 seeds cargadas (exit 0).
