@@ -3,10 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:via_justa/core/navigation/app_scaffold.dart';
 import 'package:via_justa/core/session/session_navigation_rule.dart';
-import 'package:via_justa/core/session/session_providers.dart';
 import 'package:via_justa/features/auth/presentation/pages/login_page.dart';
 import 'package:via_justa/features/auth/presentation/pages/register_page.dart';
 import 'package:via_justa/features/auth/presentation/pages/welcome_page.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_state.dart';
 import 'package:via_justa/features/businesses/presentation/pages/businesses_page.dart';
 import 'package:via_justa/features/home/presentation/pages/home_page.dart';
 import 'package:via_justa/features/map_colombia/presentation/pages/map_page.dart';
@@ -56,17 +57,48 @@ class AppRoutes {
   static String municipalityPath(String code) => '/municipality/$code';
 }
 
+/// Puente reactivo que notifica a `GoRouter` ÚNICAMENTE ante cambios en el
+/// estado de autenticación (inicio de sesión, cierre de sesión o finalización
+/// de la restauración del token).
+///
+/// **Regla de arquitectura (Ajuste 1):** NO escucha `profileTypeProvider` ni
+/// `selectedMunicipalityProvider`, evitando redirecciones prematuras mientras
+/// el usuario interactúa con la UI (ej. al seleccionar una tarjeta de perfil).
+class _AuthSessionListenable extends ChangeNotifier {
+  _AuthSessionListenable(Ref ref) {
+    ref.listen<AuthState>(
+      authControllerProvider,
+      (previous, next) {
+        if (previous?.isAuthenticated != next.isAuthenticated ||
+            previous?.isRestoring != next.isRestoring) {
+          notifyListeners();
+        }
+      },
+    );
+  }
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
+  final sessionListenable = _AuthSessionListenable(ref);
+  ref.onDispose(sessionListenable.dispose);
+
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.splash,
+    refreshListenable: sessionListenable,
     redirect: (context, state) {
-      final hasUser = ref.read(userNameProvider) != null;
+      final authState = ref.read(authControllerProvider);
+      final status = authState.isRestoring
+          ? SessionNavigationStatus.unknown
+          : (authState.isAuthenticated
+              ? SessionNavigationStatus.authenticated
+              : SessionNavigationStatus.unauthenticated);
       final hasProfile = ref.read(profileTypeProvider) != null;
       final selectedMunicipality = ref.read(selectedMunicipalityProvider);
-      return resolveSessionRedirect(
-        matchedLocation: state.matchedLocation,
-        isAuthenticated: hasUser || hasProfile,
+
+      return resolveNavigationRedirect(
+        location: state.matchedLocation,
+        status: status,
         hasSelectedProfile: hasProfile,
         hasSelectedPilotMunicipality: selectedMunicipality?.isPilot ?? false,
       );

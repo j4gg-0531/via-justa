@@ -473,9 +473,6 @@ class ProfilePage extends ConsumerWidget {
                 child: OutlinedButton.icon(
                   onPressed: () {
                     ref.read(sessionControllerProvider).signOut();
-                    try {
-                      context.go(AppRoutes.welcome);
-                    } catch (_) {}
                   },
                   icon: const Icon(Icons.logout, color: Colors.red),
                   label: Text(

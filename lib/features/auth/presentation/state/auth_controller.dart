@@ -42,7 +42,7 @@ class AuthController extends Notifier<AuthState> {
     // La sesión puede venir restaurada del almacenamiento del dispositivo.
     unawaited(_restoreSession(repository));
 
-    return AuthState(usesDemoData: repository.usesDemoData);
+    return AuthState(isRestoring: true, usesDemoData: repository.usesDemoData);
   }
 
   /// Inicia sesión. Devuelve `false` y deja `failure` cuando falla.
@@ -109,7 +109,7 @@ class AuthController extends Notifier<AuthState> {
       // Aunque falle el servidor, la sesión local se descarta igual.
     }
     if (!ref.mounted) return;
-    state = AuthState(usesDemoData: _repository.usesDemoData);
+    state = AuthState(isRestoring: false, usesDemoData: _repository.usesDemoData);
   }
 
   /// Actualiza el nombre visible en el servidor y en la UI.
@@ -180,7 +180,7 @@ class AuthController extends Notifier<AuthState> {
   void _onSessionChanged(AuthSession? session) {
     if (!ref.mounted) return;
     if (session == null) {
-      state = AuthState(usesDemoData: _repository.usesDemoData);
+      state = AuthState(isRestoring: false, usesDemoData: _repository.usesDemoData);
       return;
     }
     unawaited(_applySession(session));
@@ -189,15 +189,21 @@ class AuthController extends Notifier<AuthState> {
   Future<void> _restoreSession(AuthRepository repository) async {
     try {
       final session = await repository.currentSession();
-      if (!ref.mounted || session == null || state.session != null) return;
-      await _applySession(session);
+      if (!ref.mounted) return;
+      if (session != null && state.session == null) {
+        await _applySession(session);
+      }
     } catch (_) {
       // Sin sesión restaurada se continúa como visitante.
+    } finally {
+      if (ref.mounted && state.isRestoring) {
+        state = state.copyWith(isRestoring: false);
+      }
     }
   }
 
   Future<void> _applySession(AuthSession session) async {
-    state = state.copyWith(session: session, isBusy: false, clearFailure: true);
+    state = state.copyWith(session: session, isBusy: false, isRestoring: false, clearFailure: true);
 
     try {
       final profile = await _repository.fetchProfile(session.userId);

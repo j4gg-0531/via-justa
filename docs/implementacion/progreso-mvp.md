@@ -26,7 +26,7 @@
 | **VJ-06** | P1 | Ambos | Cierre del primer avance: walkthrough E2E, CI y documentación de sustentación | **HECHO-VERIFICADO (`feature/vj-06-cierre-primer-avance`)** | VJ-03, VJ-04, VJ-05 |
 | **VJ-07** | P0 | Backend | Supabase: migración inicial, RLS, GRANT, seeds y ER | **INTEGRADO (PR #15)** | VJ-01, VJ-06 |
 | **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos | **INTEGRADO (PR #16)** | VJ-07 |
-| **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **PENDIENTE** | VJ-08 |
+| **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **EN CURSO (VJ-09a integrado; faltan municipios remotos y debounce)** | VJ-08 |
 | **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **INTEGRADO (PR #18)** (`supabase test db`: 23/23 pgTAP PASS) | VJ-07 |
 | **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **PARCIAL (Backend listo en `feature/vj-11-reportes-reales-backend`; 18/18 pgTAP PASS; app pendiente)** | VJ-10 |
 | **VJ-12** | P1 | Frontend | Google Maps de precios, filtros y optimización | **BLOQUEADO-EXTERNO** | VJ-11 |
@@ -241,3 +241,19 @@ flutter run -d <device-id> --no-pub `
   - **Cuota diaria atómica en SQL (`supabase/migrations/20261029150000_ai_usage_quota_rpc.sql`):** RPCs `public.consume_ai_daily_quota(uuid)` y `public.refund_ai_daily_quota(uuid)` (exclusivas de `service_role`, serializadas con `pg_advisory_xact_lock` en zona horaria `America/Bogota`, límite de 5 análisis/día con reintegro automático ante fallos 502/timeout) y `public.get_my_ai_quota_status()` para `authenticated`.
   - **Edge Function `analyze_contract` (`supabase/functions/analyze_contract/`):** Validación JWT obligatoria (`verify_jwt = true` + `auth.getUser`), adaptador desacoplado `ContractModelClient` / `GeminiContractModelClient` (`responseSchema` JSON), defensa contra *Prompt Injection* (`<untrusted_contract_document>`), limpieza de HTML ejecutable, lista blanca de referencias normativas colombianas (`Ley 820 de 2003`) y cumplimiento estricto de no retención (`RN-10`).
   - **Pruebas automatizadas de backend:** `supabase/tests/ai_usage_quota.sql` (12 aserciones pgTAP en PASS) y `supabase/functions/analyze_contract/contract_analyzer_test.ts` (pruebas unitarias y de handler HTTP en Deno).
+
+---
+
+## 10. Avance de VJ-09a (Navegación Reactiva por Sesión y Protección de Rutas con GoRouter)
+- **Estado:** **HECHO-VERIFICADO** en rama `feature/vj-09a-navegacion-sesion-router`.
+- **Alcance completado:**
+  - **Regla pura de redirección tri-estado (`session_navigation_rule.dart`):** Enums `SessionNavigationStatus` (`unknown`, `unauthenticated`, `authenticated`), `classifyRoute`, `resolveFirstIncompleteStep` y `resolveNavigationRedirect`. Cero dependencias de Flutter o Riverpod; cobertura al 100% con matriz exhaustiva en `test/session_navigation_rule_test.dart`.
+  - **Integración reactiva en el enrutador (`app_router.dart`):** `_AuthSessionListenable` como puente entre `authControllerProvider` y `GoRouter`. Solo reacciona a cambios reales de sesión (`isAuthenticated` e `isRestoring`), protegiendo la UI de saltos intempestivos al seleccionar opciones intermedias de perfil o municipio antes de confirmar.
+  - **Manejo del estado desconocido en arranque:** Durante la restauración asíncrona de tokens (`isRestoring: true`), la sesión se clasifica como `unknown` y permanece en `/splash`, impidiendo destellos indeseados hacia `/welcome`.
+  - **Limpieza de navegación imperativa en vistas:** Eliminación de `context.go()` y `context.push()` en `LoginPage`, `RegisterPage` y `ProfilePage`. El enrutador maneja declarativamente el acceso tras login/registro y la salida tras cierre de sesión (`SessionController.signOut`).
+  - **Desactivación segura del botón de Google en demo:** En `LoginPage` y `RegisterPage`, el botón "Continuar con Google" muestra `'common.coming_soon'.tr()` para impedir accesos no autenticados sin registro previo en base de datos.
+  - **Batería de pruebas y cumplimiento de arquitectura:** 252 pruebas unitarias y de widgets en verde (`flutter test`), 0 advertencias en `flutter analyze`, 0 violaciones a la Regla 5.2 en vistas.
+- **Pendiente para cierre completo de VJ-09 (en sub-tareas posteriores):**
+  - Persistencia remota del perfil seleccionado (`ProfileType`) en Supabase.
+  - Repositorio remoto de municipios (reemplazo o complemento de datos locales).
+  - Debounce en el campo de búsqueda de municipios.
