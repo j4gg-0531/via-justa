@@ -1,7 +1,7 @@
 # Progreso y Control de Cambios — Vía Justa MVP
 
-**Última actualización:** 29 de octubre de 2026 (VJ-07 backend verificado en local: migraciones, RLS, GRANT y seeds con 21/21 pruebas pgTAP; VJ-13 integrado desde `main`)  
-**Rama base actual:** `main` — PRs #4 a #9 en integración; rama actual `feature/vj-07-supabase-init`  
+**Última actualización:** 29 de octubre de 2026 (VJ-08 autenticación real contra Supabase Auth, perfil y consentimientos)  
+**Rama base actual:** `main` — PRs #4 a #9 en integración; rama actual `feature/vj-08-auth-supabase`  
 **Repositorio remoto:** `https://github.com/j4gg-0531/via-justa.git`  
 **Entorno de ejecución:** Windows 10/11 x64, PowerShell 5.1  
 **Gradle Wrapper:** 9.3.1 (`android/gradle/wrapper/gradle-wrapper.properties`)  
@@ -9,7 +9,7 @@
 **Kotlin:** 2.4.0 (`android/settings.gradle.kts`)  
 **JVM Target:** Java 17 (`android/app/build.gradle.kts`)  
 **Flutter SDK:** Flutter 3.47.7 (canal `stable`, Dart 3.13.5) instalado en `C:\Users\JUAN\flutter` y añadido al PATH de usuario.  
-**Suite de pruebas:** 138 pruebas automatizadas ejecutadas y 138 aprobadas (100% éxito), incluyendo el recorrido E2E del Primer Avance (`test/first_milestone_walkthrough_test.dart`).
+**Suite de pruebas:** 173 pruebas automatizadas ejecutadas y 173 aprobadas (100% éxito), incluyendo el recorrido E2E del Primer Avance (`test/first_milestone_walkthrough_test.dart`) y las pruebas nuevas de autenticación (`test/auth_mappers_test.dart`, `test/auth_controller_test.dart`).
 
 ---
 
@@ -25,7 +25,7 @@
 | **VJ-05** | P1 | Frontend | Pantalla M10: aportar precio en 4 pasos demo por zona | **HECHO-VERIFICADO (`feature/vj-05-aportar-precio-demo`)** | VJ-04 |
 | **VJ-06** | P1 | Ambos | Cierre del primer avance: walkthrough E2E, CI y documentación de sustentación | **HECHO-VERIFICADO (`feature/vj-06-cierre-primer-avance`)** | VJ-03, VJ-04, VJ-05 |
 | **VJ-07** | P0 | Backend | Supabase: migración inicial, RLS, GRANT, seeds y ER | **HECHO-VERIFICADO** (`feature/vj-07-supabase-init`; `supabase db reset` + `supabase test db` en local: 21/21) | VJ-01, VJ-06 |
-| **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos | **PENDIENTE** | VJ-07 |
+| **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos | **HECHO-VERIFICADO (local, modo DEMO disponible)** (`feature/vj-08-auth-supabase`) | VJ-07 |
 | **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **PENDIENTE** | VJ-08 |
 | **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **PENDIENTE** | VJ-07 |
 | **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **PENDIENTE** | VJ-10 |
@@ -163,3 +163,59 @@
   - `supabase test db` → `Files=1, Tests=21`, `Result: PASS` (21/21 aserciones pgTAP).
 - **Estado:** `HECHO-VERIFICADO` (local). **No se ha aplicado al proyecto remoto** `vjehsjqmwibmiqmxlsou`; requiere aprobación explícita antes de `supabase db push`.
 - **Siguiente paso:** abrir el PR de `feature/vj-07-supabase-init` a `main` y, con aprobación, aplicar las migraciones al proyecto remoto.
+
+---
+
+## 7. VJ-08 — Autenticación real, sesión, perfil y consentimientos (29 de octubre de 2026)
+
+### 7.1 Dependencia y configuración
+
+- `supabase_flutter ^2.18.3` agregado con `flutter pub add` (31 dependencias transitivas, incluida `gotrue 2.27.3`). Los registrantes de plugins de `linux/`, `macos/` y `windows/` fueron regenerados automáticamente por la herramienta.
+- Las credenciales se inyectan en tiempo de compilación y **nunca** se versionan:
+
+```powershell
+flutter run -d <device-id> --no-pub `
+  --dart-define=SUPABASE_URL=https://<proyecto>.supabase.co `
+  --dart-define=SUPABASE_ANON_KEY=<anon-o-publishable-key>
+```
+
+- Solo se usa la clave pública (`anon`/`publishable`). La `service_role` es exclusiva de procesos de servidor y no aparece en la app.
+- Sin `--dart-define`, `SupabaseSettings.fromEnvironment()` devuelve `null`, `supabaseClientProvider` queda en `null` y `authRepositoryProvider` entrega `DemoAuthRepository`: la app sigue funcionando en modo DEMO y las pantallas rotulan el acceso como tal (`auth.demo_note`).
+
+### 7.2 Capas
+
+- **`domain/` (Dart puro):** `auth_failure.dart`, `auth_session.dart`, `user_profile.dart`, `consent_document.dart`, `sign_up_result.dart` y el contrato `auth_repository.dart`.
+- **`data/`:** `supabase_auth_repository.dart` (Auth + `profiles` + `consents`), `demo_auth_repository.dart` (memoria), `auth_failure_mapper.dart` (GoTrue/PostgREST → `AuthFailureKind`), `profile_mapper.dart` (fila → entidad).
+- **`presentation/state/`:** `auth_controller.dart` (único `Notifier` que orquesta sesión, perfil, idioma y consentimientos) y `auth_state.dart`.
+- **`core/supabase/`:** `supabase_settings.dart`, `supabase_bootstrap.dart` y `supabase_providers.dart`; `main.dart` sobreescribe el provider del cliente solo si la inicialización funciona.
+- **Vistas:** `login_page.dart` y `register_page.dart` delegan por completo en `AuthController`; `profile_page.dart` muestra el correo real, permite editar el nombre y persiste idioma y tipo de perfil; `profile_selection_page.dart` persiste la elección del onboarding.
+
+### 7.3 Reglas y decisiones aplicadas
+
+- **Consentimientos:** al registrarse se insertan las dos filas de `public.consents` (`terms_and_conditions`, `privacy_policy`) con `version = 'v1.0'`, alineadas con el CHECK de la migración `20261027151910_profiles_and_consents.sql`.
+- **D11 (`resident`) sigue PROPUESTA:** el CHECK de `profiles.profile_type` solo admite `visitor` y `settler`, así que `ProfileType.isPersistable` marca `resident` como no persistible. La app lo conserva en memoria y avisa con `auth.error.profile_type_pending`; no se inventó un valor nuevo en la base.
+- **D14 (confirmación de correo) sigue PENDIENTE:** el código ya soporta ambos escenarios. Si Supabase no devuelve sesión tras `signUp`, el controlador expone `AuthFailureKind.emailConfirmationRequired` en lugar de tratarlo como error del usuario. La configuración local mantiene `enable_confirmations = false`.
+- **Errores:** ninguno de los nueve `AuthFailureKind` se resuelve en la vista; `auth_failure_text.dart` solo traduce el enum a `'auth.error.*'.tr()`.
+- **Sincronización local:** `AuthController._syncLocalProfile` hidrata `userNameProvider` y `profileTypeProvider` con lo que el servidor confirmó, pero no los borra al perder la sesión, para no romper `session_lifecycle_test` ni el flujo DEMO del primer avance.
+
+### 7.4 Verificación ejecutada
+
+- `flutter analyze` → `No issues found!`.
+- `flutter test` → **173/173 pruebas aprobadas**, incluidas las 23 nuevas de autenticación.
+- Barrido del punto 5.2 sobre `lib/**/presentation/` excluyendo `presentation/state/` → 0 coincidencias de `normalizeForSearch|search[A-Z]\w*\(|\.where\(|\.sort\(|firstWhere|jsonDecode|rootBundle|Timer|Future\.delayed`.
+- **No verificado:** ejecución en dispositivo/emulador Android y `supabase db push` al proyecto remoto. Pendiente de aprobación explícita.
+
+### 7.5 Ruta del código
+
+- **Iniciar sesión:** `LoginPage` → `authControllerProvider.signIn()` → `AuthRepository.signIn()` → `SupabaseAuthRepository` → Supabase Auth (GoTrue).
+- **Crear cuenta:** `RegisterPage` → `AuthController.signUp()` → `registerConsents()` + `saveDisplayName()` → `SupabaseAuthRepository` → `consents` / `profiles`.
+- **Editar nombre desde Perfil:** `ProfilePage` → `AuthController.saveDisplayName()` → `SupabaseAuthRepository.saveDisplayName()` → `profiles.display_name`.
+- **Cambiar idioma:** `ProfilePage` → `AuthController.saveLanguage()` → `SupabaseAuthRepository.saveLanguage()` → `profiles.language`.
+- **Elegir tipo de perfil:** `ProfileSelectionPage` → `AuthController.persistProfileType()` → `saveProfileType()` → `profiles.profile_type` (con `resident` bloqueado por D11).
+
+### 7.6 Pendientes de VJ-08
+
+1. Aprobar y ejecutar `supabase db push` contra `vjehsjqmwibmiqmxlsou` (VJ-07 + VJ-08 comparten backend).
+2. Resolver D11 (`resident`) y D14 (confirmación de correo) en `docs/decisiones.md`.
+3. Probar el recorrido real en emulador Android con `--dart-define` y revisar overflows/logcat.
+4. VJ-09: navegación por sesión en el router.

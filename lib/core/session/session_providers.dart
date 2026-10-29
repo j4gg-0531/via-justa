@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:via_justa/core/demo/demo_data.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 import 'package:via_justa/features/contracts/presentation/state/contract_capture_provider.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
@@ -42,9 +45,11 @@ class SessionController {
 
   final Ref _ref;
 
-  /// Restablece íntegramente el estado DEMO de la sesión:
-  /// nombre, perfil, municipio seleccionado, intereses registrados y filtros de búsqueda.
+  /// Restablece íntegramente el estado de la sesión: cierra la sesión remota
+  /// (si hay backend) y limpia nombre, perfil, municipio seleccionado,
+  /// intereses registrados y filtros de búsqueda.
   void signOut() {
+    unawaited(_ref.read(authControllerProvider.notifier).signOut());
     _ref.read(userNameProvider.notifier).clear();
     _ref.read(profileTypeProvider.notifier).clear();
     _ref.read(selectedMunicipalityProvider.notifier).clear();
