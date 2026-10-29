@@ -73,8 +73,10 @@
   "map": {
     "search_hint": "Buscar departamento...",
     "unavailable": "Este departamento aún no está disponible.",
-    "sample_note": "Mapa de ejemplo",
-    "semantics": "Mapa de departamentos. Toca un departamento o usa el buscador."
+    "sample_note": "Mapa vectorial simplificado: Simplemaps.com (no oficial DANE)",
+    "semantics": "Mapa de departamentos. Toca un departamento o usa el buscador.",
+    "san_andres_inset": "San Andrés (88)",
+    "load_error": "No pudimos cargar el mapa de departamentos."
   },
   "price_map": {
     "search_hint": "Clínicas cercanas, precios o servicios...",

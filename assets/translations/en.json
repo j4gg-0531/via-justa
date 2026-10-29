@@ -73,8 +73,10 @@
   "map": {
     "search_hint": "Search department...",
     "unavailable": "This department is not available yet.",
-    "sample_note": "Sample map",
-    "semantics": "Department map. Tap a department or use the search field."
+    "sample_note": "Simplified vector map: Simplemaps.com (non-official DANE)",
+    "semantics": "Department map. Tap a department or use the search field.",
+    "san_andres_inset": "San Andrés (88)",
+    "load_error": "We couldn't load the department map."
   },
   "price_map": {
     "search_hint": "Nearby clinics, prices or services...",
