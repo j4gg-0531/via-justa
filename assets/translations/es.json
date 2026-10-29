@@ -7,6 +7,7 @@
     "retry": "Reintentar",
     "coming_soon": "Próximamente",
     "demo_badge": "DEMO",
+    "save": "Guardar",
     "close": "Cerrar"
   },
   "nav": {
@@ -45,6 +46,15 @@
     "show_password": "Mostrar contraseña",
     "hide_password": "Ocultar contraseña",
     "error": {
+      "invalid_credentials": "El correo o la contraseña no son correctos.",
+      "email_registered": "Ya existe una cuenta con este correo. Inicia sesión.",
+      "email_not_confirmed": "Debes confirmar tu correo antes de iniciar sesión.",
+      "weak_password": "La contraseña no cumple la política de seguridad.",
+      "rate_limited": "Demasiados intentos. Espera un momento y vuelve a probar.",
+      "network": "No pudimos conectar con el servidor. Revisa tu conexión.",
+      "email_confirmation_required": "Te enviamos un correo para confirmar tu cuenta antes de entrar.",
+      "profile_type_pending": "Este tipo de perfil todavía no se guarda en el servidor; quedó solo en este dispositivo.",
+      "unknown": "Algo salió mal. Inténtalo de nuevo.",
       "name_empty": "Escribe tu nombre.",
       "email_empty": "Escribe tu correo electrónico.",
       "email_invalid": "Escribe un correo válido, por ejemplo nombre@correo.com.",
@@ -283,6 +293,9 @@
     "no_results": "No se encontraron negocios con el filtro actual."
   },
   "profile": {
+    "edit_name_title": "Editar nombre",
+    "edit_name_hint": "Nombre y apellido",
+    "name_updated": "Nombre actualizado.",
     "title": "Perfil y Ajustes",
     "subtitle": "Gestiona tu perfil, ubicación e idioma.",
     "user_default_name": "Usuario Vía Justa",

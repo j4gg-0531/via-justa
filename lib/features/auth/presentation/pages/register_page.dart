@@ -7,12 +7,17 @@ import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_text_field.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/auth/presentation/state/register_form_provider.dart';
 import 'package:via_justa/features/auth/presentation/widgets/auth_error_texts.dart';
+import 'package:via_justa/features/auth/presentation/widgets/auth_failure_text.dart';
 import 'package:via_justa/features/auth/presentation/widgets/legal_text.dart';
 import 'package:via_justa/features/auth/presentation/widgets/or_divider.dart';
 
-/// Pantalla de creación de cuenta (interfaz de ejemplo con validación local).
+/// Pantalla de creación de cuenta.
+///
+/// Al registrarse se guarda el perfil y la aceptación de términos y política de
+/// privacidad en Supabase (ver `AuthController.signUp`).
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
 
@@ -33,17 +38,37 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     super.dispose();
   }
 
-  void _submit() {
-    final isValid = ref.read(registerFormProvider.notifier).submit();
-    if (!isValid) return;
+  Future<void> _submit() async {
+    if (!ref.read(registerFormProvider.notifier).submit()) return;
 
-    context.push(AppRoutes.onboarding);
+    final form = ref.read(registerFormProvider);
+    final succeeded = await ref
+        .read(authControllerProvider.notifier)
+        .signUp(
+          email: form.email,
+          password: form.password,
+          displayName: form.name,
+        );
+    if (!mounted) return;
+
+    if (succeeded) {
+      context.push(AppRoutes.onboarding);
+      return;
+    }
+
+    final message = authFailureText(ref.read(authControllerProvider).failure);
+    if (message != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(registerFormProvider);
     final notifier = ref.read(registerFormProvider.notifier);
+    final authState = ref.watch(authControllerProvider);
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -143,7 +168,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       const SizedBox(height: AppSpacing.lg),
                       VjButton(
                         label: 'register.submit'.tr(),
-                        onPressed: _submit,
+                        onPressed: authState.isBusy ? null : _submit,
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       const OrDivider(),
@@ -153,14 +178,16 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                         variant: VjButtonVariant.outlined,
                         onPressed: () => context.push(AppRoutes.onboarding),
                       ),
-                      const SizedBox(height: AppSpacing.xl),
-                      Center(
-                        child: Text(
-                          'auth.demo_note'.tr(),
-                          style: textTheme.bodySmall,
-                          textAlign: TextAlign.center,
+                      if (authState.usesDemoData) ...[
+                        const SizedBox(height: AppSpacing.xl),
+                        Center(
+                          child: Text(
+                            'auth.demo_note'.tr(),
+                            style: textTheme.bodySmall,
+                            textAlign: TextAlign.center,
+                          ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: AppSpacing.xl),
                     ],
                   ),

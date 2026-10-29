@@ -7,6 +7,7 @@ import 'package:via_justa/core/session/session_providers.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
 import 'package:via_justa/features/onboarding/presentation/widgets/profile_option_card.dart';
 import 'package:via_justa/features/onboarding/domain/profile_type.dart';
@@ -15,11 +16,28 @@ import 'package:via_justa/features/onboarding/domain/profile_type.dart';
 class ProfileSelectionPage extends ConsumerWidget {
   const ProfileSelectionPage({super.key});
 
+  /// Selecciona el perfil en memoria y lo guarda en el servidor cuando el
+  /// backend ya lo admite (D11: `resident` todavía no).
+  Future<void> _selectProfile(
+    BuildContext context,
+    WidgetRef ref,
+    ProfileType type,
+  ) async {
+    ref.read(profileTypeProvider.notifier).select(type);
+    final persisted = await ref
+        .read(authControllerProvider.notifier)
+        .persistProfileType(type);
+    if (!persisted && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('auth.error.profile_type_pending'.tr())),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selected = ref.watch(profileTypeProvider);
     final displayName = ref.watch(displayNameProvider);
-    final notifier = ref.read(profileTypeProvider.notifier);
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -63,7 +81,8 @@ class ProfileSelectionPage extends ConsumerWidget {
                         title: 'onboarding.visitor.title'.tr(),
                         description: 'onboarding.visitor.description'.tr(),
                         selected: selected == ProfileType.visitor,
-                        onTap: () => notifier.select(ProfileType.visitor),
+                        onTap: () =>
+                            _selectProfile(context, ref, ProfileType.visitor),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       ProfileOptionCard(
@@ -72,7 +91,8 @@ class ProfileSelectionPage extends ConsumerWidget {
                         description: 'onboarding.settler.description'.tr(),
                         selected: selected == ProfileType.settler,
                         badge: 'onboarding.settler.badge'.tr(),
-                        onTap: () => notifier.select(ProfileType.settler),
+                        onTap: () =>
+                            _selectProfile(context, ref, ProfileType.settler),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       ProfileOptionCard(
@@ -80,7 +100,8 @@ class ProfileSelectionPage extends ConsumerWidget {
                         title: 'onboarding.resident.title'.tr(),
                         description: 'onboarding.resident.description'.tr(),
                         selected: selected == ProfileType.resident,
-                        onTap: () => notifier.select(ProfileType.resident),
+                        onTap: () =>
+                            _selectProfile(context, ref, ProfileType.resident),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                     ],
