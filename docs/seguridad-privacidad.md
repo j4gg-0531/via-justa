@@ -113,13 +113,13 @@ Todas las tablas de la base de datos deben tener RLS activado de forma obligator
   3. Alertas de presupuesto diarias en GCP para evitar sobrecostos por uso anómalo.
 
 ### 5.2 Edge Function de Gemini y Protección contra Prompt Injection
-- El cliente móvil nunca se comunica directamente con la API de Google Gemini **[PROPUESTO]**.
-- La llamada pasa a través de la Edge Function `analyze_contract`.
+- El cliente móvil nunca se comunica directamente con la API de Google Gemini **[IMPLEMENTADO]**.
+- La llamada pasa a través de la Edge Function `analyze_contract` (`supabase/functions/analyze_contract/index.ts`, con `verify_jwt = true` en `supabase/config.toml`) **[IMPLEMENTADO EN VJ-14]**.
 - La Edge Function aplica:
-  1. Verificación del JWT de sesión del usuario.
-  2. Validación de cuota diaria en `ai_usage` (máximo 5 llamadas/día por usuario).
-  3. Sanitización del texto de entrada (máximo 15.000 caracteres).
-  4. Instrucción de sistema inyectada por el servidor que ordena al LLM actuar como analizador legal neutral, desestimando cualquier comando que intente alterar su comportamiento (*system prompt defense*).
+  1. Verificación del JWT de sesión del usuario (`auth.getUser(jwt)`).
+  2. Reserva atómica de cuota diaria en `ai_usage` mediante `public.consume_ai_daily_quota` (máximo 5 llamadas/día por usuario en zona `America/Bogota`, con reintegro automático `public.refund_ai_daily_quota` si falla el proveedor externo).
+  3. Sanitización del texto de entrada (entre 20 y 15.000 caracteres, cuerpo $\le 128\text{ KB}$) y limpieza de HTML/scripts en la salida.
+  4. Instrucción de sistema defensiva que delimita el contrato como `<untrusted_contract_document>` y exige referencias legales estrictamente verificables (`Ley 820 de 2003`) o `null`.
 
 ### 5.3 Permisos de ML Kit y Procesamiento Local de Contratos (VJ-13 / RN-10)
 - **Permisos inyectados en AndroidManifest:** La integración de google_mlkit_text_recognition y sus dependencias (com.google.android.gms:play-services-mlkit-text-recognition-common) inyectan automáticamente en el manifiesto fusionado los permisos:

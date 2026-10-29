@@ -459,11 +459,15 @@ AS $$ ... $$;
 }
 ```
 
-### 4.3 Control de Seguridad y Prompt Defense
-1. **Límite de caracteres:** Máximo 15.000 caracteres de texto plano.
-2. **Validación de cuota:** La función consulta `ai_usage`. Si `count >= 5` en el día actual, rechaza con código HTTP `429 Too Many Requests`.
-3. **Aislamiento de Prompt:** El texto del contrato se trata como dato no confiable (*untrusted input*). El system prompt instruye ignorar instrucciones imperativas embebidas en el contrato.
-4. **Privacidad estricta (RN-10):** El texto del contrato **NUNCA se persiste en la base de datos ni en logs**. Solo se registra el conteo de uso en `ai_usage`.
+### 4.3 Control de Seguridad, Cuota Atómica y Prompt Defense
+1. **Límite de caracteres:** Máximo 15.000 caracteres de texto plano (cuerpo HTTP crudo $\le 128\text{ KB}$).
+2. **Validación atómica de cuota (`public.ai_usage`, zona horaria `America/Bogota`):**
+   - La Edge Function invoca con `service_role` la RPC `public.consume_ai_daily_quota(user_id)` antes de llamar a Gemini (serializada con `pg_advisory_xact_lock`).
+   - Si `count >= 5` en el día calendario actual (`America/Bogota`, `UTC-5`), rechaza inmediatamente con HTTP `429 Too Many Requests` y código `AI_DAILY_LIMIT_EXCEEDED`.
+   - **Política de reintegro ante fallos técnicos:** Si la llamada posterior a Gemini falla por error de proveedor (`502`/`503`), timeout (`504`) o respuesta malformada (`AI_RESPONSE_INVALID`), la función ejecuta `public.refund_ai_daily_quota(user_id)` para que el reintento del usuario no consuma su cuota diaria.
+   - El usuario autenticado puede consultar su saldo diario mediante `public.get_my_ai_quota_status()`.
+3. **Aislamiento de Prompt y Saneamiento de Salida:** El texto del contrato se delimita dentro de `<untrusted_contract_document>` como dato no confiable (*untrusted input*). El validador de salida elimina etiquetas HTML/script y anula a `null` cualquier referencia legal no verificable contra normas reales colombianas (*Ley 820 de 2003*, *Código Civil*, *Código de Comercio*, *Ley 1480 de 2011*, *Ley 1581 de 2012*).
+4. **Privacidad estricta (RN-10):** El texto del contrato **NUNCA se persiste en la base de datos, Storage ni en logs**. Solo se registra el conteo de uso en `ai_usage`.
 
 ### 4.4 Esquema JSON Retornado por Gemini (`responseSchema`)
 ```json

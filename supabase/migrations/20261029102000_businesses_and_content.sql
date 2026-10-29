@@ -29,7 +29,7 @@ create table if not exists public.businesses (
   name varchar(150) not null,
   description_es text not null,
   description_en text not null,
-  location geography(Point, 4326) not null,
+  location extensions.geography(Point, 4326) not null,
   place_id varchar(150),
   phone varchar(20),
   whatsapp varchar(20) not null,
