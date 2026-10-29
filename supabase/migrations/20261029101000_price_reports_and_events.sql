@@ -29,7 +29,7 @@ create table if not exists public.price_reports (
     on delete restrict,
   zone_id varchar(50) not null,
   amount_cop integer not null check (amount_cop > 0),
-  location geography(Point, 4326),
+  location extensions.geography(Point, 4326),
   place_name varchar(150),
   is_seed boolean not null default false,
   is_demo boolean not null default false,
