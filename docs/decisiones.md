@@ -27,6 +27,10 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
 | **D17**| Reglas mínimas de R8 / Proguard para OCR en Release (ComponentRegistrar) | **ACORDADA** | Frontend | 28 de octubre de 2026 |
 | **D18**| Formatos de contrato en MVP (JPG, PNG, TXT) y diferimiento de PDF | **ACORDADA** | Ambos | 28 de octubre de 2026 |
 | **D19**| Texto nativo de ML Kit (recognized.text) sin reordenamiento manual | **ACORDADA** | Frontend | 28 de octubre de 2026 |
+| **D20**| Gateway abstracto (`ContractAnalysisGateway`) y modelo desacoplado (`ContractAnalysisResult`) | **ACORDADA** | Ambos | 29 de octubre de 2026 |
+| **D21**| Reutilización de `SemanticStatusColors` para el nivel de riesgo de contratos | **ACORDADA** | Frontend | 29 de octubre de 2026 |
+| **D22**| Segundo consentimiento informado para análisis con IA de terceros | **ACORDADA** | Ambos | 29 de octubre de 2026 |
+| **D23**| Navegación reactiva y declarativa con `GoRouter` y estado de sesión tri-estado | **ACORDADA** | Frontend | 29 de octubre de 2026 |
 
 ---
 
@@ -323,4 +327,28 @@ ative_pdf_renderer) o procesamiento en backend que aumentaría sustancialmente e
   2. La decisión de solicitar el consentimiento reside en el estado del provider (`ContractAnalysisNotifier`), conservándose durante la sesión activa y revocándose al cerrar sesión (`SessionController.signOut`).
 - **Impacto Frontend:** Estado `hasGivenAiConsent` y diálogo `_showAiConsentDialog` en `ContractCaptureSection`.
 - **Impacto Backend:** Ninguno.
+
+---
+
+## D23 · Navegación reactiva y declarativa con `GoRouter` y estado de sesión tri-estado
+- **Estado:** **ACORDADA**
+- **Responsable:** Frontend.
+- **Fecha de evidencia:** 29 de octubre de 2026 (VJ-09a).
+- **Descripción:** La navegación y el control de acceso en la aplicación móvil se articulan de forma puramente declarativa y reactiva mediante `GoRouter` y la regla de dominio `resolveNavigationRedirect`:
+  1. **Puente reactivo (`_AuthSessionListenable`):** `routerProvider` utiliza un `refreshListenable` que observa única y exclusivamente el estado de sesión en `authControllerProvider` (`isAuthenticated` e `isRestoring`). No reacciona a providers transitorios de selección (perfil o municipio), evitando saltos indeseados de pantalla durante la interacción del usuario antes de confirmar.
+  2. **Estado de sesión tri-estado (`SessionNavigationStatus`):** Se introdujo el enum con estados `unknown`, `unauthenticated` y `authenticated`. Cuando la app inicia y se está restaurando el token de sesión (`unknown`), el router mantiene al usuario en `/splash`, eliminando el destello visual prematuro hacia `/welcome`.
+  3. **Protección de rutas sin sesión:** Toda ruta privada protegida (`/home`, `/onboarding`, `/departments`, etc.) redirige de inmediato a `/welcome` si el estado es `unauthenticated`.
+  4. **Resolución del primer paso incompleto (`resolveFirstIncompleteStep`):** Usuarios autenticados que intentan ingresar a pantallas públicas (`/welcome`, `/login`, `/register`) son redirigidos de forma jerárquica a su primer paso pendiente:
+     - Sin perfil seleccionado → `/onboarding`.
+     - Sin municipio seleccionado → `/departments`.
+     - Perfil y municipio listos → `/home`.
+  5. **Exploración libre de municipios:** Las rutas de municipios (`/departments`, `/department/:code`, `/municipality/:code`) no se bloquean si el usuario ya seleccionó un municipio previamente, permitiendo cambiar de ciudad en cualquier momento.
+  6. **Cero navegación imperativa en vistas:** Se eliminaron los llamados directos a `context.go()` y `context.push()` tras login, registro y cierre de sesión (`ProfilePage`). Las vistas delegan toda la transición al ciclo de vida de los providers y a `GoRouter`.
+- **Justificación técnica:**
+  1. Cumplimiento estricto de la regla de arquitectura del proyecto (Regla 5.2): la lógica de redirección y permisos reside en funciones puras de dominio (`session_navigation_rule.dart`), facilitando pruebas unitarias exhaustivas sin instanciar widgets ni Flutter.
+  2. Experiencia de usuario limpia y sin parpadeos: se eliminan condiciones de carrera entre la restauración asíncrona del token de autenticación y el router.
+  3. Consistencia total con el cierre de sesión (`SessionController.signOut`): limpiar el estado notifica automáticamente al router, devolviendo al usuario a `/welcome` sin bloques `try/catch` ni llamadas imperativas en la UI.
+- **Impacto Frontend:** Creación de `SessionNavigationStatus`, `resolveNavigationRedirect` y `classifyRoute` en `session_navigation_rule.dart`; integración en `app_router.dart`; flag `isRestoring` en `AuthState` y `AuthController`; desmonte de navegación imperativa en `LoginPage`, `RegisterPage` y `ProfilePage`.
+- **Impacto Backend:** Ninguno.
+
 

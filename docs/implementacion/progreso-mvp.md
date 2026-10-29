@@ -26,7 +26,7 @@
 | **VJ-06** | P1 | Ambos | Cierre del primer avance: walkthrough E2E, CI y documentación de sustentación | **HECHO-VERIFICADO (`feature/vj-06-cierre-primer-avance`)** | VJ-03, VJ-04, VJ-05 |
 | **VJ-07** | P0 | Backend | Supabase: migración inicial, RLS, GRANT, seeds y ER | **INTEGRADO (PR #15)** | VJ-01, VJ-06 |
 | **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos | **INTEGRADO (PR #16)** | VJ-07 |
-| **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **PENDIENTE** | VJ-08 |
+| **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **EN CURSO (VJ-09a integrado; faltan municipios remotos y debounce)** | VJ-08 |
 | **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad | **HECHO-VERIFICADO** (`feature/vj-10-semaforo-sql`; `supabase test db`: 49/49 pgTAP PASS) | VJ-07 |
 | **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **PENDIENTE** | VJ-10 |
 | **VJ-12** | P1 | Frontend | Google Maps de precios, filtros y optimización | **BLOQUEADO-EXTERNO** | VJ-11 |
@@ -236,3 +236,20 @@ flutter run -d <device-id> --no-pub `
   - **Interfaz estructurada y accesible (`ContractAnalysisResultView`):** Triple canal semántico (color + ícono + texto traducido) integrado con `SemanticStatusColors`. Ocultamiento estricto de referencias legales nulas. Banner visible de demostración. Reintento seguro ante errores transitorios. Adaptación responsiva verificada en dispositivo real (`moto_g22`), a 360 dp y 1.5x de escala de texto sin desbordamientos.
 - **Pendiente para cierre definitivo:**
   - Implementación y despliegue de la Edge Function en Supabase con Google Gemini (backend pendiente).
+
+---
+
+## 10. Avance de VJ-09a (Navegación Reactiva por Sesión y Protección de Rutas con GoRouter)
+- **Estado:** **HECHO-VERIFICADO** en rama `feature/vj-09a-navegacion-sesion-router`.
+- **Alcance completado:**
+  - **Regla pura de redirección tri-estado (`session_navigation_rule.dart`):** Enums `SessionNavigationStatus` (`unknown`, `unauthenticated`, `authenticated`), `classifyRoute`, `resolveFirstIncompleteStep` y `resolveNavigationRedirect`. Cero dependencias de Flutter o Riverpod; cobertura al 100% con matriz exhaustiva en `test/session_navigation_rule_test.dart`.
+  - **Integración reactiva en el enrutador (`app_router.dart`):** `_AuthSessionListenable` como puente entre `authControllerProvider` y `GoRouter`. Solo reacciona a cambios reales de sesión (`isAuthenticated` e `isRestoring`), protegiendo la UI de saltos intempestivos al seleccionar opciones intermedias de perfil o municipio antes de confirmar.
+  - **Manejo del estado desconocido en arranque:** Durante la restauración asíncrona de tokens (`isRestoring: true`), la sesión se clasifica como `unknown` y permanece en `/splash`, impidiendo destellos indeseados hacia `/welcome`.
+  - **Limpieza de navegación imperativa en vistas:** Eliminación de `context.go()` y `context.push()` en `LoginPage`, `RegisterPage` y `ProfilePage`. El enrutador maneja declarativamente el acceso tras login/registro y la salida tras cierre de sesión (`SessionController.signOut`).
+  - **Desactivación segura del botón de Google en demo:** En `LoginPage` y `RegisterPage`, el botón "Continuar con Google" muestra `'common.coming_soon'.tr()` para impedir accesos no autenticados sin registro previo en base de datos.
+  - **Batería de pruebas y cumplimiento de arquitectura:** 252 pruebas unitarias y de widgets en verde (`flutter test`), 0 advertencias en `flutter analyze`, 0 violaciones a la Regla 5.2 en vistas.
+- **Pendiente para cierre completo de VJ-09 (en sub-tareas posteriores):**
+  - Persistencia remota del perfil seleccionado (`ProfileType`) en Supabase.
+  - Repositorio remoto de municipios (reemplazo o complemento de datos locales).
+  - Debounce en el campo de búsqueda de municipios.
+
