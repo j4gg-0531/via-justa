@@ -7,10 +7,10 @@ import 'package:via_justa/features/businesses/domain/business_repository.dart';
 /// (y a través de `public.get_municipality_map_items`) para mostrarlos también en el directorio.
 class SupabaseBusinessRepository implements BusinessRepository {
   const SupabaseBusinessRepository({
-    required SupabaseClient client,
+    required this._client,
     this.municipalityCode = '20001',
     this.fallbackRepository = const LocalBusinessRepository(),
-  }) : _client = client;
+  });
 
   final SupabaseClient _client;
   final String municipalityCode;

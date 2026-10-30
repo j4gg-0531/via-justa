@@ -9,12 +9,12 @@ import 'package:via_justa/features/prices/domain/price_map_repository.dart';
 ///   2) Negocios y servicios aprobados (`public.businesses` con `status = 'approved'`).
 class SupabasePriceMapRepository implements PriceMapRepository {
   const SupabasePriceMapRepository({
-    required SupabaseClient client,
+    required this._client,
     this.includeDemo = true,
     this.bounds,
     this.localeCode = 'es',
     this.fallbackRepository = const LocalPriceMapRepository(),
-  }) : _client = client;
+  });
 
   final SupabaseClient _client;
   final bool includeDemo;
@@ -131,7 +131,7 @@ class SupabasePriceMapRepository implements PriceMapRepository {
           localeCode: localeCode,
         );
       }
-      return fallbackRepository.getMapItems(municipalityCode: municipalityCode);
+      return await fallbackRepository.getMapItems(municipalityCode: municipalityCode);
     } catch (_) {
       return fallbackRepository.getMapItems(municipalityCode: municipalityCode);
     }

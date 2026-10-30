@@ -137,6 +137,7 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
           14.2,
         ),
       );
+      if (!context.mounted) return;
       _showInfoDialog(
         context,
         title: cityName,

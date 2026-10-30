@@ -8,10 +8,9 @@ import 'package:via_justa/features/prices/domain/price_contribution_repository.d
 class SupabasePriceContributionRepository
     implements PriceContributionRepository {
   SupabasePriceContributionRepository({
-    required SupabaseClient client,
+    required this._client,
     DemoPriceContributionRepository? fallback,
-  }) : _client = client,
-       _fallback = fallback ?? DemoPriceContributionRepository();
+  }) : _fallback = fallback ?? DemoPriceContributionRepository();
 
   final SupabaseClient _client;
   final DemoPriceContributionRepository _fallback;
