@@ -1,11 +1,23 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:via_justa/core/supabase/supabase_providers.dart';
 import 'package:via_justa/features/businesses/data/local_business_repository.dart';
+import 'package:via_justa/features/businesses/data/supabase_business_repository.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/domain/business_filter.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
+import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 
-/// Provider del repositorio de negocios.
+/// Provider del repositorio de negocios (conecta a Supabase cuando está activo).
 final businessRepositoryProvider = Provider<BusinessRepository>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  final municipality = ref.watch(selectedMunicipalityProvider);
+  final code = municipality?.code ?? '20001';
+  if (client != null) {
+    return SupabaseBusinessRepository(
+      client: client,
+      municipalityCode: code,
+    );
+  }
   return const LocalBusinessRepository();
 });
 

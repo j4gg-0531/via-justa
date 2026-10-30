@@ -1,7 +1,11 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
@@ -11,11 +15,24 @@ import 'package:via_justa/features/municipality/presentation/state/municipality_
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
 import 'package:via_justa/features/prices/presentation/state/price_map_providers.dart';
 
-/// Pantalla 13 (M08) · Mapa local de precios, comercios y servicios del municipio seleccionado.
-class PriceMapPage extends ConsumerWidget {
+/// Pantalla 13 (M08 / VJ-12) · Mapa interactivo de Google Maps con precios, comercios y servicios del municipio seleccionado.
+class PriceMapPage extends ConsumerStatefulWidget {
   const PriceMapPage({super.key});
 
-  void _showDemoDialog(
+  @override
+  ConsumerState<PriceMapPage> createState() => _PriceMapPageState();
+}
+
+class _PriceMapPageState extends ConsumerState<PriceMapPage> {
+  GoogleMapController? _mapController;
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
+  }
+
+  void _showInfoDialog(
     BuildContext context, {
     required String title,
     required String body,
@@ -35,12 +52,195 @@ class PriceMapPage extends ConsumerWidget {
     );
   }
 
+  double _markerHueForItem(PriceMapItem item) {
+    switch (item.status) {
+      case PricePinStatus.fair:
+        return BitmapDescriptor.hueGreen;
+      case PricePinStatus.moderate:
+        return BitmapDescriptor.hueOrange;
+      case PricePinStatus.alert:
+        return BitmapDescriptor.hueRed;
+      case PricePinStatus.info:
+        if (item.category == PriceMapCategory.consulates) {
+          return BitmapDescriptor.hueViolet;
+        }
+        return BitmapDescriptor.hueAzure;
+    }
+  }
+
+  Set<Marker> _buildGoogleMarkers(
+    BuildContext context,
+    List<PriceMapItem> items,
+  ) {
+    final markers = <Marker>{};
+    for (final item in items) {
+      final title = item.pinLabel.isNotEmpty
+          ? '${item.pinLabel} · ${item.name}'
+          : item.name;
+      markers.add(
+        Marker(
+          markerId: MarkerId(item.id),
+          position: LatLng(item.latitude, item.longitude),
+          icon: BitmapDescriptor.defaultMarkerWithHue(_markerHueForItem(item)),
+          infoWindow: InfoWindow(
+            title: title,
+            snippet: item.description,
+            onTap: () => _openDirectionsToItem(context, item),
+          ),
+        ),
+      );
+    }
+    return markers;
+  }
+
+  Future<void> _focusItemOnMap(PriceMapItem item) async {
+    final controller = _mapController;
+    if (controller == null) return;
+    await controller.animateCamera(
+      CameraUpdate.newLatLngZoom(
+        LatLng(item.latitude, item.longitude),
+        16.2,
+      ),
+    );
+    await controller.showMarkerInfoWindow(MarkerId(item.id));
+  }
+
+  Future<void> _handleCenterOnMyLocation(
+    BuildContext context,
+    String cityName,
+  ) async {
+    final useNativeMap = ref.read(useNativeGoogleMapProvider);
+    if (!useNativeMap) {
+      _showInfoDialog(
+        context,
+        title: cityName,
+        body: 'price_map.demo_location_body'.tr(namedArgs: {'city': cityName}),
+      );
+      return;
+    }
+
+    final coords = await ref
+        .read(userMapLocationProvider.notifier)
+        .requestAndFetchLocation();
+
+    if (!context.mounted) return;
+
+    if (coords != null) {
+      final (lat, lng) = coords;
+      await _mapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(LatLng(lat, lng), 15.8),
+      );
+    } else {
+      await _mapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          const LatLng(kValleduparCenterLat, kValleduparCenterLng),
+          14.2,
+        ),
+      );
+      if (!context.mounted) return;
+      _showInfoDialog(
+        context,
+        title: cityName,
+        body: 'price_map.demo_location_body'.tr(namedArgs: {'city': cityName}),
+      );
+    }
+  }
+
+  Future<void> _openDirectionsToItem(
+    BuildContext context,
+    PriceMapItem item,
+  ) async {
+    final useNativeMap = ref.read(useNativeGoogleMapProvider);
+    if (!useNativeMap) {
+      _showInfoDialog(
+        context,
+        title: 'price_map.action_route'.tr(),
+        body: 'price_map.demo_route_body'.tr(namedArgs: {'name': item.name}),
+      );
+      return;
+    }
+
+    await _focusItemOnMap(item);
+    final uri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=${item.latitude},${item.longitude}',
+    );
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && context.mounted) {
+        _showInfoDialog(
+          context,
+          title: 'price_map.action_route'.tr(),
+          body: 'price_map.demo_route_body'.tr(namedArgs: {'name': item.name}),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        _showInfoDialog(
+          context,
+          title: 'price_map.action_route'.tr(),
+          body: 'price_map.demo_route_body'.tr(namedArgs: {'name': item.name}),
+        );
+      }
+    }
+  }
+
+  Future<void> _callItem(BuildContext context, PriceMapItem item) async {
+    final useNativeMap = ref.read(useNativeGoogleMapProvider);
+    final rawPhone = (item.phone != null && item.phone!.trim().isNotEmpty)
+        ? item.phone!.trim()
+        : item.whatsapp?.trim();
+
+    if (!useNativeMap || rawPhone == null || rawPhone.isEmpty) {
+      _showInfoDialog(
+        context,
+        title: 'businesses.contact_dialog_title'.tr(),
+        body: 'businesses.contact_dialog_body'.tr(),
+      );
+      return;
+    }
+
+    final sanitizedDigits = rawPhone.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (sanitizedDigits.isEmpty) {
+      _showInfoDialog(
+        context,
+        title: 'businesses.contact_dialog_title'.tr(),
+        body: 'businesses.contact_dialog_body'.tr(),
+      );
+      return;
+    }
+
+    final telUri = Uri(scheme: 'tel', path: sanitizedDigits);
+    try {
+      final launched = await launchUrl(telUri);
+      if (!launched && context.mounted) {
+        _showInfoDialog(
+          context,
+          title: 'businesses.contact_dialog_title'.tr(),
+          body: 'businesses.contact_dialog_body'.tr(),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        _showInfoDialog(
+          context,
+          title: 'businesses.contact_dialog_title'.tr(),
+          body: 'businesses.contact_dialog_body'.tr(),
+        );
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final itemsAsync = ref.watch(filteredPriceMapItemsProvider);
     final selectedCategory = ref.watch(priceMapCategoryProvider);
     final sectionTitleKey = ref.watch(priceMapSectionTitleKeyProvider);
     final cityName = ref.watch(activeCityNameProvider);
+    final useNativeGoogleMap = ref.watch(useNativeGoogleMapProvider);
+    final userLocation = ref.watch(userMapLocationProvider);
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -49,29 +249,63 @@ class PriceMapPage extends ConsumerWidget {
         child: CustomScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           slivers: [
-            // Lienzo del mapa urbano local con controles superpuestos (M08)
+            // Lienzo de Google Maps (o respaldo en entorno de pruebas) con controles superpuestos (M08 / VJ-12)
             SliverToBoxAdapter(
               child: SizedBox(
-                height: 340,
+                height: 360,
                 child: Stack(
                   children: [
-                    // 1. Lienzo de cuadrícula urbana + punto de ubicación central
-                     Positioned.fill(
+                    // 1. Mapa interactivo (Google Maps en Android real / Canvas en test headless)
+                    Positioned.fill(
                       child: Semantics(
                         label: 'price_map.semantics'.tr(
                           namedArgs: {'city': cityName},
                         ),
-                        child: ClipRect(
-                          child: CustomPaint(
-                            painter: _UrbanMapCanvasPainter(),
-                            child: const SizedBox.expand(),
-                          ),
-                        ),
+                        child: useNativeGoogleMap
+                            ? GoogleMap(
+                                initialCameraPosition: const CameraPosition(
+                                  target: LatLng(
+                                    kValleduparCenterLat,
+                                    kValleduparCenterLng,
+                                  ),
+                                  zoom: 14.2,
+                                ),
+                                onMapCreated: (controller) {
+                                  _mapController = controller;
+                                },
+                                myLocationEnabled:
+                                    userLocation.permissionGranted,
+                                myLocationButtonEnabled: false,
+                                zoomControlsEnabled: false,
+                                compassEnabled: true,
+                                mapToolbarEnabled: true,
+                                buildingsEnabled: true,
+                                indoorViewEnabled: true,
+                                markers: itemsAsync.hasValue
+                                    ? _buildGoogleMarkers(
+                                        context,
+                                        itemsAsync.value!,
+                                      )
+                                    : const <Marker>{},
+                                gestureRecognizers: <
+                                  Factory<OneSequenceGestureRecognizer>
+                                >{
+                                  Factory<OneSequenceGestureRecognizer>(
+                                    EagerGestureRecognizer.new,
+                                  ),
+                                },
+                              )
+                            : ClipRect(
+                                child: CustomPaint(
+                                  painter: _UrbanMapCanvasPainter(),
+                                  child: const SizedBox.expand(),
+                                ),
+                              ),
                       ),
                     ),
 
-                    // 2. Marcadores interactivos sobre el mapa
-                    if (itemsAsync.hasValue)
+                    // 2. Marcadores interactivos sobre el lienzo de respaldo (en entorno de test)
+                    if (!useNativeGoogleMap && itemsAsync.hasValue)
                       for (final item in itemsAsync.value!)
                         Align(
                           alignment: Alignment(
@@ -80,7 +314,7 @@ class PriceMapPage extends ConsumerWidget {
                           ),
                           child: _MapPinWidget(
                             item: item,
-                            onTap: () => _showDemoDialog(
+                            onTap: () => _showInfoDialog(
                               context,
                               title: item.name,
                               body:
@@ -176,7 +410,7 @@ class PriceMapPage extends ConsumerWidget {
                                   if (GoRouter.maybeOf(context) != null) {
                                     context.push(AppRoutes.priceContribute);
                                   } else {
-                                    _showDemoDialog(
+                                    _showInfoDialog(
                                       context,
                                       title:
                                           'home.contribute_dialog_title'.tr(),
@@ -191,7 +425,7 @@ class PriceMapPage extends ConsumerWidget {
                       ),
                     ),
 
-                    // 4. Botones flotantes derechos (Capas y Centrar ubicación)
+                    // 4. Botones flotantes derechos (Restablecer/Refrescar capas y Centrar en mi ubicación GPS)
                     Positioned(
                       right: AppSpacing.lg,
                       bottom: AppSpacing.xl,
@@ -200,9 +434,27 @@ class PriceMapPage extends ConsumerWidget {
                         children: [
                           IconButton(
                             tooltip: 'price_map.layers_tooltip'.tr(),
-                            onPressed: () => ref
-                                .read(priceMapCategoryProvider.notifier)
-                                .selectCategory(null),
+                            onPressed: () {
+                              ref
+                                  .read(priceMapCategoryProvider.notifier)
+                                  .selectCategory(null);
+                              ref
+                                  .read(priceMapSearchQueryProvider.notifier)
+                                  .clear();
+                              ref
+                                  .read(priceMapViewportBoundsProvider.notifier)
+                                  .clear();
+                              ref.invalidate(allPriceMapItemsProvider);
+                              _mapController?.animateCamera(
+                                CameraUpdate.newLatLngZoom(
+                                  const LatLng(
+                                    kValleduparCenterLat,
+                                    kValleduparCenterLng,
+                                  ),
+                                  14.2,
+                                ),
+                              );
+                            },
                             icon: const Icon(Icons.layers_outlined),
                             style: IconButton.styleFrom(
                               backgroundColor: AppColors.surface,
@@ -214,14 +466,17 @@ class PriceMapPage extends ConsumerWidget {
                           const SizedBox(height: AppSpacing.sm),
                           IconButton(
                             tooltip: 'price_map.center_tooltip'.tr(),
-                            onPressed: () => _showDemoDialog(
-                              context,
-                              title: cityName,
-                              body: 'price_map.demo_location_body'.tr(
-                                namedArgs: {'city': cityName},
-                              ),
-                            ),
-                            icon: const Icon(Icons.my_location),
+                            onPressed: () =>
+                                _handleCenterOnMyLocation(context, cityName),
+                            icon: userLocation.isRequesting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.my_location),
                             style: IconButton.styleFrom(
                               backgroundColor: AppColors.surface,
                               foregroundColor: AppColors.primary,
@@ -233,7 +488,7 @@ class PriceMapPage extends ConsumerWidget {
                       ),
                     ),
 
-                    // 5. Etiqueta honesta de mapa DEMO abajo a la izquierda
+                    // 5. Etiqueta inferior izquierda del municipio activo
                     Positioned(
                       left: AppSpacing.lg,
                       bottom: AppSpacing.lg,
@@ -263,7 +518,7 @@ class PriceMapPage extends ConsumerWidget {
               ),
             ),
 
-            // Hoja inferior redondeada con listado de Servicios / Precios
+            // Hoja inferior redondeada con listado de Servicios / Precios / Negocios
             SliverToBoxAdapter(
               child: Container(
                 decoration: BoxDecoration(
@@ -320,6 +575,7 @@ class PriceMapPage extends ConsumerWidget {
                             ref
                                 .read(priceMapSearchQueryProvider.notifier)
                                 .clear();
+                            ref.invalidate(allPriceMapItemsProvider);
                           },
                           style: TextButton.styleFrom(
                             foregroundColor: AppColors.primary,
@@ -334,7 +590,7 @@ class PriceMapPage extends ConsumerWidget {
               ),
             ),
 
-            // Tarjetas de lugares y reportes filtrados
+            // Tarjetas de lugares, negocios y reportes filtrados
             itemsAsync.when(
               loading: () => const SliverToBoxAdapter(
                 child: Padding(
@@ -384,18 +640,10 @@ class PriceMapPage extends ConsumerWidget {
                           padding: const EdgeInsets.only(bottom: AppSpacing.md),
                           child: _PriceMapItemCard(
                             item: item,
-                            onRouteTap: () => _showDemoDialog(
-                              context,
-                              title: 'price_map.action_route'.tr(),
-                              body: 'price_map.demo_route_body'.tr(
-                                namedArgs: {'name': item.name},
-                              ),
-                            ),
-                            onCallTap: () => _showDemoDialog(
-                              context,
-                              title: 'businesses.contact_dialog_title'.tr(),
-                              body: 'businesses.contact_dialog_body'.tr(),
-                            ),
+                            onCardTap: () => _focusItemOnMap(item),
+                            onRouteTap: () =>
+                                _openDirectionsToItem(context, item),
+                            onCallTap: () => _callItem(context, item),
                           ),
                         );
                       },
@@ -591,8 +839,7 @@ class _MapPinWidget extends StatelessWidget {
             child: Center(
               child: Container(
                 padding: EdgeInsets.symmetric(
-                  horizontal:
-                      isServicePin ? AppSpacing.sm : AppSpacing.md,
+                  horizontal: isServicePin ? AppSpacing.sm : AppSpacing.md,
                   vertical: AppSpacing.xs,
                 ),
                 decoration: BoxDecoration(
@@ -637,15 +884,17 @@ class _MapPinWidget extends StatelessWidget {
   }
 }
 
-/// Tarjeta inferior de un servicio o reporte de precio (M08).
+/// Tarjeta inferior de un servicio, negocio o reporte de precio (M08 / VJ-12).
 class _PriceMapItemCard extends StatelessWidget {
   const _PriceMapItemCard({
     required this.item,
+    required this.onCardTap,
     required this.onRouteTap,
     required this.onCallTap,
   });
 
   final PriceMapItem item;
+  final VoidCallback onCardTap;
   final VoidCallback onRouteTap;
   final VoidCallback onCallTap;
 
@@ -670,126 +919,142 @@ class _PriceMapItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.background,
+    return Material(
+      color: AppColors.background,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: InkWell(
+        onTap: onCardTap,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Icon(
-              _iconForKind(item.pinKind),
-              color: AppColors.primary,
-              size: 24,
-            ),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: AppColors.border),
           ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Icon(
+                  _iconForKind(item.pinKind),
+                  color: AppColors.primary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        item.name,
-                        style: textTheme.titleMedium?.copyWith(fontSize: 15),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sm,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.border,
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                      ),
-                      child: Text(
-                        item.badgeText,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w700,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.name,
+                            style: textTheme.titleMedium?.copyWith(
+                              fontSize: 15,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.border,
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                          ),
+                          child: Text(
+                            item.badgeText,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.description,
+                      style: textTheme.bodyMedium?.copyWith(fontSize: 13),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    _SemaphoreStatusBadge(
+                      status: item.status,
+                      isDemo: item.isDemo,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.xs,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: onRouteTap,
+                          icon: const Icon(Icons.route_outlined, size: 16),
+                          label: Text('price_map.action_route'.tr()),
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: AppColors.primarySoft,
+                            foregroundColor: AppColors.primary,
+                            side: BorderSide.none,
+                            minimumSize: const Size(48, 48),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                            ),
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: onCallTap,
+                          icon: const Icon(Icons.phone, size: 16),
+                          label: Text('businesses.action_call'.tr()),
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: AppColors.surface,
+                            foregroundColor: AppColors.textPrimary,
+                            side: const BorderSide(color: AppColors.border),
+                            minimumSize: const Size(48, 48),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  item.description,
-                  style: textTheme.bodyMedium?.copyWith(fontSize: 13),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                _SemaphoreStatusBadge(status: item.status),
-                const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.xs,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: onRouteTap,
-                      icon: const Icon(Icons.route_outlined, size: 16),
-                      label: Text('price_map.action_route'.tr()),
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: AppColors.primarySoft,
-                        foregroundColor: AppColors.primary,
-                        side: BorderSide.none,
-                        minimumSize: const Size(48, 48),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.sm),
-                        ),
-                      ),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: onCallTap,
-                      icon: const Icon(Icons.phone, size: 16),
-                      label: Text('businesses.action_call'.tr()),
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: AppColors.surface,
-                        foregroundColor: AppColors.textPrimary,
-                        side: const BorderSide(color: AppColors.border),
-                        minimumSize: const Size(48, 48),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.sm),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-/// Insignia accesible que combina color + ícono + texto para el nivel del semáforo.
+/// Insignia accesible que combina color + ícono + texto para el nivel del semáforo o estado verificado.
 class _SemaphoreStatusBadge extends StatelessWidget {
-  const _SemaphoreStatusBadge({required this.status});
+  const _SemaphoreStatusBadge({
+    required this.status,
+    required this.isDemo,
+  });
 
   final PricePinStatus status;
+  final bool isDemo;
 
   @override
   Widget build(BuildContext context) {
@@ -891,12 +1156,16 @@ class _SemaphoreStatusBadge extends StatelessWidget {
           ),
         );
       case PricePinStatus.info:
-        return VjBadge(label: 'businesses.demo_badge'.tr());
+        return VjBadge(
+          label: isDemo
+              ? 'businesses.demo_badge'.tr()
+              : 'businesses.verified_badge'.tr(),
+        );
     }
   }
 }
 
-/// Dibuja la cuadrícula de calles urbanas y el marcador central de posición en el lienzo DEMO (M08).
+/// Dibuja la cuadrícula de calles urbanas y el marcador central de posición en el lienzo de respaldo (M08).
 class _UrbanMapCanvasPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
