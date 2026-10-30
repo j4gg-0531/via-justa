@@ -1,7 +1,7 @@
 # Contrato de Datos v1.0 — Vía Justa MVP
 
-> **Estado del documento:** RATIFICADO E IMPLEMENTADO EN MIGRACIONES (`0001` a `0007`).
-> **Fecha:** 29 de octubre de 2026.
+> **Estado del documento:** RATIFICADO E IMPLEMENTADO EN MIGRACIONES (`0001` a `0007`, más extensiones incrementales `VJ-07`–`VJ-15`).
+> **Fecha:** 30 de octubre de 2026.
 > **Importante:** Este documento representa el acuerdo de interfaz formal entre Frontend (Flutter) y Backend (Supabase/PostgreSQL), sincronizado con las migraciones versionadas en `supabase/migrations/`.
 
 ---
@@ -71,9 +71,8 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
    - **Decisión arquitectónica:** En el MVP, los aportes a la base de precios son datos agregados para cálculo estadístico (mediana) y no requieren mostrar la identidad del autor a terceros. Por tanto, el nombre del autor permanece **estrictamente privado** y la función queda **[POSPUESTA / FUERA DE MVP]**. Cada usuario únicamente consulta sus propios aportes mediante RLS (`using (user_id = auth.uid())`).
 3. **Restricción de actualización: RLS implementado vs. GRANTs propuestos:**
    - **RLS a nivel de fila [IMPLEMENTADO]:** La política `profiles_update_own` en la migración de Isaac garantiza que solo el dueño del registro pueda ejecutar `UPDATE` sobre su fila (`using (id = auth.uid()) with check (id = auth.uid())`).
-   - **GRANTs a nivel de columna [PROPUESTO para VJ-07/VJ-08]:** Como mecanismo adicional de defensa en profundidad para evitar que se intenten modificar columnas inmutables o de auditoría, se propone para VJ-07 la siguiente configuración de privilegios (pendiente de incorporar por backend):
+   - **GRANTs a nivel de columna [IMPLEMENTADO en VJ-07/VJ-08]:** Como mecanismo de defensa en profundidad para evitar que se intenten modificar columnas inmutables o de auditoría:
      ```sql
-     -- Propuesta de defensa en profundidad (pendiente de acuerdo con Isaac en VJ-07):
      REVOKE UPDATE ON public.profiles FROM authenticated;
      GRANT UPDATE (display_name, origin_country, current_municipality_code, language, profile_type) ON public.profiles TO authenticated;
      ```
@@ -218,18 +217,22 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 ---
 
 ### 2.7 `events`
-- **Finalidad:** Registro de festivales, ferias y eventos masivos que provocan variaciones estacionales en los precios.
-- **Estructura:**
+- **Finalidad:** Registro de festivales, ferias y eventos masivos que provocan variaciones estacionales en los precios y enriquecen la vista cultural de ciudad (`VJ-15`).
+- **Estructura (actualizada con `20261030130000_city_content_and_events_rpc.sql`):**
   | Columna | Tipo | Restricciones | Descripción |
   |---|---|---|---|
   | `id` | `UUID` | PK DEFAULT gen_random_uuid() | Identificador del evento |
   | `municipality_code` | `VARCHAR(5)` | NOT NULL, FK -> `municipalities(code)` | Municipio sede del evento |
-  | `name` | `VARCHAR(150)` | NOT NULL | Nombre del evento (ej. "Festival Vallenato") |
+  | `name` | `VARCHAR(150)` | NOT NULL | Nombre del evento (ej. `"Festival de la Leyenda Vallenata (Edición Anual Oficial)"`) |
+  | `description_es` | `TEXT` | NULL | Descripción verificable en español |
+  | `description_en` | `TEXT` | NULL | Descripción verificable en inglés |
+  | `venue` | `VARCHAR(150)` | NULL | Escenario principal (ej. `"Parque de la Leyenda Vallenata 'Consuelo Araujonoguera'"`) |
+  | `source_citation` | `VARCHAR(255)` | NULL | Fuente oficial verificable |
   | `starts_at` | `TIMESTAMPTZ` | NOT NULL | Fecha/hora de inicio |
   | `ends_at` | `TIMESTAMPTZ` | NOT NULL, CHECK (ends_at >= starts_at) | Fecha/hora de finalización |
   | `is_demo` | `BOOLEAN` | NOT NULL DEFAULT false | **Obligatorio para la demo**: no presentar eventos simulados como reales |
 - **Índices:** `CREATE INDEX idx_events_dates ON events(municipality_code, starts_at, ends_at);`
-- **Políticas RLS:** `SELECT` público. `INSERT`/`UPDATE`/`DELETE` exclusivo de administradores.
+- **Políticas RLS:** `SELECT` público (`anon`, `authenticated`). `INSERT`/`UPDATE`/`DELETE` exclusivo de administradores.
 
 ---
 
@@ -337,20 +340,34 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 
 ---
 
-### 2.13 `city_content`
-- **Finalidad:** Contenido cultural, gastronómico, patrimonial y de servicios de la ciudad piloto.
-- **Estructura:**
+### 2.13 `city_content` y RPCs de Vista de Ciudad (`VJ-15`)
+- **Finalidad:** Contenido cultural, de contexto, patrimonial, gastronómico y de emergencias de la ciudad piloto (`20001` — Valledupar), con atribución obligatoria de fuentes oficiales y fallback automático a español (`es`).
+- **Estructura (actualizada con `20261030130000_city_content_and_events_rpc.sql`):**
   | Columna | Tipo | Restricciones | Descripción |
   |---|---|---|---|
-  | `id` | `UUID` | PK DEFAULT gen_random_uuid() | Identificador |
-  | `municipality_code` | `VARCHAR(5)` | NOT NULL, FK -> `municipalities(code)` | Municipio al que pertenece |
-  | `locale` | `VARCHAR(2)` | NOT NULL, CHECK (locale IN ('es', 'en')) | Idioma del contenido |
-  | `section` | `VARCHAR(50)` | NOT NULL | Sección: `culture`, `gastronomy`, `emergency` |
-  | `title` | `VARCHAR(150)` | NOT NULL | Título de la tarjeta |
-  | `body` | `TEXT` | NOT NULL | Contenido narrativo |
-  | `image_path` | `TEXT` | NULL | Imagen con licencia y atribución |
-  | `source_citation` | `VARCHAR(255)` | NOT NULL | Fuente y crédito oficial de la información |
-- **Políticas RLS:** `SELECT` público. Modificación exclusiva de administradores.
+  | `id` | `UUID` | PK DEFAULT gen_random_uuid() | Identificador de la tarjeta |
+  | `municipality_code` | `TEXT` | NOT NULL, FK -> `municipalities(code)` ON DELETE CASCADE | Municipio al que pertenece (ej. `'20001'`) |
+  | `slug` | `VARCHAR(80)` | NOT NULL, UNIQUE `(municipality_code, slug, locale)` | Identificador estable que vincula traducciones `es`/`en` |
+  | `locale` | `TEXT` | NOT NULL, CHECK (`locale IN ('es', 'en')`) | Idioma del registro |
+  | `section` | `TEXT` | NOT NULL, CHECK (`section IN ('welcome', 'context', 'culture', 'places', 'gastronomy', 'emergency')`) | Sección temática de la vista de ciudad |
+  | `title` | `TEXT` | NOT NULL, CHECK (`length(btrim(title)) > 0`) | Título verificable |
+  | `body` | `TEXT` | NOT NULL, CHECK (`length(btrim(body)) > 0`) | Cuerpo narrativo verificable |
+  | `image_path` | `TEXT` | NULL | Ruta de imagen con licencia verificada (`NULL` cuando se usan íconos vectoriales de UI) |
+  | `image_license` | `VARCHAR(120)` | NULL, CHECK (`image_path IS NULL OR length(btrim(image_license)) > 0`) | Licencia de la imagen (obligatoria si `image_path` no es `NULL`) |
+  | `source_citation` | `TEXT` | NOT NULL, CHECK (`length(btrim(source_citation)) > 0`) | Atribución institucional auditable |
+  | `source_url` | `TEXT` | NULL, CHECK (`source_url IS NULL OR source_url ~ '^https?://'`) | URL oficial de referencia |
+  | `sort_order` | `INTEGER` | NOT NULL DEFAULT 0 | Orden determinista dentro de la sección |
+  | `is_demo` | `BOOLEAN` | NOT NULL DEFAULT false | Marca de datos de demostración |
+  | `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha de creación |
+- **RPCs expuestas a `anon` y `authenticated`:**
+  1. `public.get_city_content(p_municipality_code text, p_locale text default 'es', p_section text default null, p_include_demo boolean default false)`:
+     - Valida que el municipio exista (`[CITY_MUNICIPALITY_NOT_FOUND]`, `P0002`) y esté habilitado como piloto (`[CITY_MUNICIPALITY_NOT_PILOT]`, `22023`).
+     - Resuelve por cada `slug` la versión en `p_locale` (`'es'` o `'en'`); si no existe traducción en inglés para una tarjeta, aplica **fallback automático a `'es'`** e informa `resolved_locale = 'es'` e `is_locale_fallback = true`.
+  2. `public.get_city_events_status(p_municipality_code text, p_reference_time timestamptz default now(), p_include_demo boolean default false)`:
+     - Evalúa la ventana temporal real de cada evento (`temporal_status IN ('active', 'upcoming', 'past')`, `is_currently_active boolean`) y excluye por defecto eventos con `is_demo = true` para no presentar un evento simulado como activo real.
+  3. `public.get_city_overview(p_municipality_code text, p_locale text default 'es', p_reference_time timestamptz default now(), p_include_demo boolean default false)`:
+     - Retorna en una sola llamada `jsonb` los metadatos del municipio piloto, el arreglo `sections` (resuelto con fallback `es`/`en`) y el arreglo `events` con su estado temporal real.
+- **Políticas RLS:** `SELECT` público (`anon`, `authenticated`). `INSERT`/`UPDATE`/`DELETE` exclusivo de administradores (`public.is_admin()`).
 
 ---
 
