@@ -366,7 +366,7 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
   2. `public.get_city_events_status(p_municipality_code text, p_reference_time timestamptz default now(), p_include_demo boolean default false)`:
      - Evalúa la ventana temporal real de cada evento (`temporal_status IN ('active', 'upcoming', 'past')`, `is_currently_active boolean`) y excluye por defecto eventos con `is_demo = true` para no presentar un evento simulado como activo real.
   3. `public.get_city_overview(p_municipality_code text, p_locale text default 'es', p_reference_time timestamptz default now(), p_include_demo boolean default false)`:
-     - Retorna en una sola llamada `jsonb` los metadatos del municipio piloto, el arreglo `sections` (resuelto con fallback `es`/`en`) y el arreglo `events` con su estado temporal real.
+     - Retorna en una sola llamada `jsonb` un objeto con las claves `municipality_code`, `municipality_name`, `department_code`, `is_pilot`, `requested_locale`, `has_locale_fallback`, `content` (arreglo de tarjetas resuelto con fallback `es`/`en`, mismo formato que `get_city_content`) y `events` (arreglo con el estado temporal real, mismo formato que `get_city_events_status`).
 - **Políticas RLS:** `SELECT` público (`anon`, `authenticated`). `INSERT`/`UPDATE`/`DELETE` exclusivo de administradores (`public.is_admin()`).
 
 ---
