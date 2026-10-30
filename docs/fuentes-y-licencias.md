@@ -45,13 +45,24 @@ Este documento certifica las fuentes oficiales de datos, licencias de propiedad 
 
 ---
 
-## 3. Contenido Cultural y Fotografías de Valledupar
+## 3. Contenido Cultural y Fotografías de Valledupar (`VJ-15`)
 
-### 3.1 Criterios de Selección de Multimedia
-1. **Fotografías con licencia Creative Commons (CC BY, CC BY-SA o CC0 / Dominio Público):** Cada recurso gráfico incluido en `assets/images/` o servido desde Supabase Storage debe contar con su correspondiente registro de atribución, autor y enlace a la licencia en el campo `source_citation` de la tabla `city_content`.
-2. **Fotografías Propias:** Tomadas directamente en trabajo de campo por los integrantes del equipo.
-3. **Fotografías de Comercios:** Aportadas voluntariamente por los dueños de negocios bajo consentimiento explícito para difusión local en la app.
+### 3.1 Criterios de Selección de Multimedia y Restricción en Base de Datos
+1. **Fotografías con licencia Creative Commons (CC BY, CC BY-SA o CC0 / Dominio Público):** Cada recurso gráfico incluido en `assets/images/` o servido desde Supabase Storage debe contar con su correspondiente registro de atribución, autor y enlace a la licencia en los campos `source_citation` e `image_license` de la tabla `public.city_content`.
+2. **Garantía técnica (`city_content_image_license_required_check`):** La migración `20261030130000_city_content_and_events_rpc.sql` impone a nivel de PostgreSQL que ninguna fila en `public.city_content` pueda definir `image_path` si `image_license` es nulo o vacío.
+3. **Fotografías Propias y de Comercios:** Tomadas directamente en trabajo de campo por los integrantes del equipo o aportadas voluntariamente por dueños de negocios bajo consentimiento explícito.
 4. **Prohibición Expresa:** Queda terminantemente prohibido el uso de imágenes protegidas por derechos de autor comerciales o marcas registradas sin autorización explícita.
+
+### 3.2 Ficha Auditable de Fuentes Culturales de Valledupar (`20001` — `09_city_content_valledupar.sql`)
+
+| Slug (`slug`) | Sección (`section`) | Idiomas | Fuente Oficial Verificada (`source_citation`) | Enlace (`source_url`) |
+|---|---|---|---|---|
+| `valledupar_welcome` | `welcome` | `es`, `en` | Alcaldía de Valledupar — Reseña histórica e institucional del municipio (DIVIPOLA 20001) | `https://www.valledupar-cesar.gov.co` |
+| `valledupar_context` | `context` | `es`, `en` | Instituto Geográfico Agustín Codazzi (IGAC) y DANE — Geografía del Cesar y Valledupar | `https://www.dane.gov.co` |
+| `vallenato_unesco` | `culture` | `es`, `en` | UNESCO — Decisión 10.COM 10.a.3 (2015) y Red de Ciudades Creativas de la UNESCO (2019) | `https://ich.unesco.org/es/USL/la-musica-vallenata-tradicional-del-magdalena-grande-01095` |
+| `plaza_alfonso_lopez_y_hurtado` | `places` | `es`, `en` | Ministerio de las Culturas, las Artes y los Saberes de Colombia — Patrimonio Urbano de Valledupar | `https://www.mincultura.gov.co` |
+| `gastronomia_tradicional_cesar` | `gastronomy` | `es`, `en` | Ministerio de Cultura — Biblioteca Básica de Cocinas Tradicionales de Colombia (Región Caribe / Cesar) | `https://www.mincultura.gov.co` |
+| `lineas_atencion_y_emergencia_vup` | `emergency` | `es`, `en` | Alcaldía de Valledupar / Defensoría del Pueblo Regional Cesar — Directorio de Atención Ciudadana | `https://www.defensoria.gov.co` |
 
 ---
 
