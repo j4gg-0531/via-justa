@@ -1,7 +1,7 @@
 # Contrato de Datos v1.0 — Vía Justa MVP
 
-> **Estado del documento:** RATIFICADO E IMPLEMENTADO EN MIGRACIONES (`0001` a `0007`, más extensiones incrementales `VJ-07`–`VJ-15`).
-> **Fecha:** 30 de octubre de 2026.
+> **Estado del documento:** RATIFICADO E IMPLEMENTADO EN MIGRACIONES (`0001` a `0007`, más extensiones incrementales `VJ-07`–`VJ-16`).
+> **Fecha:** 31 de octubre de 2026.
 > **Importante:** Este documento representa el acuerdo de interfaz formal entre Frontend (Flutter) y Backend (Supabase/PostgreSQL), sincronizado con las migraciones versionadas en `supabase/migrations/`.
 
 ---
@@ -17,8 +17,7 @@
      - `profile_type`:
        - **Valores admitidos en base de datos [IMPLEMENTADO - D11 RATIFICADA]:** `'visitor'`, `'settler'` y `'resident'` (mediante `CHECK (profile_type IN ('visitor', 'settler', 'resident'))` en la migración `20261029120000_close_vj07_vj08_d11_and_account_deletion.sql`).
      - `language`: `TEXT CHECK (language IN ('es', 'en'))` (implementado con valor por defecto `'es'`).
-   - Para entidades posteriores planificadas:
-     - `business_status`: `TEXT CHECK (status IN ('pending', 'approved', 'rejected'))` (planificado para VJ-16).
+     - `business_status`: `TEXT CHECK (status IN ('pending', 'approved', 'rejected'))` **[IMPLEMENTADO EN VJ-16]**.
      - `verdict_level`: valor de texto retornado por la función de semáforo (`'insufficient'`, `'green'`, `'yellow'`, `'red'`).
    - **Eliminación de `user_role_enum`:** Se elimina formalmente cualquier tipo de rol en `profiles`. La pertenencia a administración vive exclusivamente en la tabla `public.admin_users` evaluada por la función `public.is_admin()`.
 
@@ -45,8 +44,6 @@
 > **Compatibilidad con `handle_new_user()`:** Al registrarse un usuario en `auth.users`, el trigger inicial de base de datos ejecuta:
 > `INSERT INTO public.profiles (id, display_name) VALUES (new.id, coalesce(...));`
 > Para que esta inserción no falle, las columnas `profile_type`, `origin_country` y `current_municipality_code` son inicialmente `NULL` y se completan durante el onboarding. `language` cuenta con `DEFAULT 'es'`.
->
-> **Distinción de perfiles admitidos vs. propuestos:** La migración `20261027151910_profiles_and_consents.sql` valida activamente `check (profile_type in ('visitor', 'settler'))`. La inclusión del perfil `'resident'` es una propuesta (D11) sujeta a validación con backend; hasta que se aplique la migración complementaria correspondiente, cualquier intento de escribir `'resident'` generará un error de restricción de integridad en PostgreSQL.
 
 #### `admin_users` (Autorización Administrativa Separada)
 Siguiendo la arquitectura de seguridad implementada en la migración `20261027151910_profiles_and_consents.sql`, **los privilegios de administración NO se guardan en `profiles`**. Se aísla el acceso administrativo en una tabla separada:
@@ -69,9 +66,9 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 2. **Auditoría de autoría y descarte de `get_public_author_name()`:**
    - **Evaluación de riesgos de seguridad:** Se auditó la propuesta de exponer `get_public_author_name(p_user_id UUID)` con `SECURITY DEFINER` y permisos `EXECUTE`. Esta función permitiría que cualquier cliente (incluso no autenticado o autenticado con fines maliciosos) consulte UUIDs arbitrarios en bucle, facilitando la **cosecha masiva de identidades y nombres reales (PII)** eludiendo la política RLS.
    - **Decisión arquitectónica:** En el MVP, los aportes a la base de precios son datos agregados para cálculo estadístico (mediana) y no requieren mostrar la identidad del autor a terceros. Por tanto, el nombre del autor permanece **estrictamente privado** y la función queda **[POSPUESTA / FUERA DE MVP]**. Cada usuario únicamente consulta sus propios aportes mediante RLS (`using (user_id = auth.uid())`).
-3. **Restricción de actualización: RLS implementado vs. GRANTs propuestos:**
-   - **RLS a nivel de fila [IMPLEMENTADO]:** La política `profiles_update_own` en la migración de Isaac garantiza que solo el dueño del registro pueda ejecutar `UPDATE` sobre su fila (`using (id = auth.uid()) with check (id = auth.uid())`).
-   - **GRANTs a nivel de columna [IMPLEMENTADO en VJ-07/VJ-08]:** Como mecanismo de defensa en profundidad para evitar que se intenten modificar columnas inmutables o de auditoría:
+3. **Restricción de actualización: RLS y GRANTs a nivel de columna [IMPLEMENTADO en VJ-07/VJ-08]:**
+   - La política `profiles_update_own` garantiza que solo el dueño del registro pueda ejecutar `UPDATE` sobre su fila (`using (id = auth.uid()) with check (id = auth.uid())`).
+   - Como mecanismo de defensa en profundidad para evitar que se intenten modificar columnas inmutables o de auditoría:
      ```sql
      REVOKE UPDATE ON public.profiles FROM authenticated;
      GRANT UPDATE (display_name, origin_country, current_municipality_code, language, profile_type) ON public.profiles TO authenticated;
@@ -137,6 +134,8 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
   | `sector_hint_en` | `VARCHAR(150)` | NOT NULL DEFAULT '' | Barrios o puntos de referencia en inglés (ej. `"Novalito, San Joaquín, Guatapurí Mall"`) |
   | `normalized_x` | `NUMERIC(5,4)` | NOT NULL DEFAULT 0.5, CHECK (0..1) | Posición X normalizada en el lienzo del mapa local (consumida por `MunicipalityZone.fromMap`) |
   | `normalized_y` | `NUMERIC(5,4)` | NOT NULL DEFAULT 0.5, CHECK (0..1) | Posición Y normalizada en el lienzo del mapa local (consumida por `MunicipalityZone.fromMap`) |
+  | `center_lat` | `DOUBLE PRECISION` | NOT NULL DEFAULT 10.4742, CHECK (-4.5..13.5) | Latitud WGS84 de referencia de la zona (`VJ-12`) |
+  | `center_lng` | `DOUBLE PRECISION` | NOT NULL DEFAULT -73.2436, CHECK (-82.0..-66.0) | Longitud WGS84 de referencia de la zona (`VJ-12`) |
   | `sort_order` | `INTEGER` | NOT NULL DEFAULT 0 | Orden de visualización en selectores |
   | `is_active` | `BOOLEAN` | NOT NULL DEFAULT true | Si la zona está activa para consultas y reportes |
 - **Índices:** `CREATE INDEX idx_municipality_zones_mun ON public.municipality_zones(municipality_code, sort_order);`
@@ -184,7 +183,7 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 > 
 > La desvinculación de la clave foránea mediante `ON DELETE SET NULL` sobre `price_reports.user_id` ocurre al suprimirse el usuario. Sin embargo, **si se elimina primero el registro en `auth.users`, los reportes quedan huérfanos con `user_id = NULL` y se vuelve imposible identificar cuáles pertenecían a ese usuario para depurar información contextual o privada**.
 >
-> Por tanto, el protocolo de eliminación **debe ejecutarse en orden estricto antes de la baja del usuario**, mediante una operación de backend segura y transaccional (RPC con `SECURITY DEFINER` o Edge Function administrativa con `service_role`):
+> Por tanto, el protocolo de eliminación **debe ejecutarse en orden estricto antes de la baja del usuario**, mediante una operación de backend segura y transaccional (`public.delete_my_account()`):
 > 
 > 1. **Fase 1: Pre-supresión y depuración contextual (Antes de eliminar la cuenta):**
 >    - Se valida que el llamador autenticado coincida con el usuario objetivo (`auth.uid() = p_user_id`).
@@ -193,13 +192,8 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 >      - **Saneamiento espacial:** Si el reporte contiene coordenadas GPS de alta precisión (`location`) asociadas a domicilios privados o rutas personales, se disocian fijándolas en `NULL` (`UPDATE price_reports SET location = NULL WHERE user_id = p_user_id;`), conservando únicamente `municipality_code`, `zone_id` y `category_id` (macro-zona del municipio sin coordenadas exactas).
 >      - **Eliminación de registros personales directos:** Se suprimen los registros en `consents` y solicitudes en `interest_registrations`.
 > 2. **Fase 2: Supresión del usuario en `auth.users`:**
->    - Una vez saneados los datos contextuales, se invoca la eliminación en el subsistema de autenticación (`supabase.auth.admin.deleteUser(p_user_id)`).
+>    - Una vez saneados los datos contextuales, se elimina el registro en `auth.users`.
 >    - Esta baja elimina en cascada `public.profiles` (`ON DELETE CASCADE`) y activa `ON DELETE SET NULL` sobre `price_reports.user_id`, desvinculando la clave foránea del registro numérico previamente saneado.
-> 3. **Manejo transaccional y tratamiento de errores:**
->    - Si la depuración en la Fase 1 falla o arroja excepción, la transacción hace `ROLLBACK` completo y la cuenta **NO** se elimina, retornando un error controlado al cliente (`500 Internal Error / Error en saneamiento previo de cuenta`).
->    - Si la Fase 1 culmina exitosamente pero falla la invocación de `deleteUser` en Auth, la operación se registra en bitácora administrativa para reintento y se notifica al usuario, evitando inconsistencias entre Auth y la base de datos pública.
-> 4. **Aclaración sobre el nivel de privacidad:**
->    - No se califica este procedimiento como "anonimización irreversible absoluta", ya que el riesgo residual de reidentificación depende del tamaño de la muestra comunitaria ($k$-anonimato) y de correlaciones externas. Se clasifica formalmente como una **estrategia de minimización de datos y disociación seudónima reforzada** conforme a la Ley 1581 de 2012 y las directrices de la SIC, sujeta a auditoría de privacidad empírica.
 - **Índices obligatorios:**
   - `CREATE INDEX idx_price_reports_stat ON price_reports(municipality_code, zone_id, category_id, created_at) WHERE is_hidden = false AND is_demo = false;`
   - `CREATE INDEX idx_price_reports_location ON price_reports USING GIST(location);`
@@ -241,25 +235,38 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 - **Estructura:**
   | Columna | Tipo | Restricciones | Descripción |
   |---|---|---|---|
-  | `key` | `VARCHAR(50)` | PK | Clave de configuración (ej. `price_verdict_rules`) |
+  | `key` | `VARCHAR(50)` | PK | Clave de configuración (`price_verdict_rules`, `business_registration_rules`) |
   | `value` | `JSONB` | NOT NULL | Objeto con valores tipados |
   | `updated_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha de última actualización |
 - **Valores por defecto en semilla:**
-  ```json
-  {
-    "window_days": 60,
-    "min_reports": 3,
-    "threshold_green": 15.0,
-    "threshold_yellow": 40.0,
-    "underpriced_alert_threshold": -40.0,
-    "recommended_cap_factor": 1.15,
-    "daily_ai_limit_per_user": 5,
-    "daily_report_limit_per_user": 10,
-    "duplicate_cooldown_minutes": 15,
-    "min_report_amount_cop": 500,
-    "max_report_amount_cop": 20000000
-  }
-  ```
+  - `price_verdict_rules`:
+    ```json
+    {
+      "window_days": 60,
+      "min_reports": 3,
+      "threshold_green": 15.0,
+      "threshold_yellow": 40.0,
+      "underpriced_alert_threshold": -40.0,
+      "recommended_cap_factor": 1.15,
+      "daily_ai_limit_per_user": 5,
+      "daily_report_limit_per_user": 10,
+      "duplicate_cooldown_minutes": 15,
+      "min_report_amount_cop": 500,
+      "max_report_amount_cop": 20000000
+    }
+    ```
+  - `business_registration_rules` (`VJ-16`):
+    ```json
+    {
+      "max_active_per_owner": 5,
+      "max_submissions_per_day": 3,
+      "max_photos": 5,
+      "max_dishes": 5,
+      "max_photo_bytes": 5242880,
+      "location_radius_m": 60000,
+      "allowed_owner_types": ["restaurant", "hotel", "service", "handicraft", "transport"]
+    }
+    ```
 - **Políticas RLS:** `SELECT` público a autenticados. Modificación exclusiva de administradores.
 
 ---
@@ -277,65 +284,83 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 
 ---
 
-### 2.10 `businesses`
-- **Finalidad:** Directorio y registro ciudadano de negocios y comercios locales.
-- **Estructura:**
+### 2.10 `businesses` y Flujo de Registro/Moderación (`VJ-16`)
+- **Finalidad:** Directorio y registro ciudadano en 4 pasos de negocios y comercios locales con moderación administrativa.
+- **Estructura (actualizada con `20261031100000_business_registration_storage_and_moderation.sql`):**
   | Columna | Tipo | Restricciones | Descripción |
   |---|---|---|---|
   | `id` | `UUID` | PK DEFAULT gen_random_uuid() | Identificador del negocio |
-  | `owner_id` | `UUID` | NOT NULL, FK -> `auth.users(id)` | Usuario dueño o proponente del registro |
-  | `municipality_code` | `VARCHAR(5)` | NOT NULL, FK -> `municipalities(code)` | Municipio del establecimiento |
-  | `type` | `VARCHAR(50)` | NOT NULL | Tipo: `restaurant`, `hotel`, `service`, `handicraft` |
-  | `name` | `VARCHAR(150)` | NOT NULL | Nombre comercial |
-  | `description_es` | `TEXT` | NOT NULL | Descripción en español |
-  | `description_en` | `TEXT` | NOT NULL | Descripción en inglés |
-  | `location` | `GEOGRAPHY(Point, 4326)` | NOT NULL | Coordenadas del local |
-  | `place_id` | `VARCHAR(150)` | NULL | Google Places ID para "Cómo llegar" |
-  | `phone` | `VARCHAR(20)` | NULL | Teléfono fijo o móvil local |
-  | `whatsapp` | `VARCHAR(20)` | NOT NULL | Teléfono en formato internacional (sin el `+`) |
-  | `whatsapp_consent_at`| `TIMESTAMPTZ` | NOT NULL | Consentimiento para enlace comercial wa.me |
-  | `order_url` | `TEXT` | NULL | Enlace opcional a carta o sistema de pedidos externo |
-  | `hours` | `JSONB` | NULL | Estructura de horarios de atención |
-  | `status` | `TEXT` | NOT NULL DEFAULT 'pending', CHECK (status in ('pending', 'approved', 'rejected')) | Estado: `pending`, `approved`, `rejected` |
-  | `rejection_reason` | `TEXT` | NULL | Motivo de rechazo en caso de no aprobación |
-  | `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha de registro |
-- **Índices:**
-  - `CREATE INDEX idx_businesses_approved ON businesses(municipality_code, type) WHERE status = 'approved';`
-  - `CREATE INDEX idx_businesses_owner ON businesses(owner_id);`
-  - `CREATE INDEX idx_businesses_location ON businesses USING GIST(location);`
-- **Políticas RLS:**
-  - `SELECT`: Cualquier usuario puede leer comercios con `status = 'approved'`. El `owner_id` puede ver sus comercios en cualquier estado.
-  - `INSERT`: Cualquier usuario autenticado puede proponer un nuevo negocio (nace obligatoriamente con `status = 'pending'`).
-  - `UPDATE`: El `owner_id` puede editar datos descriptivos mientras esté pendiente o aprobado, pero **no puede alterar el campo `status`**.
-  - Transición a `approved` o `rejected`: Exclusiva de administradores.
+  | `owner_id` | `UUID` | NULL (solo seeds/consola), FK -> `auth.users(id)` ON DELETE CASCADE | Usuario dueño del registro (fijado a `auth.uid()` por trigger) |
+  | `municipality_code` | `VARCHAR(5)` | NOT NULL, FK -> `municipalities(code)` | Municipio piloto (`'20001'`) |
+  | `type` | `VARCHAR(50)` | NOT NULL, CHECK (`type IN ('restaurant', 'hotel', 'service', 'handicraft', 'transport', 'hospital', 'consulate')`) | Tipo de establecimiento (ciudadano: `restaurant`, `hotel`, `service`, `handicraft`, `transport`) |
+  | `name` | `VARCHAR(150)` | NOT NULL | Nombre comercial (3 a 120 caracteres, sin HTML ni prefijo `[DEMO]`) |
+  | `description_es` | `TEXT` | NOT NULL | Descripción en español (20 a 1000 caracteres, sin HTML) |
+  | `description_en` | `TEXT` | NOT NULL | Descripción en inglés (20 a 1000 caracteres, fallback a `description_es`) |
+  | `address` | `VARCHAR(200)` | NULL (obligatoria en envíos ciudadanos, 5 a 200 caracteres) | Dirección física responsable y verificable |
+  | `location` | `GEOGRAPHY(Point, 4326)` | NOT NULL | Coordenadas WGS84 dentro del radio del municipio piloto |
+  | `place_id` | `VARCHAR(150)` | NULL, CHECK (`^[A-Za-z0-9_-]{10,150}$`) | Google Places ID opcional |
+  | `phone` | `VARCHAR(20)` | NULL, CHECK (`^\+?[0-9]{7,15}$`) | Teléfono fijo o móvil validado (se exige al menos `phone` o `whatsapp`) |
+  | `whatsapp` | `VARCHAR(20)` | NULL, CHECK (`^[1-9][0-9]{9,14}$`) | Teléfono en formato internacional E.164 sin `+` (ej. `573001234567`) |
+  | `whatsapp_consent_at`| `TIMESTAMPTZ` | NULL, CHECK (`(whatsapp IS NULL) = (whatsapp_consent_at IS NULL)`) | Marca de consentimiento específico para enlace comercial `wa.me` |
+  | `publication_consent_at` | `TIMESTAMPTZ` | NULL (obligatoria en envíos ciudadanos) | Marca de consentimiento de publicación del paso 4 |
+  | `client_request_id` | `UUID` | NULL, UNIQUE `(owner_id, client_request_id)` | Clave de idempotencia contra reenvíos o clics múltiples |
+  | `order_url` | `TEXT` | NULL, CHECK (`^https://...` <= 500 chars) | Enlace opcional a carta o pedidos externos (estrictamente `https://`) |
+  | `hours` | `JSONB` | NULL, CHECK (`public.is_valid_business_hours(hours)`) | Horario estructurado (`mon`..`sun`, hasta 3 franjas `{"open":"HH:MM","close":"HH:MM"}` por día) |
+  | `status` | `TEXT` | NOT NULL DEFAULT `'pending'`, CHECK (`status IN ('pending', 'approved', 'rejected')`) | Estado: `pending`, `approved`, `rejected` (fijado en servidor) |
+  | `rejection_reason` | `TEXT` | NULL, CHECK (`status <> 'rejected' OR char_length(btrim(rejection_reason)) >= 10`) | Motivo de rechazo obligatorio ($\ge 10$ caracteres) |
+  | `reviewed_at` | `TIMESTAMPTZ` | NULL | Fecha/hora de última revisión administrativa |
+  | `reviewed_by` | `UUID` | NULL, FK -> `auth.users(id)` ON DELETE SET NULL | Administrador que ejecutó la moderación |
+  | `is_demo` | `BOOLEAN` | NOT NULL DEFAULT false | Marca de registro demostrativo |
+  | `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha de creación |
+  | `updated_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha de última actualización |
+- **RPCs de Registro y Moderación (`VJ-16`):**
+  1. `public.submit_business(p_client_request_id, p_type, p_name, p_description_es, p_description_en, p_latitude, p_longitude, p_address, p_phone, p_whatsapp, p_whatsapp_consent, p_publication_consent, p_order_url, p_hours, p_place_id, p_dishes, p_municipality_code)`:
+     - Disponible para cualquier usuario autenticado con perfil válido (`visitor`, `settler` o `resident`).
+     - Fija `owner_id = auth.uid()`, `status = 'pending'` e `is_demo = false` en servidor.
+     - Inserta atómicamente hasta 5 platos destacados (`p_dishes`) y es idempotente por `(owner_id, p_client_request_id)`.
+  2. `public.moderate_business(p_business_id, p_decision, p_reason)`:
+     - Exclusiva para administradores (`public.is_admin()`) o consola/`service_role`. Impide auto-revisión (`[MODERATION_SELF_REVIEW]`) y exige motivo $\ge 10$ caracteres al rechazar (`[MODERATION_REASON_REQUIRED]`).
+  3. `public.get_business_moderation_queue(p_limit)` y `public.list_orphan_business_media(p_min_age)`:
+     - Consultas administrativas para cola de negocios `pending` y auditoría de archivos huérfanos en Storage.
+- **Políticas RLS y Re-moderación Automática:**
+  - `SELECT`: Cualquier usuario lee negocios reales con `status = 'approved' AND is_demo = false`. El dueño (`owner_id = auth.uid()`) y los administradores ven el negocio en cualquier estado.
+  - `INSERT`: Cualquier usuario autenticado (`status = 'pending'` forzado en servidor).
+  - `UPDATE`: El dueño puede editar su negocio en cualquier estado (incluido tras un `rejected`); el trigger `private.enforce_business_rules()` devuelve automáticamente el estado a `pending` y limpia `rejection_reason` para nueva revisión.
 
 ---
 
-### 2.11 `business_photos`
-- **Finalidad:** Fotografías del local y productos (máximo 5 por negocio).
+### 2.11 `business_photos` y Bucket Privado `business-media` (`VJ-16`)
+- **Finalidad:** Fotografías del local y productos (máximo 5 por negocio, 1 sola portada `is_cover = true`).
 - **Estructura:**
   | Columna | Tipo | Restricciones | Descripción |
   |---|---|---|---|
   | `id` | `UUID` | PK DEFAULT gen_random_uuid() | Identificador |
   | `business_id` | `UUID` | NOT NULL, FK -> `businesses(id)` ON DELETE CASCADE | Negocio asociado |
-  | `storage_path` | `TEXT` | NOT NULL | Ruta del archivo en el bucket `business-media` |
-  | `position` | `INTEGER` | NOT NULL DEFAULT 0 | Orden de visualización (0 a 4) |
-  | `is_cover` | `BOOLEAN` | NOT NULL DEFAULT false | Si es la imagen de portada |
-- **Políticas RLS:** `SELECT` público si el negocio está aprobado; administrada por el dueño del negocio.
+  | `storage_path` | `TEXT` | NOT NULL, UNIQUE, CHECK (`{owner_id}/{business_id}/{archivo}.(jpg\|jpeg\|png\|webp)`) | Ruta del archivo en el bucket privado `business-media` |
+  | `position` | `INTEGER` | NOT NULL DEFAULT 0, CHECK (`0..4`), UNIQUE `(business_id, position)` | Orden de visualización (0 a 4) |
+  | `is_cover` | `BOOLEAN` | NOT NULL DEFAULT false (índice único parcial por `business_id`) | Si es la imagen de portada |
+  | `mime_type` | `TEXT` | NULL, CHECK (`image/jpeg`, `image/png`, `image/webp`) | MIME real verificado contra `storage.objects` |
+  | `size_bytes` | `BIGINT` | NULL | Tamaño en bytes verificado contra `storage.objects` ($\le 5\text{ MiB}$) |
+  | `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha de vinculación |
+- **Seguridad del Bucket `business-media` y Validación de MIME Real:**
+  - El bucket `business-media` es **privado (`public = false`)**, con límite de `5 MiB` (`5242880` bytes) y tipos permitidos `image/jpeg`, `image/png`, `image/webp`.
+  - Las políticas sobre `storage.objects` permiten subir máximo 5 objetos bajo la ruta `{auth.uid()}/{business_id}/...` y restringen la lectura pública únicamente a fotos cuyo negocio tenga `status = 'approved'`. Mientras el negocio está `pending` o `rejected`, solo el dueño y los administradores pueden leer las imágenes.
+  - Al insertar en `public.business_photos`, el trigger `private.enforce_business_photo_rules()` inspecciona `storage.objects.metadata` y rechaza archivos inexistentes, que excedan 5 MiB o cuyo MIME real no coincida con su extensión (por ejemplo, un PDF disfrazado de `.jpg` arroja `[BUSINESS_PHOTO_INVALID_MIME]`).
+  - Cualquier cambio en `business_photos` o `business_dishes` sobre un negocio ya evaluado lo devuelve automáticamente a `status = 'pending'`.
 
 ---
 
 ### 2.12 `business_dishes`
-- **Finalidad:** Platos o servicios destacados (máximo 5 por negocio, opcional para restaurantes y servicios).
+- **Finalidad:** Platos o servicios destacados (máximo 5 por negocio, `sort_order` de 0 a 4).
 - **Estructura:**
   | Columna | Tipo | Restricciones | Descripción |
   |---|---|---|---|
   | `id` | `UUID` | PK DEFAULT gen_random_uuid() | Identificador |
   | `business_id` | `UUID` | NOT NULL, FK -> `businesses(id)` ON DELETE CASCADE | Negocio asociado |
-  | `name` | `VARCHAR(100)` | NOT NULL | Nombre del plato o servicio |
-  | `price_cop` | `INTEGER` | NOT NULL, CHECK (price_cop > 0) | Precio en pesos colombianos |
-  | `description` | `TEXT` | NULL | Breve reseña del producto |
-  | `sort_order` | `INTEGER` | NOT NULL DEFAULT 0 | Orden de aparición |
+  | `name` | `VARCHAR(100)` | NOT NULL, CHECK (2 a 100 chars, sin HTML/control) | Nombre del plato o servicio |
+  | `price_cop` | `INTEGER` | NOT NULL, CHECK (`price_cop BETWEEN 500 AND 20000000`) | Precio en pesos colombianos |
+  | `description` | `TEXT` | NULL, CHECK ($\le 300$ chars, sin HTML) | Breve reseña del producto |
+  | `sort_order` | `INTEGER` | NOT NULL DEFAULT 0, CHECK (`0..4`), UNIQUE `(business_id, sort_order)` | Orden de aparición |
 - **Políticas RLS:** Hereda la visibilidad y permisos del negocio asociado.
 
 ---
