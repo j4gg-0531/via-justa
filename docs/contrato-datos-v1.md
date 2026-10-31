@@ -1,6 +1,6 @@
 # Contrato de Datos v1.0 — Vía Justa MVP
 
-> **Estado del documento:** RATIFICADO E IMPLEMENTADO EN MIGRACIONES (`0001` a `0007`, más extensiones incrementales `VJ-07`–`VJ-16`).
+> **Estado del documento:** RATIFICADO E IMPLEMENTADO EN MIGRACIONES (`0001` a `0007`, más extensiones incrementales `VJ-07`–`VJ-17`).
 > **Fecha:** 31 de octubre de 2026.
 > **Importante:** Este documento representa el acuerdo de interfaz formal entre Frontend (Flutter) y Backend (Supabase/PostgreSQL), sincronizado con las migraciones versionadas en `supabase/migrations/`.
 
@@ -284,9 +284,9 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 
 ---
 
-### 2.10 `businesses` y Flujo de Registro/Moderación (`VJ-16`)
-- **Finalidad:** Directorio y registro ciudadano en 4 pasos de negocios y comercios locales con moderación administrativa.
-- **Estructura (actualizada con `20261031100000_business_registration_storage_and_moderation.sql`):**
+### 2.10 `businesses` y Flujo de Registro, Moderación y Catálogo (`VJ-16` / `VJ-17`)
+- **Finalidad:** Directorio, registro ciudadano en 4 pasos, moderación administrativa y catálogo/detalle paginado de negocios y comercios locales.
+- **Estructura (actualizada con `20261031100000` y `20261031110000`):**
   | Columna | Tipo | Restricciones | Descripción |
   |---|---|---|---|
   | `id` | `UUID` | PK DEFAULT gen_random_uuid() | Identificador del negocio |
@@ -322,6 +322,19 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
      - Exclusiva para administradores (`public.is_admin()`) o consola/`service_role`. Impide auto-revisión (`[MODERATION_SELF_REVIEW]`) y exige motivo $\ge 10$ caracteres al rechazar (`[MODERATION_REASON_REQUIRED]`).
   3. `public.get_business_moderation_queue(p_limit)` y `public.list_orphan_business_media(p_min_age)`:
      - Consultas administrativas para cola de negocios `pending` y auditoría de archivos huérfanos en Storage.
+- **RPCs de Catálogo, Ficha de Detalle y Acciones Externas (`VJ-17`):**
+  1. `public.get_business_catalog(p_municipality_code, p_type, p_search, p_locale, p_include_demo, p_limit, p_offset)`:
+     - Retorna únicamente negocios con `status = 'approved'` en el municipio actual, paginados (`p_limit` acotado a `1..50`).
+     - Soporta filtro por `type` o grupo (`food`, `lodging`, `transport`, `services`) y búsqueda insensible a tildes (`unaccent`) sobre nombre, descripción `es`/`en`, dirección y nombres de platos destacados (`business_dishes`).
+     - Incluye solo la ruta de portada (`cover_photo_path`) y conteos (`photos_count`, `dishes_count`, `min_dish_price_cop`) para evitar transferir fotos pesadas en el listado.
+  2. `public.get_business_detail(p_business_id, p_locale, p_include_demo)`:
+     - Retorna en un objeto `jsonb` la ficha completa del negocio: descripción localizada (`es`/`en` con fallback a `es`), horarios (`hours`), arreglo de hasta 5 fotos (`photos`), arreglo de hasta 5 platos destacados (`dishes`) y bloque `actions` (`can_call`, `tel_url`, `can_whatsapp`, `whatsapp_url`, `can_directions`, `maps_url`, `can_order_external`, `order_url`, `external_order_disclaimer`).
+     - Si el negocio no tiene WhatsApp consentido o no tiene `order_url`, desactiva la acción respectiva (`can_whatsapp = false`, `whatsapp_url = null`, `can_order_external = false`, `order_url = null`).
+     - Si un usuario `anon` o tercero solicita un negocio en `pending` o `rejected`, arroja `[BUSINESS_NOT_FOUND]` (`P0002`).
+  3. `public.get_my_businesses()`:
+     - Permite al comerciante autenticado consultar el estado de sus propios negocios (`pending`, `approved`, `rejected`) y su `rejection_reason`.
+  4. `public.build_business_whatsapp_url(p_whatsapp, p_business_name, p_locale)` y `public.build_business_maps_url(p_latitude, p_longitude, p_place_id)`:
+     - Funciones puras que validan E.164 sin `+` para `wa.me`, codifican en RFC 3986 UTF-8 (`public.uri_encode_component`) el saludo en `es`/`en` sin inyección ni espacios sin escapar, y construyen la ruta externa hacia Google Maps.
 - **Políticas RLS y Re-moderación Automática:**
   - `SELECT`: Cualquier usuario lee negocios reales con `status = 'approved' AND is_demo = false`. El dueño (`owner_id = auth.uid()`) y los administradores ven el negocio en cualquier estado.
   - `INSERT`: Cualquier usuario autenticado (`status = 'pending'` forzado en servidor).
