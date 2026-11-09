@@ -1,28 +1,30 @@
-# Vía Justa — App Móvil MVP
+# Vía Justa — App Móvil Android & Backend Supabase (MVP)
 
-> Plataforma móvil Android para consulta de precios justos comunitarios por zona, verificación orientativa de cláusulas de contratos con IA, exploración geográfica y directorio de negocios locales.
+> Plataforma móvil Android para consulta de precios justos comunitarios por zona urbana, verificación orientativa de cláusulas de contratos con OCR local + IA, guía cultural verificada y directorio moderado de negocios locales.
 
 ---
 
 ## 1. Visión del Proyecto
 
-**Vía Justa** es una aplicación diseñada para que ninguna persona (turista, migrante en proceso de instalación o residente local) llegue o viva en una ciudad colombiana sin herramientas para contrastar precios frente a reportes reales o entender contratos de arrendamiento y servicios.
+**Vía Justa** es una aplicación diseñada para que ninguna persona (visitante/turista, persona en proceso de instalación o residente local) llegue o habite en una ciudad colombiana sin herramientas transparentes para contrastar precios frente a reportes comunitarios reales o comprender las cláusulas de un contrato de arrendamiento y servicios antes de firmar.
 
-- **Ciudad Piloto:** Valledupar (Cesar), segmentada por zonas urbanas (`Zona Norte`, `Zona Centro`, `Zona Sur`, `Zona Oriente`, `Zona Occidente`).
-- **Enfoque técnico:** Android-first, arquitectura estricta en tres capas (`presentation` → `domain` ← `data`), bilingüe (`es` / `en`).
-- **Núcleo de precios:** Regla estadística verificable por zona del municipio (mediana comunitaria, ventana móvil de 60 días, mínimo $N \ge 3$ reportes), **nunca una caja negra de IA** *(Implementado en modo DEMO en `VJ-04` y `VJ-05`; conexión a RPC PostgreSQL en Semana 3)*.
-- **Núcleo de contratos:** Análisis asistido por IA (Gemini vía Edge Functions) con detección de cláusulas abusivas y advertencias legales orientativas *(Demostración educativa rotulada en `VJ-04`; OCR y Edge Function en Semana 4)*.
+- **Ciudad Piloto Activa:** Valledupar, Cesar (`20001`), segmentada en 5 zonas urbanas (`Zona Norte`, `Zona Centro`, `Zona Sur`, `Zona Oriente`, `Zona Occidente`).
+- **Enfoque técnico:** Android-first, arquitectura limpia de tres capas (`presentation` → `domain` ← `data`), soporte bilingüe en vivo (`es` / `en`) y seguridad de doble barrera (validación pura en cliente + RLS, `GRANT`s y triggers `SECURITY DEFINER` en PostgreSQL).
+- **Núcleo de precios (Nunca IA):** Regla estadística verificable por zona del municipio (`public.calculate_price_verdict` en PostgreSQL: mediana `PERCENTILE_CONT(0.5)`, ventana móvil de 60 días, muestra mínima $N \ge 3$, umbrales `+15%` / `+40%`, alerta `<-40%` y contraste con eventos activos).
+- **Núcleo de contratos (`RN-10` — Cero retención):** Captura con OCR 100% en el dispositivo mediante Google ML Kit (`VJ-13`) y análisis orientativo mediante la Edge Function `analyze_contract` con Gemini (`VJ-14`), cuota diaria atómica de 5 análisis por usuario (`public.consume_ai_daily_quota`), aislamiento contra *Prompt Injection* y cero almacenamiento del texto contractual.
 
 ---
 
 ## 2. Pila Tecnológica
 
-- **Framework:** Flutter 3.47.7 (Dart 3.13.5), compilación orientada a Android.
-- **Gestión de Estado:** Riverpod 3 (`Notifier`, `Provider`, `FutureProvider`).
-- **Navegación:** `go_router` con rutas declarativas centralizadas y `StatefulShellRoute.indexedStack` de 5 pestañas.
-- **Internacionalización:** `easy_localization` con paridad estricta español e inglés.
-- **Componentes Compartidos:** Atomic design (`VjButton`, `VjCard`, `VjBadge`, `VjSearchField`, `VjTextField`) y extensión de tema `SemanticStatusColors`.
-- **Backend (Planificado Semanas 2–5):** Supabase (PostgreSQL, PostGIS, Auth, Storage, Edge Functions).
+| Capa | Tecnología |
+|---|---|
+| **Cliente Móvil (Android)** | Flutter `3.47.7` (canal `stable`), Dart `3.13.5`, JDK `17`, Android Gradle Plugin `9.1.0` |
+| **Estado, Rutas e i18n** | `flutter_riverpod: ^3.4.3`, `go_router: ^18.1.1` (`StatefulShellRoute.indexedStack`), `easy_localization: ^3.0.8` |
+| **OCR en Dispositivo** | `google_mlkit_text_recognition` (inferencia local sin subir imágenes al servidor) |
+| **Base de Datos y Geoespacial** | Supabase PostgreSQL `17` + `PostGIS` + `unaccent` + `pgTAP` (`14` migraciones versionadas) |
+| **Seguridad y Almacenamiento** | Supabase Auth (GoTrue JWT), Row Level Security (RLS) en las 16 tablas, Storage privado (`business-media`) con verificación de MIME real |
+| **Cómputo Serverless e IA** | Supabase Edge Functions (Deno / TypeScript) + Google Gemini API (`responseSchema` JSON estructurado) |
 
 ---
 
@@ -30,90 +32,122 @@
 
 ```text
 via-justa/
-├── android/                         # Configuración nativa Android y Gradle
+├── android/                         # Configuración nativa Android, Gradle, ProGuard/R8
 ├── assets/
-│   ├── data/                        # Datos locales de muestra (DIVIPOLA Cesar)
-│   ├── images/                      # Activos visuales autorizados
-│   └── translations/                # Archivos es.json y en.json (paridad estricta)
+│   ├── data/                        # Catálogo local de respaldo (DIVIPOLA Cesar)
+│   ├── images/                      # Activos visuales con licencia verificada
+│   └── translations/                # Archivos es.json y en.json (paridad estricta 1:1)
 ├── lib/
 │   ├── app/                         # Configuración raíz de MaterialApp.router
-│   ├── core/                        # Infraestructura compartida
-│   │   ├── demo/                    # Constantes de demostración
-│   │   ├── navigation/              # Shell persistente de 5 pestañas (AppScaffold)
-│   │   ├── router/                  # Definición centralizada de rutas (app_router.dart)
-│   │   ├── session/                 # Controlador y proveedores de sesión en memoria
-│   │   ├── theme/                   # Tokens de diseño y SemanticStatusColors
-│   │   ├── utils/                   # Utilidades puras (normalización de texto)
-│   │   └── widgets/                 # Componentes UI reutilizables
+│   ├── core/                        # Infraestructura compartida (router, session, supabase, theme, widgets)
 │   └── features/                    # Módulos por funcionalidad (presentation, domain, data)
-│       ├── auth/                    # Bienvenida (M01), login y registro (M16)
-│       ├── businesses/              # Directorio local de negocios de muestra (M21)
-│       ├── contracts/               # Resumen educativo DEMO de contratos (M06 / RN-10)
-│       ├── home/                    # Pantalla de inicio adaptada por perfil (M04 / M05)
+│       ├── auth/                    # Bienvenida (M01), login, registro y consentimientos (M16 / VJ-08)
+│       ├── businesses/              # Directorio, detalle y registro de negocios locales (M21/M09/M19)
+│       ├── contracts/               # Captura OCR local (VJ-13) y análisis con Gemini (VJ-14)
+│       ├── home/                    # Inicio dinámico según perfil (M04 / M05)
 │       ├── map_colombia/            # Explorador departamental de Colombia (M03)
 │       ├── municipality/            # Selector de municipios (M13) y detalle piloto/no piloto (M14/M15)
-│       ├── onboarding/              # Selección de perfil inicial (M02)
-│       ├── prices/                  # Motor de semáforo por zonas (M06/M07/M20), mapa local (M08) y aporte en 4 pasos (M10)
-│       ├── profile/                 # Perfil, cambio de idioma en vivo y cierre de sesión (M17)
-│       ├── scan/                    # Contenedor de escaneo Precios vs. Contratos (M06)
-│       └── splash/                  # Bienvenida inicial con redirección
-├── docs/                            # Documentación viva del proyecto
-│   ├── arquitectura.md              # Principios de diseño y contratos entre capas
-│   ├── contrato-datos-v1.md         # Contrato de datos SQL, RLS y RPC evaluate_price_verdict
-│   ├── decisiones.md                # Registro de decisiones de diseño (ADRs D1–D15)
-│   ├── fuentes-y-licencias.md       # Atribución de datos e imágenes
-│   ├── modelo-er.puml               # Diagrama Entidad-Relación en PlantUML
-│   ├── seguridad-privacidad.md      # Políticas de privacidad (RN-10) y controles
-│   └── implementacion/              # Tablero de progreso y guía de sustentación (VJ-06)
-└── test/                            # Suite de 138 pruebas automatizadas (unitarias, widgets y E2E)
+│       ├── onboarding/              # Selección de perfil inicial (M02: visitor, settler, resident)
+│       ├── prices/                  # Semáforo por zonas (M06/M07/M20), mapa (M08) y aporte en 4 pasos (M10)
+│       ├── profile/                 # Perfil, cambio de idioma en vivo, cierre y baja de cuenta (M17)
+│       ├── scan/                    # Contenedor segmentado Precios vs. Contratos (M06)
+│       └── splash/                  # Arranque con redirección reactiva por sesión (VJ-09a)
+├── supabase/
+│   ├── config.toml                  # Configuración del entorno Supabase CLI
+│   ├── functions/
+│   │   └── analyze_contract/        # Edge Function Deno + cliente Gemini + suite de pruebas
+│   ├── migrations/                  # 14 migraciones SQL idempotentes (0001 a 20261108220000)
+│   ├── seed/                        # 10 archivos de semillas verificadas (geografía, zonas, precios, cultura, comercios)
+│   └── tests/                       # 9 suites de pruebas automatizadas pgTAP (RLS, semáforo, cuotas, seguridad)
+├── docs/                            # Documentación técnica, operativa y de sustentación
+│   ├── arquitectura.md              # Arquitectura de 3 capas, diagrama integral y decisiones de diseño
+│   ├── contrato-datos-v1.md         # Contrato formal de tablas, RLS, RPCs y Edge Function
+│   ├── decisiones.md                # Registro de decisiones arquitectónicas (ADRs D1–D15)
+│   ├── fuentes-y-licencias.md       # Atribución institucional y licencias de contenido
+│   ├── guia-demo.md                 # Guion de sustentación de 7 minutos + Plan B sin internet
+│   ├── manual-usuario.md            # Manual de usuario completo (precios, contratos, negocios, cuenta)
+│   ├── modelo-er.puml               # Diagrama Entidad-Relación v1.2 en PlantUML (16 tablas)
+│   ├── release-android.md           # Protocolo de firma release Android, SHA-1/256, OAuth y rollback
+│   ├── seguridad-privacidad.md      # Políticas RN-10, Ley 1581, matriz de amenazas y control de costos
+│   ├── backend/
+│   │   └── guia-respaldo-restauracion.md # Procedimiento de backup y restauración del backend
+│   ├── implementacion/
+│   │   ├── progreso-mvp.md          # Tablero VJ-00..VJ-21, estado de Gates G0-G6 y dictamen Go/No-Go
+│   │   └── walkthrough-primer-avance.md  # Evidencia histórica del cierre del Primer Avance (VJ-06)
+│   └── pruebas/
+│       └── matriz-rf-casos.md       # Matriz de trazabilidad RF/RNF/RN -> pruebas SQL/Deno/Flutter
+└── test/                            # Suite de pruebas automatizadas Flutter (unitarias, widgets y E2E)
 ```
 
 ---
 
-## 4. Requisitos y Configuración del Entorno
+## 4. Puesta en Marcha Reproducible en Windows
 
-### Requisitos Previos
-1. **Dart SDK:** Restricción declarada en `pubspec.yaml` como `sdk: ^3.13.5` (entorno exacto `dart: ">=3.13.5 <4.0.0"` registrado en `pubspec.lock`).
-2. **Flutter SDK (Línea base reproducible):** **Flutter 3.47.7 (canal `stable`)**.  
-   *Nota de compatibilidad oficial:* La versión histórica Flutter 3.13 (2023) incluía Dart 3.1 y no satisface la restricción del proyecto. De acuerdo con el archivo oficial de versiones del SDK de Flutter y el bloqueo en `pubspec.lock` (`sdks: flutter: ">=3.47.0"`), Dart 3.13.5 es empaquetado por la serie estable Flutter 3.47.x (Flutter 3.47.6 / 3.47.7). Esta versión queda fijada para desarrollo local y pipelines de GitHub Actions (`subosito/flutter-action@v2` con `flutter-version: '3.47.7'`).
-3. **Compatibilidad de dependencias:** Todas las dependencias directas del proyecto en `pubspec.lock` (`flutter_riverpod: 3.4.3`, `go_router: 18.1.1`, `easy_localization: 3.0.8` y `flutter_lints: 6.0.0`) son plenamente compatibles con Flutter 3.47.7 y Dart 3.13.5.
-4. **Android SDK & Build Tools:** JDK 17, Android SDK Command-line Tools y herramientas de plataforma (`adb`).
-5. **Editor recomendado:** VS Code con extensiones oficiales de Flutter y Dart.
+### 4.1 Requisitos Previos
+1. **Flutter SDK:** `3.47.7` (canal `stable`, con **Dart `3.13.5`** incluido).
+2. **Java & Android SDK:** JDK `17`, Android SDK Command-line Tools y `adb`.
+3. **Supabase CLI:** `>= 2.100.0` (requiere Docker Desktop para ejecución local con `supabase start`, o vínculo directo al proyecto remoto con `supabase link`).
+4. **Deno (opcional para pruebas locales de Edge Functions):** `>= 1.45`.
 
-### Puesta en Marcha Local
+### 4.2 Clonar e Instalar Dependencias
 ```powershell
-# 1. Clonar repositorio
 git clone https://github.com/j4gg-0531/via-justa.git
 cd via-justa
-
-# 2. Descargar dependencias
 flutter pub get
+```
 
-# 3. Análisis estático y pruebas (incluye recorrido E2E del Primer Avance)
-flutter analyze
-flutter test
-
-# 4. Ejecución en emulador o dispositivo físico Android
+### 4.3 Ejecución en Modo DEMO (Sin Credenciales de Red)
+Si ejecutas la aplicación sin banderas `--dart-define`, el bootstrap activa automáticamente los repositorios de demostración rotulados con `[DEMO]`:
+```powershell
 flutter run -d <device-id>
 ```
 
----
+### 4.4 Ejecución Conectada a Supabase (Sin Secretos en el Repositorio)
+Las credenciales públicas se inyectan exclusivamente en tiempo de compilación mediante `--dart-define` (nunca uses `service_role` ni `GEMINI_API_KEY` en el cliente móvil):
+```powershell
+flutter run -d <device-id> `
+  --dart-define=SUPABASE_URL=https://vjehsjqmwibmiqmxlsou.supabase.co `
+  --dart-define=SUPABASE_ANON_KEY=<TU_SUPABASE_ANON_KEY> `
+  --dart-define=GOOGLE_MAPS_API_KEY=<TU_GOOGLE_MAPS_API_KEY_RESTRINGIDA>
+```
 
-## 5. Pruebas y Control de Calidad
-
-El proyecto mantiene una estricta separación de responsabilidades:
-- **Regla innegociable:** Prohibida la lógica de negocio en las vistas (`presentation/pages` y `presentation/widgets`).
-- **Verificación de higiene arquitectónica:**
-  ```powershell
-  Get-ChildItem -Path "lib" -Recurse -Include *.dart | Where-Object { $_.FullName -match "\\presentation\\" -and $_.FullName -notmatch "\\presentation\\state\\" } | Select-String -Pattern 'normalizeForSearch|search[A-Z]\w*\(|\.where\(|\.sort\(|firstWhere|jsonDecode|rootBundle|Timer|Future\.delayed' -CaseSensitive
-  ```
-- **Pruebas de internacionalización:** Se valida que cada clave en español tenga su contraparte idéntica en inglés mediante `test/translations_test.dart`.
-- **Recorrido E2E del Primer Avance:** `test/first_milestone_walkthrough_test.dart` verifica automáticamente el flujo completo de sustentación (`M01` → `M02` → `M03` → `M13` → `M15`/`M14` → Shell de 5 pestañas → `M06`/`M07`/`M20` → `M10` → `M17` → `signOut`).
+Para compilar el APK de entrega en modo `--release`, sigue paso a paso el protocolo en [`docs/release-android.md`](docs/release-android.md).
 
 ---
 
-## 6. Estado Actual del Producto (Cierre del Primer Avance — `VJ-06`)
+## 5. Comandos de Base de Datos y Pruebas Automatizadas
 
-El avance actual corresponde al **Primer Avance completo y navegable con datos de ejemplo locales** (`DEMO`):
-- Incluye el flujo completo de entrada, onboarding de 3 perfiles, mapa departamental, selector de 25 municipios del Cesar, shell de 5 pestañas, mapa local de precios y servicios (`M08`), motor estadístico del semáforo por zonas del municipio con autodetección por permiso GPS o selección manual en mapa (`M06`, `M07`, `M20`), asistente en 4 pasos para aportar precios (`M10`), resumen educativo de contratos (`RN-10`), directorio de negocios (`M21`) y cambio de idioma en vivo (`es` / `en`).
-- Consulta [`docs/implementacion/walkthrough-primer-avance.md`](docs/implementacion/walkthrough-primer-avance.md) para el guion de sustentación de 7 minutos y la tabla de rutas del código por funcionalidad.
+### 5.1 Pruebas Estáticas y Suite Flutter
+```powershell
+flutter analyze
+flutter test
+```
+
+### 5.2 Verificación de Higiene Arquitectónica (Regla 5.2)
+Ningún archivo de vista (`lib/**/presentation/pages` o `widgets`) puede contener lógica de negocio, búsquedas, ordenamientos, JSON o timers:
+```powershell
+Get-ChildItem -Path "lib" -Recurse -Include *.dart | Where-Object { $_.FullName -match "\\presentation\\" -and $_.FullName -notmatch "\\presentation\\state\\" } | Select-String -Pattern 'normalizeForSearch|search[A-Z]\w*\(|\.where\(|\.sort\(|firstWhere|jsonDecode|rootBundle|Timer|Future\.delayed' -CaseSensitive
+```
+
+### 5.3 Migraciones, Semillas y Suite pgTAP (Supabase)
+```powershell
+# Verificar estado de las 14 migraciones frente a Supabase Cloud
+supabase migration list
+
+# Reiniciar base local (migraciones + semillas) y correr las 9 suites pgTAP (168 aserciones)
+supabase db reset
+supabase test db
+
+# Ejecutar pruebas unitarias y de contrato HTTP de la Edge Function analyze_contract
+deno test supabase/functions/analyze_contract/contract_analyzer_test.ts
+```
+
+---
+
+## 6. Documentación Clave del Repositorio
+
+- **Arquitectura y Modelo de Datos:** [`docs/arquitectura.md`](docs/arquitectura.md) | [`docs/contrato-datos-v1.md`](docs/contrato-datos-v1.md) | [`docs/modelo-er.puml`](docs/modelo-er.puml)
+- **Seguridad, Privacidad y Backups:** [`docs/seguridad-privacidad.md`](docs/seguridad-privacidad.md) | [`docs/backend/guia-respaldo-restauracion.md`](docs/backend/guia-respaldo-restauracion.md)
+- **Pruebas y Trazabilidad:** [`docs/pruebas/matriz-rf-casos.md`](docs/pruebas/matriz-rf-casos.md)
+- **Entrega Android, Manual y Sustentación:** [`docs/release-android.md`](docs/release-android.md) | [`docs/manual-usuario.md`](docs/manual-usuario.md) | [`docs/guia-demo.md`](docs/guia-demo.md)
+- **Estado del MVP y Dictamen Go/No-Go:** [`docs/implementacion/progreso-mvp.md`](docs/implementacion/progreso-mvp.md)
