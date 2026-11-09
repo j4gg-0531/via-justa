@@ -1,8 +1,8 @@
 # Contrato de Datos v1.0 — Vía Justa MVP
 
-> **Estado del documento:** RATIFICADO E IMPLEMENTADO EN MIGRACIONES (`0001` a `0007`, más extensiones incrementales `VJ-07`–`VJ-17`).
-> **Fecha:** 31 de octubre de 2026.
-> **Importante:** Este documento representa el acuerdo de interfaz formal entre Frontend (Flutter) y Backend (Supabase/PostgreSQL), sincronizado con las migraciones versionadas en `supabase/migrations/`.
+> **Estado del documento:** RATIFICADO E IMPLEMENTADO EN MIGRACIONES (`0001` a `0014`, incluyendo endurecimiento cruzado `VJ-18` y sincronización en Supabase Cloud `vjehsjqmwibmiqmxlsou`).
+> **Fecha:** 8 de noviembre de 2026.
+> **Importante:** Este documento representa el acuerdo de interfaz formal entre Frontend (Flutter) y Backend (Supabase/PostgreSQL 17), sincronizado con las 14 migraciones versionadas en `supabase/migrations/`.
 
 ---
 
@@ -179,34 +179,35 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
   | `source_note` | `VARCHAR(255)` | NULL | Fuente u observación (ej. "Factura local", "Observación en terminal") |
   | `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha y hora del reporte |
 
-> **Protocolo Transaccional de Supresión de Cuenta y Minimizacion de Datos (Habeas Data - Ley 1581 de 2012):**  
+> **Protocolo Transaccional de Supresión de Cuenta y Minimización de Datos en 5 Fases (Habeas Data - Ley 1581 de 2012, actualizado en `VJ-18`):**  
 > 
 > La desvinculación de la clave foránea mediante `ON DELETE SET NULL` sobre `price_reports.user_id` ocurre al suprimirse el usuario. Sin embargo, **si se elimina primero el registro en `auth.users`, los reportes quedan huérfanos con `user_id = NULL` y se vuelve imposible identificar cuáles pertenecían a ese usuario para depurar información contextual o privada**.
 >
-> Por tanto, el protocolo de eliminación **debe ejecutarse en orden estricto antes de la baja del usuario**, mediante una operación de backend segura y transaccional (`public.delete_my_account()`):
+> Por tanto, el protocolo de eliminación **se ejecuta en orden estricto de 5 fases dentro de una única transacción** mediante `public.delete_my_account()` (`20261108220000_security_reliability_cross_hardening.sql`):
 > 
-> 1. **Fase 1: Pre-supresión y depuración contextual (Antes de eliminar la cuenta):**
->    - Se valida que el llamador autenticado coincida con el usuario objetivo (`auth.uid() = p_user_id`).
->    - Dentro de una transacción atómica de base de datos:
->      - **Depuración de texto libre e identificadores:** Se vacían `source_note = NULL` y `place_name = NULL` (`UPDATE price_reports SET source_note = NULL, place_name = NULL WHERE user_id = p_user_id;`), erradicando nombres comerciales atípicos, referencias domiciliarias o comentarios con PII.
->      - **Saneamiento espacial:** Si el reporte contiene coordenadas GPS de alta precisión (`location`) asociadas a domicilios privados o rutas personales, se disocian fijándolas en `NULL` (`UPDATE price_reports SET location = NULL WHERE user_id = p_user_id;`), conservando únicamente `municipality_code`, `zone_id` y `category_id` (macro-zona del municipio sin coordenadas exactas).
->      - **Eliminación de registros personales directos:** Se suprimen los registros en `consents` y solicitudes en `interest_registrations`.
-> 2. **Fase 2: Supresión del usuario en `auth.users`:**
->    - Una vez saneados los datos contextuales, se elimina el registro en `auth.users`.
->    - Esta baja elimina en cascada `public.profiles` (`ON DELETE CASCADE`) y activa `ON DELETE SET NULL` sobre `price_reports.user_id`, desvinculando la clave foránea del registro numérico previamente saneado.
+> 1. **Fase 1 — Saneamiento de reportes de precios (`public.price_reports`):**
+>    - Se vacían `source_note = NULL`, `place_name = NULL` y `location = NULL` (`UPDATE public.price_reports SET source_note = NULL, place_name = NULL, location = NULL WHERE user_id = v_uid;`), conservando únicamente la muestra numérica agregada (`amount_cop`, `category_id`, `municipality_code`, `zone_id`).
+> 2. **Fase 2 — Desvinculación de trazas de moderación (`public.businesses.reviewed_by`):**
+>    - Si la cuenta tenía rol administrativo, se limpia `reviewed_by = NULL` en `public.businesses`.
+> 3. **Fase 3 — Eliminación de comercios propios y detección de archivos huérfanos:**
+>    - Se eliminan explícitamente los negocios de `owner_id = v_uid` (`DELETE FROM public.businesses WHERE owner_id = v_uid;`), lo que elimina en cascada `public.business_photos` y `public.business_dishes` y marca inmediatamente cualquier imagen previa en `storage.objects` como `'business_deleted'` en `public.list_orphan_business_media()`.
+> 4. **Fase 4 — Eliminación de registros personales directos:**
+>    - Se suprimen explícitamente las filas del usuario en `public.ai_usage`, `public.consents`, `public.interest_registrations` y `public.admin_users`.
+> 5. **Fase 5 — Supresión definitiva en `auth.users`:**
+>    - Se ejecuta `DELETE FROM auth.users WHERE id = v_uid`, disparando `ON DELETE CASCADE` sobre `public.profiles` y `ON DELETE SET NULL` sobre `public.price_reports.user_id`.
 - **Índices obligatorios:**
   - `CREATE INDEX idx_price_reports_stat ON price_reports(municipality_code, zone_id, category_id, created_at) WHERE is_hidden = false AND is_demo = false;`
   - `CREATE INDEX idx_price_reports_location ON price_reports USING GIST(location);`
   - `CREATE INDEX idx_price_reports_user ON price_reports(user_id);`
   - `CREATE INDEX price_reports_user_recent_idx ON price_reports(user_id, created_at DESC);`
-- **Políticas RLS, Reglas de Cuota y RPCs en Servidor (`VJ-11`):**
+- **Políticas RLS, Reglas de Cuota y RPCs en Servidor (`VJ-11` y `VJ-18`):**
   - `SELECT`: Visible para todos si `is_hidden = false` y `is_demo = false`; el autor ve sus propios reportes.
   - `INSERT`: Usuarios autenticados (`auth.uid() = user_id`), protegido por el trigger `public.enforce_price_report_submission_rules()` y la RPC `public.submit_price_report(...)`:
-    - **Rango de monto y texto:** `amount_cop` entre `$500` y `$20.000.000 COP`; `place_name` limpio hasta 120 caracteres; `source_note` limpio hasta 255 caracteres.
+    - **Rango de monto y sanitización de texto:** `amount_cop` entre `$500` y `$20.000.000 COP`; eliminación de etiquetas HTML (`<[^>]*>`) en `place_name` (máx. 120 caracteres) y `source_note` (máx. 255 caracteres).
     - **Vigencia de catálogos:** Exige categoría con `is_active = true` (`[PRICE_CATEGORY_INACTIVE]`), municipio con `is_pilot = true` (`[PRICE_MUNICIPALITY_NOT_PILOT]`) y zona activa del municipio (`[PRICE_ZONE_INACTIVE]`).
     - **Privacidad geoespacial automática:** Toda coordenada `location` se redondea en servidor a 3 decimales ($\approx 110\text{ m}$ de resolución urbana), impidiendo persistir ubicaciones exactas de domicilios.
     - **Concurrencia, deduplicación y cuota diaria:** Serializa envíos concurrentes por usuario mediante `pg_advisory_xact_lock`, bloquea reportes idénticos dentro de `duplicate_cooldown_minutes` (`15 min`, error `[PRICE_DUPLICATE_REPORT]`) y limita a `daily_report_limit_per_user` (`10` aportes reales cada 24 horas móviles, error `[PRICE_RATE_LIMITED]`).
-  - `UPDATE` / `DELETE`: Solo el autor sobre sus reportes recientes (`< 24 horas`) sin alterar metadatos ni banderas, o moderación administrativa mediante `public.moderate_price_report(p_report_id, p_is_hidden, p_reason)`.
+  - `UPDATE` / `DELETE`: Solo el autor sobre sus reportes recientes (`< 24 horas`) sin alterar metadatos ni banderas, o moderación administrativa mediante `public.moderate_price_report(p_report_id, p_is_hidden, p_reason)` con bloqueo de automoderación (`[MODERATION_SELF_REVIEW]`).
 
 ---
 
