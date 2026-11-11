@@ -25,6 +25,8 @@ migrate_working_dir/
 key.properties
 *.jks
 *.keystore
+supabase/.temp/
+supabase/.branches/
 
 # Tooling and local indexes
 .codegraph/

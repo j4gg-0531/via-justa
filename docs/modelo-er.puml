@@ -9,13 +9,14 @@ skinparam class {
     BorderColor #475569
 }
 
-title Vía Justa MVP — Modelo Entidad-Relación v1.1 (Conciliado con feature/supabase-init y medianas zonales)
+title Vía Justa MVP — Modelo Entidad-Relación Final v1.2 (Sincronizado con Migraciones VJ-07 a VJ-18)
 
 package "Autenticación y Autorización (Supabase Auth)" {
     entity "auth.users" as auth_users {
         * id : UUID <<PK>>
         --
         email : VARCHAR
+        raw_user_meta_data : JSONB
         created_at : TIMESTAMPTZ
     }
 
@@ -26,15 +27,15 @@ package "Autenticación y Autorización (Supabase Auth)" {
     }
 }
 
-package "Núcleo de Usuarios y Consentimiento" {
+package "Núcleo de Usuarios y Consentimiento (Ley 1581)" {
     entity "profiles" as profiles {
         * id : UUID <<PK, FK>>
         --
         display_name : TEXT
-        profile_type : TEXT (visitor | settler | resident - D11)
+        profile_type : TEXT [visitor | settler | resident]
         origin_country : TEXT
         current_municipality_code : TEXT <<FK>>
-        language : TEXT (DEFAULT 'es')
+        language : TEXT [es | en]
         created_at : TIMESTAMPTZ
         updated_at : TIMESTAMPTZ
     }
@@ -43,35 +44,39 @@ package "Núcleo de Usuarios y Consentimiento" {
         * id : UUID <<PK>>
         --
         user_id : UUID <<FK>>
-        doc_type : TEXT
-        version : TEXT
+        doc_type : VARCHAR(50) [terms_and_conditions | privacy_policy]
+        version : VARCHAR(20)
         accepted_at : TIMESTAMPTZ
     }
 }
 
-package "División Político-Administrativa (DANE) y Zonas" {
+package "División Político-Administrativa (DANE DIVIPOLA) y Zonas" {
     entity "departments" as departments {
-        * code : TEXT (regex ^[0-9]{2}$) <<PK>>
+        * code : VARCHAR(2) <<PK>>
         --
-        name : TEXT
+        name : VARCHAR(100)
     }
 
     entity "municipalities" as municipalities {
-        * code : TEXT (regex ^[0-9]{5}$) <<PK>>
+        * code : VARCHAR(5) <<PK>>
         --
-        department_code : TEXT <<FK>>
-        name : TEXT
+        department_code : VARCHAR(2) <<FK>>
+        name : VARCHAR(100)
         is_pilot : BOOLEAN
     }
 
     entity "municipality_zones" as municipality_zones {
         * id : VARCHAR(50) <<PK>>
         --
-        municipality_code : TEXT <<FK>>
+        municipality_code : VARCHAR(5) <<FK>>
         name_es : VARCHAR(100)
         name_en : VARCHAR(100)
         sector_hint_es : VARCHAR(150)
         sector_hint_en : VARCHAR(150)
+        normalized_x : DOUBLE PRECISION
+        normalized_y : DOUBLE PRECISION
+        center_lat : DOUBLE PRECISION
+        center_lng : DOUBLE PRECISION
         sort_order : INTEGER
         is_active : BOOLEAN
     }
@@ -80,22 +85,35 @@ package "División Político-Administrativa (DANE) y Zonas" {
         * id : UUID <<PK>>
         --
         user_id : UUID <<FK>>
-        municipality_code : TEXT <<FK>>
+        municipality_code : VARCHAR(5) <<FK>>
         created_at : TIMESTAMPTZ
     }
 }
 
-package "Motor de Precios y Semáforo Estadístico por Zona" {
+package "Motor de Precios, Semáforo Estadístico y Eventos" {
     entity "price_categories" as price_categories {
         * id : VARCHAR(50) <<PK>>
         --
-        group_key : VARCHAR(50)
+        group_key : VARCHAR(50) [food | transport | lodging | services]
         name_es : VARCHAR(100)
         name_en : VARCHAR(100)
         unit_description_es : VARCHAR(100)
         unit_description_en : VARCHAR(100)
         sort_order : INTEGER
         is_active : BOOLEAN
+    }
+
+    entity "official_tariffs" as official_tariffs {
+        * id : UUID <<PK>>
+        --
+        municipality_code : VARCHAR(5) <<FK>>
+        category_id : VARCHAR(50) <<FK>>
+        amount_cop : INTEGER
+        source_title : VARCHAR(200)
+        source_url : TEXT
+        valid_from : DATE
+        valid_until : DATE
+        is_verified : BOOLEAN
     }
 
     entity "price_reports" as price_reports {
@@ -105,8 +123,8 @@ package "Motor de Precios y Semáforo Estadístico por Zona" {
         category_id : VARCHAR(50) <<FK>>
         municipality_code : TEXT <<FK>>
         zone_id : VARCHAR(50) <<FK>>
-        amount_cop : INTEGER
-        location : GEOGRAPHY(Point, 4326)
+        amount_cop : INTEGER [500..20000000]
+        location : GEOGRAPHY(Point, 4326) (Redondeado 3 dec ~110m)
         place_name : VARCHAR(150)
         is_seed : BOOLEAN
         is_demo : BOOLEAN
@@ -118,8 +136,12 @@ package "Motor de Precios y Semáforo Estadístico por Zona" {
     entity "events" as events {
         * id : UUID <<PK>>
         --
-        municipality_code : TEXT <<FK>>
+        municipality_code : VARCHAR(5) <<FK>>
         name : VARCHAR(150)
+        description_es : TEXT
+        description_en : TEXT
+        venue : VARCHAR(150)
+        source_citation : VARCHAR(255)
         starts_at : TIMESTAMPTZ
         ends_at : TIMESTAMPTZ
         is_demo : BOOLEAN
@@ -138,69 +160,84 @@ package "Análisis de Contratos con IA (Gemini)" {
         * user_id : UUID <<PK, FK>>
         * day : DATE <<PK>>
         --
-        count : INTEGER
+        count : INTEGER (Tope diario America/Bogota)
     }
 }
 
-package "Comercios y Directorio Local" {
+package "Comercios, Multimedia Privada y Cultura de Ciudad" {
     entity "businesses" as businesses {
         * id : UUID <<PK>>
         --
-        owner_id : UUID <<FK>>
-        municipality_code : TEXT <<FK>>
-        type : VARCHAR(50)
+        owner_id : UUID <<FK, NULL>> (ON DELETE CASCADE)
+        municipality_code : VARCHAR(5) <<FK>>
+        type : VARCHAR(50) [restaurant|hotel|service|handicraft|transport|hospital|consulate]
         name : VARCHAR(150)
         description_es : TEXT
         description_en : TEXT
+        address : VARCHAR(200)
         location : GEOGRAPHY(Point, 4326)
         place_id : VARCHAR(150)
         phone : VARCHAR(20)
         whatsapp : VARCHAR(20)
         whatsapp_consent_at : TIMESTAMPTZ
-        order_url : TEXT
+        publication_consent_at : TIMESTAMPTZ
+        client_request_id : UUID
+        order_url : TEXT (https://)
         hours : JSONB
-        status : TEXT [pending|approved|rejected]
+        status : TEXT [pending | approved | rejected]
         rejection_reason : TEXT
+        reviewed_at : TIMESTAMPTZ
+        reviewed_by : UUID <<FK, NULL>> (ON DELETE SET NULL)
+        is_demo : BOOLEAN
         created_at : TIMESTAMPTZ
+        updated_at : TIMESTAMPTZ
     }
 
     entity "business_photos" as business_photos {
         * id : UUID <<PK>>
         --
-        business_id : UUID <<FK>>
-        storage_path : TEXT
-        position : INTEGER
+        business_id : UUID <<FK>> (ON DELETE CASCADE)
+        storage_path : TEXT <<UNIQUE>> ({owner_id}/{business_id}/...)
+        position : INTEGER [0..4]
         is_cover : BOOLEAN
+        mime_type : TEXT [image/jpeg | image/png | image/webp]
+        size_bytes : BIGINT [<= 5 MiB]
+        created_at : TIMESTAMPTZ
     }
 
     entity "business_dishes" as business_dishes {
         * id : UUID <<PK>>
         --
-        business_id : UUID <<FK>>
+        business_id : UUID <<FK>> (ON DELETE CASCADE)
         name : VARCHAR(100)
-        price_cop : INTEGER
+        price_cop : INTEGER [500..20000000]
         description : TEXT
-        sort_order : INTEGER
+        sort_order : INTEGER [0..4]
     }
 
     entity "city_content" as city_content {
         * id : UUID <<PK>>
         --
-        municipality_code : TEXT <<FK>>
-        locale : VARCHAR(2)
-        section : VARCHAR(50)
+        municipality_code : VARCHAR(5) <<FK>>
+        slug : VARCHAR(80)
+        locale : VARCHAR(2) [es | en]
+        section : VARCHAR(50) [welcome|context|culture|places|gastronomy|emergency]
         title : VARCHAR(150)
         body : TEXT
         image_path : TEXT
+        image_license : VARCHAR(120)
         source_citation : VARCHAR(255)
+        source_url : TEXT
+        sort_order : INTEGER
+        is_demo : BOOLEAN
     }
 }
 
 ' Relaciones de Autenticación y Autorización
 auth_users ||--|| profiles : "1:1 hereda identidad"
-auth_users ||--o| admin_users : "1:0..1 rol de administración aislado"
+auth_users ||--o| admin_users : "1:0..1 rol admin aislado"
 auth_users ||--o{ consents : "1:N acepta"
-auth_users ||--o{ ai_usage : "1:N consume cuota diaria"
+auth_users ||--o{ ai_usage : "1:N consume cuota IA"
 auth_users ||--o{ interest_registrations : "1:N solicita apertura"
 
 ' Relaciones Geográficas y Zonales
@@ -209,18 +246,21 @@ municipalities ||--o{ municipality_zones : "1:N divide en zonas"
 municipalities ||--o{ profiles : "0..1:N residencia"
 municipalities ||--o{ price_reports : "1:N ubica"
 municipality_zones ||--o{ price_reports : "1:N segmenta mediana"
+municipalities ||--o{ official_tariffs : "1:N tarifa regulada"
+price_categories ||--o{ official_tariffs : "1:N categoría"
 municipalities ||--o{ events : "1:N celebra"
 municipalities ||--o{ businesses : "1:N localiza"
 municipalities ||--o{ city_content : "1:N divulga cultura"
 municipalities ||--o{ interest_registrations : "1:N recibe interés"
 
 ' Relaciones de Precios
-auth_users ||--o{ price_reports : "1:N reporta (anónimo si cuenta se elimina)"
+auth_users ||--o{ price_reports : "1:N reporta (SET NULL y sanea PII al borrar cuenta)"
 price_categories ||--o{ price_reports : "1:N clasifica"
 
 ' Relaciones de Negocios
-auth_users ||--o{ businesses : "1:N registra/propietario"
-businesses ||--o{ business_photos : "1:N (máx 5 fotos)"
+auth_users ||--o{ businesses : "1:N propietario (owner_id)"
+auth_users ||--o{ businesses : "0..1:N modera (reviewed_by)"
+businesses ||--o{ business_photos : "1:N (máx 5 fotos en bucket privado)"
 businesses ||--o{ business_dishes : "1:N (máx 5 platos)"
 
 @enduml
