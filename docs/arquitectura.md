@@ -1,8 +1,54 @@
-# Arquitectura del Sistema — Vía Justa MVP
+# Arquitectura del Sistema — Vía Justa MVP (`VJ-21`)
 
-## 1. Principios de Arquitectura
+## 1. Visión de Extremo a Extremo (End-to-End Architecture)
 
-El proyecto adopta una arquitectura en capas limpias y ligeras (adaptación de Clean / Hexagonal Architecture para Flutter), con flujo de dependencias unidireccional hacia el dominio:
+El sistema **Vía Justa MVP** combina una aplicación móvil Android en **Flutter** estructurada en 3 capas limpias (`Presentation` → `Domain` ← `Data`) con un backend transaccional en **Supabase** (**PostgreSQL 17**, **PostGIS**, **Supabase Auth**, **Row Level Security**, **Supabase Storage** y **Edge Functions** en Deno) e integraciones desacopladas con **Google Gemini**, **Google Maps SDK for Android** y **Google ML Kit OCR (On-Device)**.
+
+```mermaid
+flowchart TB
+  subgraph Android["Teléfono Android (Cliente Móvil Flutter)"]
+    UI["Presentation Layer\n(Pages, Widgets, GoRouter, EasyLocalization)"]
+    STATE["Presentation State\n(Riverpod 3 Notifiers / FutureProviders)"]
+    DOM["Domain Layer (Dart Puro)\n(Entidades, Validadores, Contratos Repository)"]
+    DATA["Data Layer\n(Supabase Adapters / Demo Fixtures)"]
+    MLKIT["Google ML Kit Text Recognition\n(OCR 100% Local On-Device)"]
+    MAPS_SDK["Google Maps SDK for Android\n(Renderizado de Tiles y Marcadores)"]
+
+    UI --> STATE
+    STATE --> DOM
+    DATA -. "implementa" .-> DOM
+    DATA --> MLKIT
+    UI --> MAPS_SDK
+  end
+
+  subgraph Supabase["Supabase Cloud (vjehsjqmwibmiqmxlsou)"]
+    AUTH["Supabase Auth\n(JWT, Email/Password, OAuth)"]
+    PG["PostgreSQL 17 + PostGIS\n(16 Tablas con RLS + Triggers + GRANTs por columna)"]
+    RPC["Funciones RPC SQL\n(calculate_price_verdict, submit_price_report,\nget_municipality_map_items, get_city_overview,\nsubmit_business, get_business_catalog, delete_my_account)"]
+    STORAGE["Supabase Storage\n(Bucket privado business-media, 5 MiB, JPEG/PNG/WebP)"]
+    EDGE["Edge Function: analyze_contract\n(Deno + Verificación JWT + Reserva de Cuota Atómica)"]
+
+    PG <--> RPC
+    PG <--> STORAGE
+    EDGE --> PG
+  end
+
+  subgraph External["Servicios Externos"]
+    GEMINI["Google Gemini API\n(responseSchema JSON estructurado)"]
+    WA["Acciones Externas del Sistema\n(wa.me, tel:, Google Maps Directions, HTTPS Order)"]
+  end
+
+  DATA -- "HTTPS + anon_key + User JWT" --> AUTH
+  DATA -- "PostgREST / RPC" --> RPC
+  DATA -- "Storage API" --> STORAGE
+  DATA -- "POST /functions/v1/analyze_contract" --> EDGE
+  EDGE -- "GEMINI_API_KEY (Solo Servidor)" --> GEMINI
+  UI -- "url_launcher (Con validación previa)" --> WA
+```
+
+---
+
+## 2. Principios de Capas en el Cliente Móvil
 
 ```text
        ┌────────────────────────┐
@@ -19,110 +65,61 @@ El proyecto adopta una arquitectura en capas limpias y ligeras (adaptación de C
        └────────────────────────┘
 ```
 
-### Reglas Innegociables de Dependencia
-1. **Presentation -> Domain:** Las pantallas y widgets solo conocen entidades, casos de uso/funciones puras e interfaces de repositorios. NUNCA importan la capa `data/`.
-2. **Domain es Dart puro:** No contiene dependencias de Flutter (`BuildContext`, `Widget`), ni de librerías externas de persistencia o red (`supabase_flutter`, `http`). Es 100% testeable con pruebas unitarias rápidas.
-3. **Data -> Domain:** Las implementaciones concretas de acceso a datos implementan las interfaces del dominio y transforman estructuras de transporte (JSON, tablas SQL) a entidades de negocio.
+### Reglas Innegociables de Dependencia (`AGENTS.md`)
+1. **`Presentation -> Domain`:** Las pantallas y widgets solo conocen entidades, casos de uso/funciones puras e interfaces de repositorios. **Jamás importan la capa `data/` ni llaman directamente a `SupabaseClient`.**
+2. **`Domain` es Dart puro:** No contiene dependencias de Flutter (`BuildContext`, `Widget`), ni de librerías externas de persistencia o red (`supabase_flutter`, `http`, `google_maps_flutter`). Es 100 % verificable con pruebas unitarias rápidas.
+3. **`Data -> Domain`:** Las implementaciones concretas (`Supabase*Repository` y `Demo*Repository` / `Local*Repository`) implementan las interfaces del dominio y transforman estructuras de transporte (JSONB, filas PostgREST) a entidades inmutables de negocio.
+4. **Conmutación explícita `DEMO` vs. `REAL`:** Cada módulo inyecta su repositorio a través de un `Provider` de Riverpod. Nunca se hace *fallback* silencioso de un fallo de red real a un precio falso sin rotularlo explícitamente como `DEMO`.
 
 ---
 
-## 2. Gestión de Estado con Riverpod 3
+## 3. Decisiones Arquitectónicas Centrales (Preguntas de Sustentación `VJ-21`)
 
-El estado de la aplicación se orquesta con **Riverpod 3** siguiendo convenciones estrictas:
-- **`Notifier` / `NotifierProvider`:** Para estado mutable controlado y formularios (e.g. `LoginFormNotifier`, `ProfileTypeNotifier`).
-- **`FutureProvider` / `FutureProvider.family`:** Para operaciones asíncronas de lectura de datos (e.g. `municipalitiesByDepartmentProvider`).
-- **`Provider`:** Para inyección de dependencias (repositorios abstractos, combinadores de providers y configuración).
-- **`.autoDispose`:** Obligatorio en pantallas y formularios efímeros para evitar fugas de memoria o persistencia accidental de estados previos.
-- **Prohibición expresa:** No se utilizan `StateProvider`, `StateNotifierProvider` ni `ChangeNotifierProvider`.
+### 3.1 ¿Dónde vive la regla estadística del semáforo de precios y por qué la IA NUNCA calcula el semáforo?
+- **Ubicación de la única fuente de verdad:** La regla estadística oficial reside en PostgreSQL dentro de la función RPC [`public.calculate_price_verdict`](file:///D:/Proyectos%20Movil/Proyecto%20de%20aula/via-justa/supabase/migrations/20261029130000_price_verdict_rpc.sql) (y su alias `public.evaluate_price_verdict`), respaldada en modo desconectado/DEMO por la función pura [`evaluatePriceSample`](file:///D:/Proyectos%20Movil/Proyecto%20de%20aula/via-justa/lib/features/prices/domain/price_verdict.dart).
+- **Fórmula determinista:**
+  1. Filtra reportes reales (`is_demo = false`, `is_hidden = false`) de la misma categoría (`category_id`), municipio (`municipality_code`) y zona urbana (`zone_id`) dentro de la ventana móvil de **60 días**.
+  2. Exige una muestra mínima de **$N \ge 3$ reportes**. Si $N < 3$, retorna `level = 'insufficient'` sin emitir colores ni juicios engañosos.
+  3. Calcula la **mediana exacta** con `percentile_cont(0.5) WITHIN GROUP (ORDER BY amount_cop)` en precisión `numeric` (nunca promedios aritméticos simples que se distorsionan con un solo valor extremo).
+  4. Si hay un **evento activo verificado** en el municipio (`public.events`) con $N \ge 3$ reportes dentro de las fechas del evento, prioriza la mediana del evento (`event_reference_cop`) y entrega ambas referencias para contraste transparente.
+  5. Evalúa la desviación porcentual exacta **sin redondear antes de comparar**:
+     - $\text{desv} \le +15.0000\% \rightarrow \text{Verde (`green`)}$ (con `underpriced_alert = true` si $\text{desv} < -40.0000\%$).
+     - $+15.0000\% < \text{desv} \le +40.0000\% \rightarrow \text{Ámbar (`yellow`)}$.
+     - $\text{desv} > +40.0000\% \rightarrow \text{Rojo (`red`)}$.
+     - Tope sugerido: $\text{round}(\text{mediana} \times 1.15)$.
+- **Por qué la IA (Gemini) NO calcula el semáforo de precios:**
+  1. **Determinismo y auditabilidad:** Un ciudadano que consulta si una carrera de taxi o un almuerzo corriente en Valledupar tiene un cobro justo necesita un cálculo matemático reproducible al centavo sobre datos comunitarios reales, no una estimación generativa que varía según la temperatura del modelo.
+  2. **Riesgo de alucinación numérica:** Los modelos de lenguaje (LLMs) no conocen en tiempo real las tarifas barriales de Valledupar ni pueden auditar su muestra; usar IA para precios inventaría cifras sin sustento empírico.
+  3. **Costo y latencia:** Una consulta agregada en PostgreSQL con índice parcial (`price_reports_stat_idx`) responde en milisegundos sin costo por token. La IA se reserva **exclusivamente** para el análisis pedagógico de cláusulas de contratos (`analyze_contract`), donde la interpretación de lenguaje natural jurídico sí es pertinente y está acotada con `responseSchema`.
 
----
-
-## 3. Enrutamiento y Navegación con GoRouter
-
-Todas las rutas del aplicativo se definen y administran de forma centralizada en [`lib/core/router/app_router.dart`](../lib/core/router/app_router.dart):
-- **`AppRoutes`:** Constantes de rutas y métodos auxiliares para paths parametrizados (`municipalityPath(code)`).
-- **Estrategia de Navegación:**
-  - `context.go`: Se reserva exclusivamente para cambios de raíz donde no debe existir retorno en el stack (e.g. desde splash al flujo inicial, o logout hacia `/welcome`).
-  - `context.push`: Para navegación jerárquica o drill-down donde el usuario puede regresar libremente.
-- **Transición a ShellRoute (VJ-03):** La barra inferior fija de 5 pestañas (`Inicio`, `Mapa`, `Escanear`, `Negocios`, `Perfil`) se implementará mediante una estructura `ShellRoute` en la tarea VJ-03.
-
----
-
-## 4. Patrón Repositorio y Fuentes de Datos Intercambiables
-
-Para cumplir con el principio de no acoplar la interfaz al backend:
-1. La interfaz vive en `domain/` (ej. `MunicipalityRepository`).
-2. La implementación inicial de demostración vive en `data/` (ej. `LocalMunicipalityRepository`).
-3. El provider `municipalityRepositoryProvider` es el **único** punto de enlace.
-4. Cuando se conecte Supabase en VJ-07/VJ-09, se sustituirá la instancia retornada por el provider por `SupabaseMunicipalityRepository` sin modificar una sola línea de código en las vistas.
-
----
-
-## 5. Internacionalización y Textos
-
-- Todo texto visible en interfaz se resuelve mediante `easy_localization` con el método `'clave'.tr()`.
-- Estructura de claves jerárquica: `modulo.seccion.elemento` (ej. `municipality.pilot_available`).
-- **Paridad estricta:** Toda clave debe existir en `assets/translations/es.json` y `assets/translations/en.json`.
-- El test automatizado `test/translations_test.dart` garantiza la paridad total de claves entre ambos idiomas.
-- Español (`es`) actúa como fallback general.
-- Los nombres propios y datos geográficos oficiales (ej. "Valledupar", "Cesar") se tratan como datos y no se traducen.
+### 3.2 ¿Dónde se validan los formularios y las reglas de negocio? (Doble Barrera)
+El sistema implementa validación en **dos barreras complementarias**:
+1. **Primera barrera — Dominio del Cliente (`lib/features/**/domain/`):**
+   - Validadores puros en Dart (`auth_validators.dart`, `price_contribution.dart`, `business_filter.dart`, etc.) que verifican formatos de correo, longitud de contraseña ($\ge 8$), rangos de montos en COP, presencia de categoría/zona y límite de 15.000 caracteres del contrato antes de realizar llamadas de red.
+   - Los widgets (`presentation/pages/`) solo muestran los errores tipados emitidos por el `Notifier` de Riverpod.
+2. **Segunda barrera (Autoritativa) — Base de Datos PostgreSQL y Edge Function:**
+   - **Precios (`VJ-11` / `VJ-18`):** El trigger [`public.enforce_price_report_submission_rules()`](file:///D:/Proyectos%20Movil/Proyecto%20de%20aula/via-justa/supabase/migrations/20261108220000_security_reliability_cross_hardening.sql) fuerza `user_id = auth.uid()`, limpia etiquetas HTML y caracteres de control, trunca coordenadas GPS a 3 decimales ($\approx 110\text{ m}$), verifica vigencia de categoría/municipio piloto/zona, bloquea duplicados en 15 minutos y aplica el tope de 10 aportes cada 24 horas con `pg_advisory_xact_lock`.
+   - **Negocios y Multimedia (`VJ-16` / `VJ-17`):** Los triggers [`private.enforce_business_rules()`](file:///D:/Proyectos%20Movil/Proyecto%20de%20aula/via-justa/supabase/migrations/20261031100000_business_registration_storage_and_moderation.sql) y `private.enforce_business_photo_rules()` fuerzan `owner_id = auth.uid()` y `status = 'pending'`, exigen consentimiento explícito de WhatsApp y de publicación, validan formato E.164, URL `https://`, horario JSON (`public.is_valid_business_hours`), comprueban en `storage.objects` el MIME real (`image/jpeg`, `image/png`, `image/webp`) y el tamaño ($\le 5\text{ MiB}$), y devuelven automáticamente cualquier negocio editado a `pending` para re-moderación.
+   - **Contratos con IA (`VJ-14`):** La Edge Function [`analyze_contract`](file:///D:/Proyectos%20Movil/Proyecto%20de%20aula/via-justa/supabase/functions/analyze_contract/index.ts) verifica el JWT de sesión, valida longitud (`20..15.000` chars), consume cuota diaria atómica (`consume_ai_daily_quota`, máx. 5/día en `America/Bogota`), encapsula el contrato en `<untrusted_contract_document>` y filtra referencias legales con `sanitizeLegalReference()`.
 
 ---
 
-## 6. Sistema de Diseño, Tokens y Accesibilidad
+## 4. Gestión de Estado con Riverpod 3 y Navegación con GoRouter
 
-- **Tokens centralizados:**
-  - Colores: [`lib/core/theme/app_colors.dart`](../lib/core/theme/app_colors.dart). Los colores verde, ámbar y rojo están reservados exclusivamente para el semáforo de justicia.
-  - Espaciados y Radios: [`lib/core/theme/app_spacing.dart`](../lib/core/theme/app_spacing.dart) (incluye `AppRadius`).
-  - Tema: [`lib/core/theme/app_theme.dart`](../lib/core/theme/app_theme.dart).
-- **Reglas de Accesibilidad y Responsividad:**
-  - Blanco táctil mínimo de 48x48 dp.
-  - Diseño adaptable sin desbordes a 360 dp de ancho y compatible con configuraciones de accesibilidad de escala de fuente aumentada.
-  - Semántica explícita (`Semantics` / `Tooltip`) en elementos interactivos complejos.
-  - El semáforo de precios nunca comunicará su estado únicamente por color: siempre combinará color, texto e icono.
+- **Riverpod 3:**
+  - `Notifier` / `NotifierProvider` para controladores de sesión y formularios (`AuthController`, `ContractCaptureNotifier`, etc.).
+  - `FutureProvider` / `FutureProvider.family` para lecturas asíncronas declarativas.
+  - Prohibición estricta de `StateProvider`, `StateNotifierProvider` y `ChangeNotifierProvider`.
+- **GoRouter ([`lib/core/router/app_router.dart`](file:///D:/Proyectos%20Movil/Proyecto%20de%20aula/via-justa/lib/core/router/app_router.dart)):**
+  - `StatefulShellRoute.indexedStack` administra las 5 pestañas principales persistentes: `Inicio` (`/home`), `Mapa` (`/map`), `Escanear` (`/scan`), `Negocios` (`/businesses`) y `Perfil` (`/profile`).
+  - `context.go` se utiliza en transiciones de raíz (como `logout` hacia `/welcome`) para vaciar la pila de navegación e impedir volver atrás a pantallas privadas.
 
 ---
 
-## 7. Control de Higiene y Prevención de Lógica en Vistas
+## 5. Control de Higiene Arquitectónica y Accesibilidad
 
-De acuerdo con la regla 5.2 de `AGENTS.md`, las vistas (`presentation/pages/` y `presentation/widgets/`) no pueden contener lógica de negocio, filtros, cálculos ni llamadas a repositorios.
-
-**Expresión regular de auditoría:**
-```regex
-normalizeForSearch|search[A-Z]\w*\(|\.where\(|\.sort\(|firstWhere|jsonDecode|rootBundle|Timer|Future\.delayed
-```
-Ningún widget debe coincidir con este patrón, excepto excepciones temporales explícitamente documentadas (e.g. animación o timer transitorio de splash).
-
----
-
-## 8. Gobierno de Cambios y Coordinación Frontend / Backend
-
-Para evitar divergencias entre el modelo en Flutter y las tablas en Supabase, toda modificación al modelo de datos sigue un ciclo riguroso de 7 pasos:
-
-```text
- 1. Proponer Cambio (Issue / RFC)
-        │
-        ▼
- 2. Actualizar Contrato de Datos (docs/contrato-datos-v1.md)
-        │
-        ▼
- 3. Evaluar Impacto en Flutter (Modelos, Repositorios, Providers)
-        │
-        ▼
- 4. Aprobación y Consenso del Equipo (Frontend + Backend)
-        │
-        ▼
- 5. Crear Migración Versionada (supabase/migrations/NNNN_nombre.sql)
-        │
-        ▼
- 6. Pruebas Locales (Test unitarios, pruebas RLS, seed local)
-        │
-        ▼
- 7. Integración Controlada mediante Pull Request a main
-```
-
-### Reglas del Procedimiento
-1. **Contract-First:** Ningún integrante escribe código de consumo ni migraciones en Supabase antes de que el cambio esté plasmado y aprobado en `docs/contrato-datos-v1.md`.
-2. **Prohibición de Cambios Manuales:** Queda terminantemente prohibido modificar tablas, columnas, RLS o funciones directamente desde la consola web de Supabase en producción. Todo cambio debe ser una migración SQL versionada e inmutable.
-3. **Compatibilidad Hacia Atrás:** Todo cambio de esquema debe prever migraciones no destructivas mientras el cliente móvil se actualiza.
-
+- **Cero lógica de negocio en vistas (`AGENTS.md §5.2`):** Ningún archivo dentro de `lib/**/presentation/` (fuera de `presentation/state/`) puede contener llamadas a `.where(`, `.sort(`, `firstWhere`, `jsonDecode`, `rootBundle`, `Timer` o `Future.delayed`. Esta regla se verifica automáticamente en el pipeline de GitHub Actions ([`.github/workflows/flutter-ci.yml`](file:///D:/Proyectos%20Movil/Proyecto%20de%20aula/via-justa/.github/workflows/flutter-ci.yml)).
+- **Accesibilidad WCAG AA:**
+  - Contraste mínimo de `4.5:1` en texto normal (`AppColors.textMuted` ajustado y verificado).
+  - Áreas táctiles mínimas de `48x48 dp`.
+  - El semáforo de precios y el de contratos **jamás comunican su estado solo por color**: combinan siempre **ícono + etiqueta textual traducida + color semántico**.
