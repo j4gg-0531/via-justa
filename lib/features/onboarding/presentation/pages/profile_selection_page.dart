@@ -40,24 +40,38 @@ class ProfileSelectionPage extends ConsumerWidget {
     final displayName = ref.watch(displayNameProvider);
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: AppSpacing.sm),
-              IconButton(
-                tooltip: 'common.back'.tr(),
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => context.pop(),
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.surface,
-                  foregroundColor: AppColors.textPrimary,
-                  minimumSize: const Size(48, 48),
+    void handleBack() {
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        ref.read(authControllerProvider.notifier).signOut();
+      }
+    }
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        handleBack();
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: AppSpacing.sm),
+                IconButton(
+                  tooltip: 'common.back'.tr(),
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: handleBack,
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.surface,
+                    foregroundColor: AppColors.textPrimary,
+                    minimumSize: const Size(48, 48),
+                  ),
                 ),
-              ),
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
@@ -113,13 +127,19 @@ class ProfileSelectionPage extends ConsumerWidget {
                 trailingIcon: Icons.arrow_forward,
                 onPressed: selected == null
                     ? null
-                    : () => context.push(AppRoutes.departmentMap),
+                    : () {
+                        ref
+                            .read(authControllerProvider.notifier)
+                            .persistProfileType(selected);
+                        context.push(AppRoutes.departmentMap);
+                      },
               ),
               const SizedBox(height: AppSpacing.xl),
             ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

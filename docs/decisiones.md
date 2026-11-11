@@ -170,6 +170,7 @@ Este documento formaliza el registro de decisiones técnicas y de producto para 
 - **Reglas críticas:**
   1. **Seguridad:** El perfil de usuario (`profile_type`) **NUNCA confiere privilegios administrativos**. La autorización administrativa no reside en `profiles` (se descarta la columna `role`) sino en la tabla independiente `public.admin_users` mediante la función `public.is_admin()`, preservando el principio de mínimo privilegio y separando el tipo de perfil de la autorización de administración.
   2. **Compatibilidad:** En la migración `20261029120000_close_vj07_vj08_d11_and_account_deletion.sql` se actualizó la restricción `profiles_profile_type_check` a `check (profile_type in ('visitor', 'settler', 'resident'))`, habilitando a nivel de base de datos la persistencia de los tres perfiles.
+  3. **Implementación Frontend (VJ-09b):** En `ProfileType.isPersistable` se habilitó `resident` para persistir junto con `visitor` y `settler` en `public.profiles.profile_type`. En `MunicipalityPage`, al presionar `Entrar a...`, se persiste `current_municipality_code` en `public.profiles.current_municipality_code`, permitiendo la hidratación completa de sesión y redirección directa a `/home` al reiniciar la aplicación sin repetir el onboarding ni la selección de municipio.
 
 ---
 
@@ -352,3 +353,18 @@ ative_pdf_renderer) o procesamiento en backend que aumentaría sustancialmente e
 - **Impacto Backend:** Ninguno.
 
 
+---
+
+## D24 · Cálculo en SQL de tarifa de taxi por rangos de distancia (0–2 km, 2–5 km, >5 km)
+- **Estado:** **ACORDADA**
+- **Responsable:** Ambos integrantes.
+- **Fecha de evidencia:** 8 de noviembre de 2026.
+- **Descripción:** Para la categoría `'transport_taxi_minimal'` (Taxi), la comparación comunitaria requiere conocer tanto el origen como el destino del trayecto. En lugar de calcular medianas por cada par de barrios o zonas individuales (lo cual fragmentaría la muestra y arrojaría casi siempre `insufficient` con $N < 3$), el cálculo de distancia en línea recta y la clasificación en rangos se ejecutan **exclusivamente en SQL** como fuente única de verdad:
+  1. **Selección precisa en mapa (`showMapPointPickerSheet`):** Reutilizando la integración de `google_maps_flutter`, `geolocator` y las coordenadas de centroides de `municipality_zones` (`VJ-12`), el usuario marca con precisión su punto de origen (o GPS actual) y su punto de destino sobre el mapa de Valledupar tanto al consultar el semáforo como al aportar un precio en `ContributePricePage`.
+  2. **Funciones deterministas en PostgreSQL / PostGIS (`20261101100000_taxi_distance_ranges_and_verdict.sql`):**
+     - `public.calculate_taxi_distance_km`: Calcula la distancia geodésica en línea recta (`ST_Distance`) entre las coordenadas de origen y destino (o entre los centroides de `zone_id` y `destination_zone_id` cuando no se envían coordenadas exactas).
+     - `public.classify_taxi_distance_range(p_distance_km)`: Agrupa la distancia en tres rangos comparables: `'0_2_km'` ($\le 2{,}0\text{ km}$, trayecto corto), `'2_5_km'` ($> 2{,}0\text{ km}$ y $\le 5{,}0\text{ km}$, trayecto medio) y `'gt_5_km'` ($> 5{,}0\text{ km}$, trayecto largo).
+  3. **Persistencia con privacidad geoespacial (RN-08):** Se añadieron las columnas `destination_zone_id`, `destination_location`, `distance_km` y `distance_range` a `public.price_reports`. El trigger `public.enforce_price_report_submission_rules()` redondea tanto `location` como `destination_location` a 3 decimales ($\approx 110\text{ m}$) y calcula automáticamente `distance_km` y `distance_range` en el servidor.
+  4. **Mediana por rango en `calculate_price_verdict`:** Cuando se consulta `'transport_taxi_minimal'` con destino o coordenadas de trayecto, la RPC filtra los reportes del municipio en el mismo `distance_range` dentro de la ventana de 60 días y exige $N \ge 3$ en ese rango para calcular la mediana (`PERCENTILE_CONT(0.5)`). No se muestran recargos oficiales de Terminal o Aeropuerto mientras `P6` continúe pendiente de fuente oficial verificada.
+- **Impacto Frontend:** Nuevo bottom sheet `showMapPointPickerSheet`, actualización de `PriceVerdict`, `PriceVerdictRepository`, `PriceContributionRepository`, `PriceContributionNotifier` y `ContributePricePage` (paso 3 exige destino para taxi).
+- **Impacto Backend:** Migración `20261101100000_taxi_distance_ranges_and_verdict.sql` y pruebas pgTAP en `supabase/tests/price_verdict.sql`.

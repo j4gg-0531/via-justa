@@ -31,6 +31,7 @@ class _FakeAuthRepository implements AuthRepository {
   final List<String> savedDisplayNames = <String>[];
   final List<String> savedLanguages = <String>[];
   final List<ProfileType> savedProfileTypes = <ProfileType>[];
+  final List<String> savedMunicipalityCodes = <String>[];
 
   @override
   bool get usesDemoData => false;
@@ -97,6 +98,17 @@ class _FakeAuthRepository implements AuthRepository {
   @override
   Future<void> saveProfileType(String userId, ProfileType type) async {
     savedProfileTypes.add(type);
+  }
+
+  @override
+  Future<void> saveCurrentMunicipality(
+    String userId,
+    String municipalityCode,
+  ) async {
+    savedMunicipalityCodes.add(municipalityCode);
+    storedProfile = (storedProfile ?? UserProfile(id: userId)).copyWith(
+      currentMunicipalityCode: municipalityCode,
+    );
   }
 
   @override
@@ -227,21 +239,7 @@ void main() {
       expect(container.read(authControllerProvider).isAuthenticated, isFalse);
     });
 
-    test('persistProfileType refuses resident and keeps it local', () async {
-      final repository = _FakeAuthRepository();
-      final container = _containerWith(repository);
-      final controller = container.read(authControllerProvider.notifier);
-      await controller.signIn(email: 'ana@example.test', password: 'secreto123');
-
-      final persisted = await controller.persistProfileType(
-        ProfileType.resident,
-      );
-
-      expect(persisted, isFalse);
-      expect(repository.savedProfileTypes, isEmpty);
-    });
-
-    test('persistProfileType saves visitor and settler', () async {
+    test('persistProfileType saves visitor, settler and resident (D11 ratified)', () async {
       final repository = _FakeAuthRepository();
       final container = _containerWith(repository);
       final controller = container.read(authControllerProvider.notifier);
@@ -249,10 +247,26 @@ void main() {
 
       expect(await controller.persistProfileType(ProfileType.visitor), isTrue);
       expect(await controller.persistProfileType(ProfileType.settler), isTrue);
+      expect(await controller.persistProfileType(ProfileType.resident), isTrue);
       expect(repository.savedProfileTypes, [
         ProfileType.visitor,
         ProfileType.settler,
+        ProfileType.resident,
       ]);
+    });
+
+    test('saveCurrentMunicipality reaches the repository and updates profile', () async {
+      final repository = _FakeAuthRepository();
+      final container = _containerWith(repository);
+      final controller = container.read(authControllerProvider.notifier);
+      await controller.signIn(email: 'ana@example.test', password: 'secreto123');
+
+      expect(await controller.saveCurrentMunicipality('20001'), isTrue);
+      expect(repository.savedMunicipalityCodes, ['20001']);
+      expect(
+        container.read(authControllerProvider).profile?.currentMunicipalityCode,
+        '20001',
+      );
     });
 
     test('saveDisplayName and saveLanguage reach the repository', () async {
@@ -292,14 +306,22 @@ void main() {
       expect(await repository.currentSession(), isNull);
     });
 
-    test('rejects resident as a persistable profile type', () async {
+    test('accepts resident as a persistable profile type (D11 ratified)', () async {
       final repository = DemoAuthRepository();
       addTearDown(repository.dispose);
 
-      expect(
-        () => repository.saveProfileType('demo', ProfileType.resident),
-        throwsA(isA<AuthFailure>()),
-      );
+      await repository.saveProfileType('demo', ProfileType.resident);
+      final profile = await repository.fetchProfile('demo');
+      expect(profile?.profileType, ProfileType.resident);
+    });
+
+    test('saveCurrentMunicipality saves municipality in DemoAuthRepository', () async {
+      final repository = DemoAuthRepository();
+      addTearDown(repository.dispose);
+
+      await repository.saveCurrentMunicipality('demo', '20001');
+      final profile = await repository.fetchProfile('demo');
+      expect(profile?.currentMunicipalityCode, '20001');
     });
   });
 }

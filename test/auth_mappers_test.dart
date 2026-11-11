@@ -123,10 +123,10 @@ void main() {
       expect(ProfileType.fromWire(42), isNull);
     });
 
-    test('marks only resident as non persistable', () {
+    test('marks all profile types as persistable (D11 ratified in migration 0006)', () {
       expect(ProfileType.visitor.isPersistable, isTrue);
       expect(ProfileType.settler.isPersistable, isTrue);
-      expect(ProfileType.resident.isPersistable, isFalse);
+      expect(ProfileType.resident.isPersistable, isTrue);
     });
   });
 

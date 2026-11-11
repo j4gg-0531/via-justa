@@ -3,25 +3,43 @@ import 'package:flutter/material.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/theme/semantic_status_colors.dart';
-import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_category.dart';
 import 'package:via_justa/features/prices/domain/price_verdict.dart';
 
-/// Tarjeta accesible del semáforo de precios por zona del municipio (M07 y M20).
-/// Combina color de SemanticStatusColors + ícono + etiqueta localizada + zona evaluada + tamaño de muestra N + aviso orientativo.
+/// Tarjeta accesible del resultado del semáforo de precios (M07 y M20).
+/// Inspirada en el mockup limpio: cabecera de contexto, tarjeta de semáforo en lenguaje humano,
+/// bloque "Sugerencia" por reglas deterministas (nunca IA) y descargo orientativo.
 class PriceVerdictCard extends StatelessWidget {
   const PriceVerdictCard({
     super.key,
     required this.verdict,
     this.category,
     this.zone,
+    this.destinationZone,
   });
 
   final PriceVerdict verdict;
   final PriceCategory? category;
   final MunicipalityZone? zone;
+  final MunicipalityZone? destinationZone;
+
+  IconData _iconForCategory() {
+    final groupKey = category?.groupKey;
+    if (groupKey == 'transport' ||
+        verdict.categoryId == 'transport_taxi_minimal') {
+      return Icons.local_taxi_outlined;
+    }
+    if (groupKey == 'food' || verdict.categoryId == 'food_corrientazo') {
+      return Icons.restaurant_outlined;
+    }
+    if (groupKey == 'lodging' ||
+        verdict.categoryId == 'lodging_standard_night') {
+      return Icons.hotel_outlined;
+    }
+    return Icons.local_laundry_service_outlined;
+  }
 
   String _titleKeyForLevel(PriceVerdictLevel level) {
     switch (level) {
@@ -54,22 +72,29 @@ class PriceVerdictCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final semanticColors =
         Theme.of(context).extension<SemanticStatusColors>() ??
-        SemanticStatusColors.light();
+            SemanticStatusColors.light();
     final style = semanticColors.styleForVerdict(verdict.level);
 
     String languageCode;
     try {
       languageCode = context.locale.languageCode;
     } catch (_) {
-      languageCode =
-          Localizations.maybeLocaleOf(context)?.languageCode ?? 'es';
+      languageCode = Localizations.maybeLocaleOf(context)?.languageCode ?? 'es';
     }
 
     final categoryTitle =
         category?.localizedName(languageCode) ?? verdict.categoryId;
-    final categoryUnit = category?.localizedUnit(languageCode);
-    final zoneTitle =
-        zone?.localizedFullLabel(languageCode) ?? verdict.zoneId;
+    final originZoneName =
+        zone?.localizedName(languageCode) ?? verdict.zoneId;
+    final destinationZoneName = destinationZone?.localizedName(languageCode) ??
+        verdict.destinationZoneId;
+    final headerTitle = buildVerdictHeaderTitle(
+      categoryId: verdict.categoryId,
+      categoryName: categoryTitle,
+      originZoneName: originZoneName,
+      destinationZoneName: destinationZoneName,
+    );
+    final suggestion = resolvePriceSuggestion(verdict);
 
     return Semantics(
       container: true,
@@ -78,7 +103,53 @@ class PriceVerdictCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. Encabezado principal del veredicto (Color + Ícono + Texto + Insignia DEMO)
+          // 1. Cabecera limpia de contexto ("Taxi: Origen → Destino" o "Categoría · Zona" + "Evaluado ahora")
+          VjCard(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Icon(
+                    _iconForCategory(),
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        headerTitle,
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'price_verdict.evaluated_now'.tr(),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          // 2. Tarjeta principal del semáforo (Color + Ícono + Monto consultado + Explicación humana)
           Container(
             padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
@@ -89,33 +160,34 @@ class PriceVerdictCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.xs,
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(style.icon, color: style.foreground, size: 28),
-                        const SizedBox(width: AppSpacing.sm),
-                        Flexible(
-                          child: Text(
+                    Icon(style.icon, color: style.foreground, size: 28),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
                             _titleKeyForLevel(verdict.level).tr(),
-                            style: textTheme.headlineMedium?.copyWith(
-                              fontSize: 20,
+                            style: textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
                               color: style.foreground,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    if (verdict.isDemo)
-                      VjBadge(
-                        label: 'price_verdict.demo_orientative_badge'.tr(),
-                        icon: Icons.science_outlined,
+                          const SizedBox(height: 4),
+                          Text(
+                            formatCop(verdict.submittedCop),
+                            style: textTheme.headlineMedium?.copyWith(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
@@ -124,61 +196,11 @@ class PriceVerdictCard extends StatelessWidget {
                   style: textTheme.bodyMedium?.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                const Divider(height: 1, color: AppColors.border),
-                const SizedBox(height: AppSpacing.md),
-
-                // Categoría evaluada
-                Text(
-                  categoryTitle,
-                  style: textTheme.titleMedium,
-                ),
-                if (categoryUnit != null && categoryUnit.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    categoryUnit,
-                    style: textTheme.bodySmall,
-                  ),
-                ],
-                const SizedBox(height: AppSpacing.sm),
-
-                // Zona del municipio evaluada
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm,
-                    vertical: AppSpacing.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.place_outlined,
-                        size: 16,
-                        color: AppColors.primary,
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Flexible(
-                        child: Text(
-                          '${'price_verdict.evaluated_zone_label'.tr()}: $zoneTitle',
-                          style: textTheme.bodySmall?.copyWith(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
+                    height: 1.35,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
 
-                // Monto consultado vs Referencia zonal (mediana)
                 if (verdict.isInsufficient)
                   _InsufficientSampleSection(verdict: verdict)
                 else
@@ -186,11 +208,20 @@ class PriceVerdictCard extends StatelessWidget {
                     verdict: verdict,
                     accentColor: style.foreground,
                   ),
+
+                // Contexto de evento activo real (solo cuando eventContext != null)
+                if (verdict.eventContext != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  _EventContextBanner(
+                    eventContext: verdict.eventContext!,
+                    palette: semanticColors.eventContext,
+                  ),
+                ],
               ],
             ),
           ),
 
-          // 2. Alerta de precio sospechosamente bajo (desviación < -40%)
+          // 3. Alerta de precio sospechosamente bajo (desviación < -40%)
           if (verdict.lowPriceWarning && !verdict.isInsufficient) ...[
             const SizedBox(height: AppSpacing.md),
             Container(
@@ -235,16 +266,48 @@ class PriceVerdictCard extends StatelessWidget {
             ),
           ],
 
-          // 3. Contexto de evento activo (Color azul independiente, nunca semáforo)
-          if (verdict.eventContext != null) ...[
-            const SizedBox(height: AppSpacing.md),
-            _EventContextBanner(
-              eventContext: verdict.eventContext!,
-              palette: semanticColors.eventContext,
+          // 4. Bloque "Sugerencia" por reglas fijas (nunca "Sugerencia de la IA")
+          if (suggestion != null) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              suggestion.titleKey.tr(),
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            VjCard(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.lightbulb_outline,
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      suggestion.bodyKey.tr(
+                        namedArgs: {
+                          'ref': suggestion.formattedReferenceCop,
+                          'cap': suggestion.formattedRecommendedCapCop,
+                        },
+                      ),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textPrimary,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
 
-          // 4. Aviso orientativo obligatorio (nunca alega IA ni tarifa vinculante)
+          // 5. Aviso orientativo obligatorio (nunca alega IA ni tarifa vinculante)
           const SizedBox(height: AppSpacing.md),
           VjCard(
             padding: const EdgeInsets.all(AppSpacing.md),
@@ -274,8 +337,8 @@ class PriceVerdictCard extends StatelessWidget {
   }
 }
 
-/// Métricas cuantitativas cuando la muestra de la zona es suficiente (N >= 3):
-/// Referencia de zona (mediana), desviación porcentual, muestra N y tope sugerido.
+/// Métricas claras cuando la muestra de la zona o rango es suficiente (N >= 3):
+/// Precio de referencia, diferencia porcentual y tamaño de muestra discreto.
 class _QuantifiedMetricsSection extends StatelessWidget {
   const _QuantifiedMetricsSection({
     required this.verdict,
@@ -292,65 +355,39 @@ class _QuantifiedMetricsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          spacing: AppSpacing.lg,
-          runSpacing: AppSpacing.md,
-          children: [
-            _MetricColumn(
-              label: 'price_verdict.submitted_label'.tr(),
-              value: formatCop(verdict.submittedCop),
-              valueColor: AppColors.textPrimary,
-            ),
-            if (verdict.referenceCop != null)
-              _MetricColumn(
-                label: 'price_verdict.reference_median_label'.tr(),
-                value: formatCop(verdict.referenceCop!),
-                valueColor: AppColors.primary,
-              ),
-            if (verdict.deviationPct != null)
-              _MetricColumn(
-                label: 'price_verdict.deviation_label'.tr(),
-                value: formatDeviationPct(verdict.deviationPct!),
-                valueColor: accentColor,
-              ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        if (verdict.recommendedCapCop != null)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'price_verdict.recommended_cap_label'.tr(),
-                  style: textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  formatCop(verdict.recommendedCapCop!),
-                  style: textTheme.titleMedium?.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: AppColors.border),
           ),
+          child: Wrap(
+            spacing: AppSpacing.lg,
+            runSpacing: AppSpacing.sm,
+            children: [
+              if (verdict.referenceCop != null)
+                _MetricColumn(
+                  label: 'price_verdict.reference_median_label'.tr(),
+                  value: formatCop(verdict.referenceCop!),
+                  valueColor: AppColors.primary,
+                ),
+              if (verdict.deviationPct != null)
+                _MetricColumn(
+                  label: 'price_verdict.deviation_label'.tr(),
+                  value: formatDeviationPct(verdict.deviationPct!),
+                  valueColor: accentColor,
+                ),
+            ],
+          ),
+        ),
         const SizedBox(height: AppSpacing.sm),
         Row(
           children: [
             const Icon(
               Icons.groups_outlined,
-              size: 18,
+              size: 16,
               color: AppColors.textSecondary,
             ),
             const SizedBox(width: AppSpacing.xs),
@@ -364,7 +401,7 @@ class _QuantifiedMetricsSection extends StatelessWidget {
                 ),
                 style: textTheme.bodySmall?.copyWith(
                   color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
@@ -375,7 +412,7 @@ class _QuantifiedMetricsSection extends StatelessWidget {
   }
 }
 
-/// Estado neutro M20 cuando N < 3 en la zona: sin color de semáforo ni umbral artificial.
+/// Estado neutro M20 cuando N < 3: sin color de semáforo ni umbral artificial.
 class _InsufficientSampleSection extends StatelessWidget {
   const _InsufficientSampleSection({required this.verdict});
 
@@ -385,48 +422,37 @@ class _InsufficientSampleSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _MetricColumn(
-          label: 'price_verdict.submitted_label'.tr(),
-          value: formatCop(verdict.submittedCop),
-          valueColor: AppColors.textPrimary,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: AppColors.border),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'price_verdict.insufficient_sample_detail'.tr(
+              namedArgs: {'n': verdict.n.toString()},
+            ),
+            style: textTheme.bodyMedium?.copyWith(
+              color: AppColors.textPrimary,
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'price_verdict.insufficient_sample_detail'.tr(
-                  namedArgs: {'n': verdict.n.toString()},
-                ),
-                style: textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'price_verdict.insufficient_no_threshold'.tr(),
-                style: textTheme.bodySmall,
-              ),
-            ],
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'price_verdict.insufficient_no_threshold'.tr(),
+            style: textTheme.bodySmall,
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-/// Banner azul independiente para contexto de evento (nunca usa verde/ámbar/rojo).
+/// Banner azul independiente para contexto de evento real activo (nunca usa verde/ámbar/rojo).
 class _EventContextBanner extends StatelessWidget {
   const _EventContextBanner({
     required this.eventContext,
@@ -511,7 +537,8 @@ class _MetricColumn extends StatelessWidget {
         Text(
           value,
           style: textTheme.titleMedium?.copyWith(
-            fontSize: 18,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
             color: valueColor,
           ),
         ),

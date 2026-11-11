@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:via_justa/core/supabase/supabase_providers.dart';
 import 'package:via_justa/features/prices/data/demo_price_contribution_repository.dart';
+import 'package:via_justa/features/prices/data/supabase_price_contribution_repository.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_category.dart';
 import 'package:via_justa/features/prices/domain/price_contribution.dart';
@@ -10,6 +12,10 @@ import 'package:via_justa/features/prices/presentation/state/price_scan_provider
 /// Proveedor del repositorio de aportes de precio (único punto que referencia la clase concreta).
 final priceContributionRepositoryProvider =
     Provider<PriceContributionRepository>((ref) {
+      final client = ref.watch(supabaseClientProvider);
+      if (client != null) {
+        return SupabasePriceContributionRepository(client);
+      }
       return DemoPriceContributionRepository();
     });
 
@@ -21,6 +27,12 @@ class PriceContributionWizardState {
     this.rawAmount = '',
     this.amountError,
     this.selectedZoneId = 'vup_centro',
+    this.originLatitude,
+    this.originLongitude,
+    this.selectedDestinationZoneId,
+    this.destinationLatitude,
+    this.destinationLongitude,
+    this.destinationError = false,
     this.locationPermission = LocationPermissionStatus.prompt,
     this.isManualMapOpen = false,
     this.pinNormalizedX = 0.50,
@@ -37,6 +49,12 @@ class PriceContributionWizardState {
   final String rawAmount;
   final PriceContributionAmountError? amountError;
   final String selectedZoneId;
+  final double? originLatitude;
+  final double? originLongitude;
+  final String? selectedDestinationZoneId;
+  final double? destinationLatitude;
+  final double? destinationLongitude;
+  final bool destinationError;
   final LocationPermissionStatus locationPermission;
   final bool isManualMapOpen;
   final double pinNormalizedX;
@@ -48,6 +66,10 @@ class PriceContributionWizardState {
 
   /// Número de paso visible para el usuario (1 a 4).
   int get displayStepNumber => currentStep + 1;
+
+  /// Indica si la categoría activa corresponde a taxi y por tanto requiere origen y destino.
+  bool get requiresDestination =>
+      categoryRequiresDestination(selectedCategoryId);
 
   /// Monto entero positivo parseado desde `rawAmount` (o `null` si no es válido).
   int? get parsedAmount => parseCopAmount(rawAmount);
@@ -75,6 +97,13 @@ class PriceContributionWizardState {
     PriceContributionAmountError? amountError,
     bool clearAmountError = false,
     String? selectedZoneId,
+    double? originLatitude,
+    double? originLongitude,
+    String? selectedDestinationZoneId,
+    bool clearDestination = false,
+    double? destinationLatitude,
+    double? destinationLongitude,
+    bool? destinationError,
     LocationPermissionStatus? locationPermission,
     bool? isManualMapOpen,
     double? pinNormalizedX,
@@ -91,6 +120,18 @@ class PriceContributionWizardState {
       rawAmount: rawAmount ?? this.rawAmount,
       amountError: clearAmountError ? null : (amountError ?? this.amountError),
       selectedZoneId: selectedZoneId ?? this.selectedZoneId,
+      originLatitude: originLatitude ?? this.originLatitude,
+      originLongitude: originLongitude ?? this.originLongitude,
+      selectedDestinationZoneId: clearDestination
+          ? null
+          : (selectedDestinationZoneId ?? this.selectedDestinationZoneId),
+      destinationLatitude: clearDestination
+          ? null
+          : (destinationLatitude ?? this.destinationLatitude),
+      destinationLongitude: clearDestination
+          ? null
+          : (destinationLongitude ?? this.destinationLongitude),
+      destinationError: destinationError ?? this.destinationError,
       locationPermission: locationPermission ?? this.locationPermission,
       isManualMapOpen: isManualMapOpen ?? this.isManualMapOpen,
       pinNormalizedX: pinNormalizedX ?? this.pinNormalizedX,
@@ -112,8 +153,11 @@ class PriceContributionNotifier extends Notifier<PriceContributionWizardState> {
 
   /// Paso 1: Selecciona la categoría comparable.
   void selectCategory(String categoryId) {
+    final requiresDest = categoryRequiresDestination(categoryId);
     state = state.copyWith(
       selectedCategoryId: categoryId,
+      clearDestination: !requiresDest,
+      destinationError: false,
       submitError: false,
     );
   }
@@ -139,6 +183,8 @@ class PriceContributionNotifier extends Notifier<PriceContributionWizardState> {
       locationPermission: LocationPermissionStatus.granted,
       isManualMapOpen: false,
       selectedZoneId: detectedZone.id,
+      originLatitude: detectedZone.centerLat,
+      originLongitude: detectedZone.centerLng,
       pinNormalizedX: detectedZone.normalizedX,
       pinNormalizedY: detectedZone.normalizedY,
       submitError: false,
@@ -159,24 +205,63 @@ class PriceContributionNotifier extends Notifier<PriceContributionWizardState> {
     state = state.copyWith(isManualMapOpen: open);
   }
 
-  /// Paso 3: Selecciona directamente una zona en el mapa.
+  /// Paso 3: Selecciona directamente una zona de origen o establecimiento.
   void selectZone(String zoneId) {
     final zones = ref.read(municipalityZonesProvider).value;
     double? nextX;
     double? nextY;
+    double? nextLat;
+    double? nextLng;
     if (zones != null) {
       for (final z in zones) {
         if (z.id == zoneId) {
           nextX = z.normalizedX;
           nextY = z.normalizedY;
+          nextLat = z.centerLat;
+          nextLng = z.centerLng;
           break;
         }
       }
     }
     state = state.copyWith(
       selectedZoneId: zoneId,
+      originLatitude: nextLat,
+      originLongitude: nextLng,
       pinNormalizedX: nextX,
       pinNormalizedY: nextY,
+      submitError: false,
+    );
+  }
+
+  /// Paso 3: Selecciona un punto preciso de origen/establecimiento desde el mapa modal.
+  void selectPreciseOrigin({
+    required String zoneId,
+    required double latitude,
+    required double longitude,
+    required double normalizedX,
+    required double normalizedY,
+  }) {
+    state = state.copyWith(
+      selectedZoneId: zoneId,
+      originLatitude: latitude,
+      originLongitude: longitude,
+      pinNormalizedX: normalizedX,
+      pinNormalizedY: normalizedY,
+      submitError: false,
+    );
+  }
+
+  /// Paso 3: Selecciona un punto preciso de destino (solo para Taxi) desde el mapa modal.
+  void selectPreciseDestination({
+    required String destinationZoneId,
+    required double latitude,
+    required double longitude,
+  }) {
+    state = state.copyWith(
+      selectedDestinationZoneId: destinationZoneId,
+      destinationLatitude: latitude,
+      destinationLongitude: longitude,
+      destinationError: false,
       submitError: false,
     );
   }
@@ -199,6 +284,8 @@ class PriceContributionNotifier extends Notifier<PriceContributionWizardState> {
 
     state = state.copyWith(
       selectedZoneId: resolvedZone.id,
+      originLatitude: resolvedZone.centerLat,
+      originLongitude: resolvedZone.centerLng,
       pinNormalizedX: clampedX,
       pinNormalizedY: clampedY,
       isManualMapOpen: true,
@@ -237,10 +324,22 @@ class PriceContributionNotifier extends Notifier<PriceContributionWizardState> {
         );
         return true;
       case 2:
-        if (!isValidContributionZone(state.selectedZoneId)) {
+        final validLocation = isValidContributionLocation(
+          categoryId: state.selectedCategoryId,
+          zoneId: state.selectedZoneId,
+          destinationZoneId: state.selectedDestinationZoneId,
+          destinationLatitude: state.destinationLatitude,
+          destinationLongitude: state.destinationLongitude,
+        );
+        if (!validLocation) {
+          state = state.copyWith(destinationError: true);
           return false;
         }
-        state = state.copyWith(currentStep: 3, submitError: false);
+        state = state.copyWith(
+          currentStep: 3,
+          destinationError: false,
+          submitError: false,
+        );
         return true;
       default:
         return false;
@@ -263,7 +362,7 @@ class PriceContributionNotifier extends Notifier<PriceContributionWizardState> {
     state = state.copyWith(currentStep: step, submitError: false);
   }
 
-  /// Paso 4: Valida y guarda el aporte ciudadano en el repositorio DEMO.
+  /// Paso 4: Valida y guarda el aporte ciudadano en el repositorio activo.
   Future<bool> submitContribution({String municipalityCode = '20001'}) async {
     if (!isValidContributionCategory(state.selectedCategoryId)) return false;
     final amountError = validateContributionAmount(state.rawAmount);
@@ -271,11 +370,22 @@ class PriceContributionNotifier extends Notifier<PriceContributionWizardState> {
     if (amountError != null || parsedAmount == null) {
       state = state.copyWith(
         currentStep: 1,
-        amountError: amountError ?? PriceContributionAmountError.notPositiveNumber,
+        amountError:
+            amountError ?? PriceContributionAmountError.notPositiveNumber,
       );
       return false;
     }
-    if (!isValidContributionZone(state.selectedZoneId)) return false;
+    final validLocation = isValidContributionLocation(
+      categoryId: state.selectedCategoryId,
+      zoneId: state.selectedZoneId,
+      destinationZoneId: state.selectedDestinationZoneId,
+      destinationLatitude: state.destinationLatitude,
+      destinationLongitude: state.destinationLongitude,
+    );
+    if (!validLocation) {
+      state = state.copyWith(currentStep: 2, destinationError: true);
+      return false;
+    }
 
     state = state.copyWith(isSubmitting: true, submitError: false);
 
@@ -287,6 +397,17 @@ class PriceContributionNotifier extends Notifier<PriceContributionWizardState> {
         zoneId: state.selectedZoneId,
         amountCop: parsedAmount,
         placeNote: state.sanitizedNote,
+        destinationZoneId: state.requiresDestination
+            ? state.selectedDestinationZoneId
+            : null,
+        originLatitude: state.originLatitude,
+        originLongitude: state.originLongitude,
+        destinationLatitude: state.requiresDestination
+            ? state.destinationLatitude
+            : null,
+        destinationLongitude: state.requiresDestination
+            ? state.destinationLongitude
+            : null,
       );
       state = state.copyWith(
         isSubmitting: false,
@@ -333,7 +454,7 @@ final activeContributionCategoryProvider = Provider<PriceCategory?>((ref) {
   return null;
 });
 
-/// Zona del municipio seleccionada en el wizard de aporte de precios.
+/// Zona del municipio seleccionada en el wizard de aporte de precios (origen o establecimiento).
 final activeContributionZoneProvider = Provider<MunicipalityZone?>((ref) {
   final zones = ref.watch(municipalityZonesProvider).value;
   final wizard = ref.watch(priceContributionProvider);
@@ -341,6 +462,23 @@ final activeContributionZoneProvider = Provider<MunicipalityZone?>((ref) {
   final targetZoneId = wizard.submittedRecord?.zoneId ?? wizard.selectedZoneId;
   for (final zone in zones) {
     if (zone.id == targetZoneId) return zone;
+  }
+  return null;
+});
+
+/// Zona de destino seleccionada en el wizard cuando la categoría es taxi.
+final activeContributionDestinationZoneProvider = Provider<MunicipalityZone?>((
+  ref,
+) {
+  final zones = ref.watch(municipalityZonesProvider).value;
+  final wizard = ref.watch(priceContributionProvider);
+  if (zones == null) return null;
+  final targetDestId =
+      wizard.submittedRecord?.destinationZoneId ??
+      wizard.selectedDestinationZoneId;
+  if (targetDestId == null) return null;
+  for (final zone in zones) {
+    if (zone.id == targetDestId) return zone;
   }
   return null;
 });

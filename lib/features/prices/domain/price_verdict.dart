@@ -54,7 +54,11 @@ class PriceEventContext {
     final name = map['event_name'] as String?;
     final refCop = map['event_reference_cop'] as int?;
     final devPct = (map['event_deviation_pct'] as num?)?.toDouble();
-    if (name == null || name.trim().isEmpty || refCop == null || refCop <= 0 || devPct == null) {
+    if (name == null ||
+        name.trim().isEmpty ||
+        refCop == null ||
+        refCop <= 0 ||
+        devPct == null) {
       throw const FormatException('Invalid PriceEventContext payload');
     }
     return PriceEventContext(
@@ -73,6 +77,9 @@ class PriceVerdict {
     required this.categoryId,
     required this.municipalityCode,
     this.zoneId = 'vup_centro',
+    this.destinationZoneId,
+    this.distanceKm,
+    this.distanceRange,
     required this.level,
     required this.submittedCop,
     required this.n,
@@ -92,8 +99,17 @@ class PriceVerdict {
   /// Código DIVIPOLA del municipio evaluado (ej. `'20001'`).
   final String municipalityCode;
 
-  /// Identificador de la zona del municipio donde se calculó la mediana (ej. `'vup_norte'`, `'vup_centro'`, `'vup_sur'`).
+  /// Identificador de la zona del municipio donde se calculó la mediana (o zona de origen en taxi).
   final String zoneId;
+
+  /// Identificador de la zona de destino (cuando la categoría es taxi y se evaluó un trayecto).
+  final String? destinationZoneId;
+
+  /// Distancia en línea recta calculada en SQL entre origen y destino en kilómetros (solo taxi).
+  final double? distanceKm;
+
+  /// Rango de distancia calculado en SQL (`'0_2_km'`, `'2_5_km'`, `'gt_5_km'`).
+  final String? distanceRange;
 
   /// Nivel del veredicto (`green`, `yellow`, `red`, `insufficient`).
   final PriceVerdictLevel level;
@@ -101,16 +117,16 @@ class PriceVerdict {
   /// Monto consultado por el usuario en pesos colombianos (COP).
   final int submittedCop;
 
-  /// Mediana estadística de referencia en la zona en COP (nulo cuando `isInsufficient` es `true`).
+  /// Mediana estadística de referencia en COP (nulo cuando `isInsufficient` es `true`).
   final int? referenceCop;
 
-  /// Desviación porcentual frente a la mediana de la zona (nulo cuando `isInsufficient` es `true`).
+  /// Desviación porcentual frente a la mediana (nulo cuando `isInsufficient` es `true`).
   final double? deviationPct;
 
-  /// Tope recomendado (+15% sobre la mediana de la zona; nulo cuando `isInsufficient` es `true`).
+  /// Tope recomendado (+15% sobre la mediana; nulo cuando `isInsufficient` es `true`).
   final int? recommendedCapCop;
 
-  /// Tamaño de muestra comunitaria en la zona (cantidad de reportes válidos en la ventana).
+  /// Tamaño de muestra comunitaria (cantidad de reportes válidos en la ventana).
   final int n;
 
   /// Alias semántico alineado con `sample_count` del contrato SQL.
@@ -131,7 +147,7 @@ class PriceVerdict {
   /// Indica si la muestra es insuficiente (`n < 3` o `level == insufficient`).
   bool get isInsufficient => level == PriceVerdictLevel.insufficient;
 
-  ///Construye y valida un `PriceVerdict` a partir del esquema JSON del contrato de datos.
+  /// Construye y valida un `PriceVerdict` a partir del esquema JSON del contrato de datos.
   factory PriceVerdict.fromMap(
     Map<String, dynamic> map, {
     required String categoryId,
@@ -160,7 +176,8 @@ class PriceVerdict {
     final recommendedCapCop =
         isInsufficient ? null : map['recommended_cap_cop'] as int?;
 
-    if (!isInsufficient && (referenceCop == null || referenceCop <= 0 || deviationPct == null)) {
+    if (!isInsufficient &&
+        (referenceCop == null || referenceCop <= 0 || deviationPct == null)) {
       throw const FormatException(
         'Non-insufficient PriceVerdict requires positive reference_cop and deviation_percent',
       );
@@ -173,6 +190,9 @@ class PriceVerdict {
       categoryId: categoryId,
       municipalityCode: municipalityCode,
       zoneId: resolvedZoneId,
+      destinationZoneId: map['destination_zone_id'] as String?,
+      distanceKm: (map['distance_km'] as num?)?.toDouble(),
+      distanceRange: map['distance_range'] as String?,
       level: level,
       submittedCop: submitted,
       referenceCop: referenceCop,
@@ -220,4 +240,65 @@ String formatDeviationPct(double pct) {
     return '+$rounded%';
   }
   return '$rounded%';
+}
+
+
+/// Especificación determinista del bloque "Sugerencia" (sin IA, calculada por reglas fijas).
+class PriceSuggestionSpec {
+  const PriceSuggestionSpec({
+    required this.titleKey,
+    required this.bodyKey,
+    required this.formattedReferenceCop,
+    required this.formattedRecommendedCapCop,
+  });
+
+  final String titleKey;
+  final String bodyKey;
+  final String formattedReferenceCop;
+  final String formattedRecommendedCapCop;
+}
+
+/// Resuelve por reglas fijas la sugerencia práctica a partir de `referenceCop` y `recommendedCapCop`.
+/// Retorna `null` cuando la muestra es insuficiente (`isInsufficient`) o faltan montos de referencia.
+PriceSuggestionSpec? resolvePriceSuggestion(PriceVerdict verdict) {
+  if (verdict.isInsufficient ||
+      verdict.referenceCop == null ||
+      verdict.recommendedCapCop == null) {
+    return null;
+  }
+
+  final String bodyKey;
+  switch (verdict.level) {
+    case PriceVerdictLevel.green:
+      bodyKey = 'price_verdict.suggestion_green_body';
+    case PriceVerdictLevel.yellow:
+      bodyKey = 'price_verdict.suggestion_yellow_body';
+    case PriceVerdictLevel.red:
+      bodyKey = 'price_verdict.suggestion_red_body';
+    case PriceVerdictLevel.insufficient:
+      return null;
+  }
+
+  return PriceSuggestionSpec(
+    titleKey: 'price_verdict.suggestion_section_title',
+    bodyKey: bodyKey,
+    formattedReferenceCop: formatCop(verdict.referenceCop!),
+    formattedRecommendedCapCop: formatCop(verdict.recommendedCapCop!),
+  );
+}
+
+/// Construye el título de cabecera de la consulta evaluada:
+/// `"Taxi: Origen → Destino"` para carreras de taxi con destino, o `"Categoría · Zona"` para el resto.
+String buildVerdictHeaderTitle({
+  required String categoryId,
+  required String categoryName,
+  required String originZoneName,
+  String? destinationZoneName,
+}) {
+  if (categoryId == 'transport_taxi_minimal' &&
+      destinationZoneName != null &&
+      destinationZoneName.trim().isNotEmpty) {
+    return 'Taxi: $originZoneName → $destinationZoneName';
+  }
+  return '$categoryName · $originZoneName';
 }

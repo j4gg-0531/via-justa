@@ -26,7 +26,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(23);
+select plan(28);
 
 -- ---------------------------------------------------------------------------
 -- Datos base aislados para la prueba (dentro de transacción con ROLLBACK)
@@ -521,6 +521,249 @@ select is(
   (select flag from verdict_test_results where label = 'err_no_uid'),
   1,
   'caller without auth.uid() is rejected with 42501 insufficient_privilege'
+);
+
+-- ---------------------------------------------------------------------------
+-- 25-28 · Tarifa de taxi con destino por rangos de distancia en SQL
+--         (0_2_km, 2_5_km, gt_5_km y muestra insuficiente N < 3 por rango)
+-- ---------------------------------------------------------------------------
+select is(
+  public.classify_taxi_distance_range(1.85) || ':' ||
+  public.classify_taxi_distance_range(2.00) || ':' ||
+  public.classify_taxi_distance_range(3.24) || ':' ||
+  public.classify_taxi_distance_range(5.00) || ':' ||
+  public.classify_taxi_distance_range(6.07),
+  '0_2_km:0_2_km:2_5_km:2_5_km:gt_5_km',
+  'classify_taxi_distance_range classifies 0-2 km, 2-5 km, and >5 km boundaries accurately in SQL'
+);
+
+insert into public.price_reports (
+  user_id,
+  category_id,
+  municipality_code,
+  zone_id,
+  amount_cop,
+  location,
+  destination_location
+)
+values
+  (
+    '33333333-3333-3333-3333-333333333333',
+    'transport_taxi_minimal',
+    '20001',
+    'vup_centro',
+    8500,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2436, 10.4742), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2480, 10.4820), 4326)::extensions.geography
+  ),
+  (
+    '33333333-3333-3333-3333-333333333333',
+    'transport_taxi_minimal',
+    '20001',
+    'vup_centro',
+    9000,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2436, 10.4742), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2485, 10.4825), 4326)::extensions.geography
+  ),
+  (
+    '33333333-3333-3333-3333-333333333333',
+    'transport_taxi_minimal',
+    '20001',
+    'vup_norte',
+    9500,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2535, 10.4885), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2436, 10.4742), 4326)::extensions.geography
+  ),
+  (
+    '33333333-3333-3333-3333-333333333333',
+    'transport_taxi_minimal',
+    '20001',
+    'vup_centro',
+    12000,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2436, 10.4742), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2468, 10.4452), 4326)::extensions.geography
+  ),
+  (
+    '33333333-3333-3333-3333-333333333333',
+    'transport_taxi_minimal',
+    '20001',
+    'vup_sur',
+    13000,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2468, 10.4452), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2436, 10.4742), 4326)::extensions.geography
+  ),
+  (
+    '33333333-3333-3333-3333-333333333333',
+    'transport_taxi_minimal',
+    '20001',
+    'vup_centro',
+    14000,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2436, 10.4742), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2785, 10.4680), 4326)::extensions.geography
+  ),
+  (
+    '33333333-3333-3333-3333-333333333333',
+    'transport_taxi_minimal',
+    '20001',
+    'vup_sur',
+    17000,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2468, 10.4452), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2610, 10.4980), 4326)::extensions.geography
+  ),
+  (
+    '33333333-3333-3333-3333-333333333333',
+    'transport_taxi_minimal',
+    '20001',
+    'vup_oriente',
+    18000,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2610, 10.4980), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2468, 10.4452), 4326)::extensions.geography
+  );
+
+set local role authenticated;
+set local request.jwt.claims =
+  '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+
+insert into verdict_test_results (label, payload)
+values (
+  'taxi_range_short',
+  public.calculate_price_verdict(
+    'transport_taxi_minimal',
+    '20001',
+    'vup_centro',
+    9000,
+    'vup_centro',
+    10.4742,
+    -73.2436,
+    10.4820,
+    -73.2480
+  )
+);
+
+insert into verdict_test_results (label, payload)
+values (
+  'taxi_range_medium',
+  public.calculate_price_verdict(
+    'transport_taxi_minimal',
+    '20001',
+    'vup_centro',
+    13000,
+    'vup_sur',
+    10.4742,
+    -73.2436,
+    10.4452,
+    -73.2468
+  )
+);
+
+insert into verdict_test_results (label, payload)
+values (
+  'taxi_range_long_n2',
+  public.calculate_price_verdict(
+    'transport_taxi_minimal',
+    '20001',
+    'vup_sur',
+    18000,
+    'vup_oriente',
+    10.4452,
+    -73.2468,
+    10.4980,
+    -73.2610
+  )
+);
+
+reset role;
+
+insert into public.price_reports (
+  user_id,
+  category_id,
+  municipality_code,
+  zone_id,
+  amount_cop,
+  location,
+  destination_location
+)
+values (
+  '33333333-3333-3333-3333-333333333333',
+  'transport_taxi_minimal',
+  '20001',
+  'vup_sur',
+  19000,
+  extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2468, 10.4452), 4326)::extensions.geography,
+  extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2610, 10.4980), 4326)::extensions.geography
+);
+
+set local role authenticated;
+set local request.jwt.claims =
+  '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+
+insert into verdict_test_results (label, payload)
+values (
+  'taxi_range_long_n3',
+  public.calculate_price_verdict(
+    'transport_taxi_minimal',
+    '20001',
+    'vup_sur',
+    18000,
+    'vup_oriente',
+    10.4452,
+    -73.2468,
+    10.4980,
+    -73.2610
+  )
+);
+
+reset role;
+
+select is(
+  (
+    select (payload ->> 'distance_range') || ':' ||
+           (payload ->> 'level') || ':' ||
+           (payload ->> 'reference_cop') || ':' ||
+           (payload ->> 'sample_count')
+    from verdict_test_results
+    where label = 'taxi_range_short'
+  ),
+  '0_2_km:green:9000:3',
+  'taxi trip <= 2 km uses 0_2_km range median (9000 COP, N=3)'
+);
+
+select is(
+  (
+    select (payload ->> 'distance_range') || ':' ||
+           (payload ->> 'level') || ':' ||
+           (payload ->> 'reference_cop') || ':' ||
+           (payload ->> 'sample_count')
+    from verdict_test_results
+    where label = 'taxi_range_medium'
+  ),
+  '2_5_km:green:13000:3',
+  'taxi trip 2-5 km uses 2_5_km range median (13000 COP, N=3)'
+);
+
+select is(
+  (
+    select (payload ->> 'distance_range') || ':' ||
+           (payload ->> 'level') || ':' ||
+           (payload ->> 'sample_count')
+    from verdict_test_results
+    where label = 'taxi_range_long_n2'
+  ),
+  'gt_5_km:insufficient:2',
+  'taxi trip > 5 km with N=2 returns insufficient for gt_5_km range'
+);
+
+select is(
+  (
+    select (payload ->> 'distance_range') || ':' ||
+           (payload ->> 'level') || ':' ||
+           (payload ->> 'reference_cop') || ':' ||
+           (payload ->> 'sample_count')
+    from verdict_test_results
+    where label = 'taxi_range_long_n3'
+  ),
+  'gt_5_km:green:18000:3',
+  'taxi trip > 5 km with N=3 returns green and gt_5_km median (18000 COP)'
 );
 
 select * from finish();

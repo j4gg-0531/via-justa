@@ -22,6 +22,8 @@ class MunicipalityZone {
     required this.sectorHintEn,
     this.normalizedX = 0.5,
     this.normalizedY = 0.5,
+    this.centerLat = 10.4742,
+    this.centerLng = -73.2436,
     this.sortOrder = 0,
   });
 
@@ -48,6 +50,12 @@ class MunicipalityZone {
 
   /// Coordenada vertical normalizada [0.0, 1.0] en el lienzo del mapa del municipio.
   final double normalizedY;
+
+  /// Latitud WGS84 del centro de referencia de la zona (`public.municipality_zones.center_lat`).
+  final double centerLat;
+
+  /// Longitud WGS84 del centro de referencia de la zona (`public.municipality_zones.center_lng`).
+  final double centerLng;
 
   /// Orden de visualización.
   final int sortOrder;
@@ -87,6 +95,8 @@ class MunicipalityZone {
       sectorHintEn: map['sector_hint_en'] as String? ?? '',
       normalizedX: (map['normalized_x'] as num?)?.toDouble() ?? 0.5,
       normalizedY: (map['normalized_y'] as num?)?.toDouble() ?? 0.5,
+      centerLat: (map['center_lat'] as num?)?.toDouble() ?? 10.4742,
+      centerLng: (map['center_lng'] as num?)?.toDouble() ?? -73.2436,
       sortOrder: map['sort_order'] as int? ?? 0,
     );
   }
@@ -111,6 +121,31 @@ MunicipalityZone? resolveNearestZoneByNormalizedPoint({
     final dx = zone.normalizedX - clampedX;
     final dy = zone.normalizedY - clampedY;
     final distanceSquared = (dx * dx) + (dy * dy);
+    if (distanceSquared < minDistanceSquared) {
+      minDistanceSquared = distanceSquared;
+      nearest = zone;
+    }
+  }
+
+  return nearest;
+}
+
+/// Función pura de dominio que identifica la zona activa más cercana a unas
+/// coordenadas WGS84 `(latitude, longitude)` seleccionadas en el mapa o GPS.
+MunicipalityZone? resolveNearestZoneByCoordinates({
+  required List<MunicipalityZone> zones,
+  required double latitude,
+  required double longitude,
+}) {
+  if (zones.isEmpty) return null;
+
+  MunicipalityZone nearest = zones.first;
+  double minDistanceSquared = double.infinity;
+
+  for (final zone in zones) {
+    final dLat = zone.centerLat - latitude;
+    final dLng = zone.centerLng - longitude;
+    final distanceSquared = (dLat * dLat) + (dLng * dLng);
     if (distanceSquared < minDistanceSquared) {
       minDistanceSquared = distanceSquared;
       nearest = zone;

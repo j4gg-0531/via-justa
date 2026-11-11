@@ -1,10 +1,13 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:via_justa/core/supabase/supabase_providers.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
+import 'package:via_justa/core/theme/app_spacing.dart';
 
 /// Contenedor persistente principal de navegación para las 5 pestañas de Vía Justa.
-class AppScaffold extends StatelessWidget {
+class AppScaffold extends ConsumerWidget {
   const AppScaffold({
     super.key,
     required this.navigationShell,
@@ -20,7 +23,9 @@ class AppScaffold extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDemoMode = ref.watch(isDemoModeProvider);
+
     return BackButtonListener(
       onBackButtonPressed: () async {
         // Si no estamos en la pestaña de Inicio, el botón atrás regresa a Inicio.
@@ -31,7 +36,12 @@ class AppScaffold extends StatelessWidget {
         return false; // Permitir que el sistema maneje el pop
       },
       child: Scaffold(
-        body: navigationShell,
+        body: Column(
+          children: [
+            if (isDemoMode) const _GlobalDemoNoticeBanner(),
+            Expanded(child: navigationShell),
+          ],
+        ),
         bottomNavigationBar: Container(
           decoration: const BoxDecoration(
             border: Border(
@@ -108,6 +118,48 @@ class AppScaffold extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Único aviso global cuando la aplicación se ejecuta sin cliente de Supabase.
+class _GlobalDemoNoticeBanner extends StatelessWidget {
+  const _GlobalDemoNoticeBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        width: double.infinity,
+        color: AppColors.primarySoft,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.science_outlined,
+              size: 14,
+              color: AppColors.primary,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Flexible(
+              child: Text(
+                'common.global_demo_banner'.tr(),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
     );

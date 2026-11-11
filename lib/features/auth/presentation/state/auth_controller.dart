@@ -11,6 +11,7 @@ import 'package:via_justa/features/auth/domain/auth_session.dart';
 import 'package:via_justa/features/auth/domain/consent_document.dart';
 import 'package:via_justa/features/auth/domain/user_profile.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_state.dart';
+import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/onboarding/domain/profile_type.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
 
@@ -150,22 +151,35 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  /// Persiste el tipo de perfil cuando el backend ya lo admite (D11).
-  ///
-  /// Devuelve `false` para `resident`, que sigue PROPUESTA: la app lo conserva
-  /// solo en memoria y la vista lo informa.
+  /// Persiste el tipo de perfil seleccionado en el servidor (D11 ratificada en migración 0006).
   Future<bool> persistProfileType(ProfileType type) async {
     final session = state.session;
     if (session == null) return true;
-    if (!type.isPersistable) return false;
 
     try {
       await _repository.saveProfileType(session.userId, type);
       if (!ref.mounted) return false;
-      final profile = state.profile;
-      if (profile != null) {
-        state = state.copyWith(profile: profile.copyWith(profileType: type));
-      }
+      final profile = state.profile ?? UserProfile(id: session.userId);
+      state = state.copyWith(profile: profile.copyWith(profileType: type));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Guarda el municipio activo del usuario en su perfil.
+  Future<bool> saveCurrentMunicipality(String municipalityCode) async {
+    final session = state.session;
+    final trimmed = municipalityCode.trim();
+    if (session == null || trimmed.isEmpty) return false;
+
+    try {
+      await _repository.saveCurrentMunicipality(session.userId, trimmed);
+      if (!ref.mounted) return false;
+      final profile = state.profile ?? UserProfile(id: session.userId);
+      state = state.copyWith(
+        profile: profile.copyWith(currentMunicipalityCode: trimmed),
+      );
       return true;
     } catch (_) {
       return false;
@@ -183,14 +197,16 @@ class AuthController extends Notifier<AuthState> {
       state = AuthState(isRestoring: false, usesDemoData: _repository.usesDemoData);
       return;
     }
-    unawaited(_applySession(session));
+    if (!state.isRestoring) {
+      unawaited(_applySession(session));
+    }
   }
 
   Future<void> _restoreSession(AuthRepository repository) async {
     try {
       final session = await repository.currentSession();
       if (!ref.mounted) return;
-      if (session != null && state.session == null) {
+      if (session != null) {
         await _applySession(session);
       }
     } catch (_) {
@@ -203,22 +219,27 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> _applySession(AuthSession session) async {
-    state = state.copyWith(session: session, isBusy: false, isRestoring: false, clearFailure: true);
-
+    UserProfile? profile;
     try {
-      final profile = await _repository.fetchProfile(session.userId);
-      if (!ref.mounted || state.session?.userId != session.userId) return;
-      if (profile != null) {
-        state = state.copyWith(profile: profile);
-        _syncLocalProfile(profile);
+      profile = await _repository.fetchProfile(session.userId);
+      if (profile != null && ref.mounted) {
+        await _syncLocalProfile(profile);
       }
     } catch (_) {
       // La sesión sigue siendo válida aunque el perfil no se pueda leer.
     }
+
+    if (!ref.mounted) return;
+    state = state.copyWith(
+      session: session,
+      profile: profile ?? state.profile,
+      isBusy: false,
+      clearFailure: true,
+    );
   }
 
   /// Refleja en el estado local lo que el servidor ya confirmó.
-  void _syncLocalProfile(UserProfile profile) {
+  Future<void> _syncLocalProfile(UserProfile profile) async {
     final name = profile.displayName;
     if (name != null && name.isNotEmpty) {
       ref.read(userNameProvider.notifier).setName(name);
@@ -226,6 +247,16 @@ class AuthController extends Notifier<AuthState> {
     final type = profile.profileType;
     if (type != null) {
       ref.read(profileTypeProvider.notifier).select(type);
+    }
+    final municipalityCode = profile.currentMunicipalityCode;
+    if (municipalityCode != null && municipalityCode.isNotEmpty) {
+      try {
+        final repository = ref.read(municipalityRepositoryProvider);
+        final municipality = await repository.getByCode(municipalityCode);
+        if (municipality != null && ref.mounted) {
+          ref.read(selectedMunicipalityProvider.notifier).select(municipality);
+        }
+      } catch (_) {}
     }
   }
 

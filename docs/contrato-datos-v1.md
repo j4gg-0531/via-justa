@@ -178,6 +178,10 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
   | `is_hidden` | `BOOLEAN` | NOT NULL DEFAULT false | Oculto por moderación o anomalía |
   | `source_note` | `VARCHAR(255)` | NULL | Fuente u observación (ej. "Factura local", "Observación en terminal") |
   | `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT now() | Fecha y hora del reporte |
+  | `destination_zone_id` | `VARCHAR(50)` | NULL, FK -> `municipality_zones(id)` | Zona del destino para trayectos de taxi (`transport_taxi_minimal`) |
+  | `destination_location` | `GEOGRAPHY(Point, 4326)` | NULL | Coordenadas aproximadas del destino (redondeadas a 3 decimales en trigger por RN-08) |
+  | `distance_km` | `NUMERIC(8,2)` | NULL, CHECK (`>= 0`) | Distancia en línea recta entre origen y destino calculada en SQL |
+  | `distance_range` | `VARCHAR(16)` | NULL, CHECK (`IN ('0_2_km', '2_5_km', 'gt_5_km')`) | Rango de distancia clasificado en SQL (`0–2 km`, `2–5 km`, `> 5 km`) |
 
 > **Protocolo Transaccional de Supresión de Cuenta y Minimización de Datos en 5 Fases (Habeas Data - Ley 1581 de 2012, actualizado en `VJ-18`):**  
 > 
@@ -434,7 +438,12 @@ CREATE OR REPLACE FUNCTION calculate_price_verdict(
     p_category_id VARCHAR,
     p_municipality_code VARCHAR,
     p_zone_id VARCHAR,
-    p_amount_cop INTEGER
+    p_amount_cop INTEGER,
+    p_destination_zone_id VARCHAR DEFAULT NULL,
+    p_origin_lat DOUBLE PRECISION DEFAULT NULL,
+    p_origin_lng DOUBLE PRECISION DEFAULT NULL,
+    p_destination_lat DOUBLE PRECISION DEFAULT NULL,
+    p_destination_lng DOUBLE PRECISION DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -443,7 +452,7 @@ AS $$ ... $$;
 ```
 
 ### 3.2 Lógica Estadística y Reglas de Negocio
-1. **Filtro de reportes válidos por zona del municipio:** Se consultan reportes de la misma categoría, municipio y **zona del municipio** (`zone_id = p_zone_id`, p. ej. Norte, Centro, Sur, Oriente u Occidente en Valledupar) dentro de una ventana de **60 días** (`created_at >= now() - INTERVAL '60 days'`), excluyendo reportes ocultos (`is_hidden = false`) y demos (`is_demo = false`).
+1. **Filtro de reportes válidos por zona del municipio (o por rango de distancia en taxi):** Se consultan reportes de la misma categoría, municipio y **zona del municipio** (`zone_id = p_zone_id`, p. ej. Norte, Centro, Sur, Oriente u Occidente en Valledupar) dentro de una ventana de **60 días** (`created_at >= now() - INTERVAL '60 days'`), excluyendo reportes ocultos (`is_hidden = false`) y demos (`is_demo = false`). Cuando `p_category_id = 'transport_taxi_minimal'` y se suministra destino o coordenadas de trayecto, SQL calcula la distancia en línea recta (`calculate_taxi_distance_km`) y clasifica el trayecto en `'0_2_km'` ($\le 2\text{ km}$), `'2_5_km'` ($2\text{–}5\text{ km}$) o `'gt_5_km'` ($> 5\text{ km}$) mediante `classify_taxi_distance_range`, filtrando los reportes de taxi del municipio en ese mismo `distance_range`.
 2. **Muestra mínima en la zona ($N \ge 3$):**
    - Si la cantidad de reportes válidos en la zona $N < 3$, la función retorna `level: "insufficient"`. No se asigna color de semáforo ni recomendación cuantitativa.
 3. **Cálculo de la referencia zonal (Mediana):**
@@ -471,6 +480,9 @@ AS $$ ... $$;
   "category_id": "transport_taxi_minimal",
   "municipality_code": "20001",
   "zone_id": "vup_centro",
+  "destination_zone_id": "vup_norte",
+  "distance_km": 3.45,
+  "distance_range": "2_5_km",
   "amount_cop": 15000,
   "reference_cop": 12000,
   "baseline_reference_cop": 12000,

@@ -28,6 +28,6 @@ enum ProfileType {
     return null;
   }
 
-  /// Tipos que el backend ya acepta (D11 pendiente para `resident`).
-  bool get isPersistable => this != ProfileType.resident;
+  /// Tipos que el backend acepta (D11 ratificada en migración 0006: visitor, settler y resident).
+  bool get isPersistable => true;
 }

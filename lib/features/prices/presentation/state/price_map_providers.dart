@@ -6,6 +6,7 @@ import 'package:via_justa/core/supabase/supabase_providers.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/data/local_price_map_repository.dart';
 import 'package:via_justa/features/prices/data/supabase_price_map_repository.dart';
+import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_map_filter.dart';
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
 import 'package:via_justa/features/prices/domain/price_map_repository.dart';
@@ -221,3 +222,113 @@ final priceMapSectionTitleKeyProvider = Provider<String>((ref) {
   final category = ref.watch(priceMapCategoryProvider);
   return sectionTitleKeyForMapCategory(category);
 });
+
+
+/// Resultado y estado activo de selección de un punto preciso en el mapa municipal.
+class PickedMapPoint {
+  const PickedMapPoint({
+    required this.zoneId,
+    required this.latitude,
+    required this.longitude,
+    required this.normalizedX,
+    required this.normalizedY,
+  });
+
+  final String zoneId;
+  final double latitude;
+  final double longitude;
+  final double normalizedX;
+  final double normalizedY;
+}
+
+/// Notifier para el selector modal de punto en el mapa (`showMapPointPickerSheet`).
+class MapPointPickerNotifier extends Notifier<PickedMapPoint> {
+  @override
+  PickedMapPoint build() {
+    return const PickedMapPoint(
+      zoneId: 'vup_centro',
+      latitude: 10.4742,
+      longitude: -73.2436,
+      normalizedX: 0.50,
+      normalizedY: 0.50,
+    );
+  }
+
+  void initialize({
+    required List<MunicipalityZone> zones,
+    required String initialZoneId,
+    double? initialLatitude,
+    double? initialLongitude,
+  }) {
+    MunicipalityZone? initialZone;
+    for (final z in zones) {
+      if (z.id == initialZoneId) {
+        initialZone = z;
+        break;
+      }
+    }
+    initialZone ??= zones.isNotEmpty ? zones.first : null;
+    state = PickedMapPoint(
+      zoneId: initialZone?.id ?? initialZoneId,
+      latitude: initialLatitude ?? initialZone?.centerLat ?? 10.4742,
+      longitude: initialLongitude ?? initialZone?.centerLng ?? -73.2436,
+      normalizedX: initialZone?.normalizedX ?? 0.50,
+      normalizedY: initialZone?.normalizedY ?? 0.50,
+    );
+  }
+
+  void selectCoordinates({
+    required List<MunicipalityZone> zones,
+    required double latitude,
+    required double longitude,
+  }) {
+    final nearest = resolveNearestZoneByCoordinates(
+      zones: zones,
+      latitude: latitude,
+      longitude: longitude,
+    );
+    state = PickedMapPoint(
+      zoneId: nearest?.id ?? state.zoneId,
+      latitude: latitude,
+      longitude: longitude,
+      normalizedX: nearest?.normalizedX ?? state.normalizedX,
+      normalizedY: nearest?.normalizedY ?? state.normalizedY,
+    );
+  }
+
+  void selectNormalizedPoint({
+    required List<MunicipalityZone> zones,
+    required double normalizedX,
+    required double normalizedY,
+  }) {
+    final nearest = resolveNearestZoneByNormalizedPoint(
+      zones: zones,
+      normalizedX: normalizedX,
+      normalizedY: normalizedY,
+    );
+    if (nearest == null) return;
+    state = PickedMapPoint(
+      zoneId: nearest.id,
+      latitude: nearest.centerLat,
+      longitude: nearest.centerLng,
+      normalizedX: normalizedX.clamp(0.08, 0.92),
+      normalizedY: normalizedY.clamp(0.10, 0.90),
+    );
+  }
+
+  void selectZone(MunicipalityZone zone) {
+    state = PickedMapPoint(
+      zoneId: zone.id,
+      latitude: zone.centerLat,
+      longitude: zone.centerLng,
+      normalizedX: zone.normalizedX,
+      normalizedY: zone.normalizedY,
+    );
+  }
+}
+
+/// Provider del punto activo en la hoja inferior de selección de mapa.
+final mapPointPickerProvider =
+    NotifierProvider<MapPointPickerNotifier, PickedMapPoint>(
+  MapPointPickerNotifier.new,
+);

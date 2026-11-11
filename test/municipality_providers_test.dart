@@ -178,6 +178,21 @@ void main() {
       expect(container.read(isMunicipalityInterestedProvider('20011')), isTrue);
     });
 
+    test('setDebouncedQuery debounces fast typing and emits only after delay', () async {
+      container
+          .read(municipalityQueryProvider.notifier)
+          .setDebouncedQuery('valle');
+      expect(container.read(municipalityQueryProvider), '');
+
+      container
+          .read(municipalityQueryProvider.notifier)
+          .setDebouncedQuery('valledupar');
+      expect(container.read(municipalityQueryProvider), '');
+
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      expect(container.read(municipalityQueryProvider), 'valledupar');
+    });
+
     test('scanModeProvider switches and resets mode without view setState', () {
       expect(container.read(scanModeProvider), ScanMode.price);
 

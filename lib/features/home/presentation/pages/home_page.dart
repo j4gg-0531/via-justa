@@ -157,7 +157,6 @@ class HomePage extends ConsumerWidget {
                 icon: Icons.rate_review_outlined,
                 title: 'home.contribute_action_title'.tr(),
                 subtitle: 'home.contribute_action_desc'.tr(),
-                badge: 'common.demo_badge'.tr(),
                 onTap: () {
                   if (GoRouter.maybeOf(context) != null) {
                     context.push(AppRoutes.priceContribute);
@@ -454,14 +453,12 @@ class _QuickActionCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.badge,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final String? badge;
 
   @override
   Widget build(BuildContext context) {
@@ -485,19 +482,9 @@ class _QuickActionCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: textTheme.titleMedium?.copyWith(fontSize: 15),
-                      ),
-                    ),
-                    if (badge != null) ...[
-                      const SizedBox(width: AppSpacing.xs),
-                      VjBadge(label: badge!),
-                    ],
-                  ],
+                Text(
+                  title,
+                  style: textTheme.titleMedium?.copyWith(fontSize: 15),
                 ),
                 const SizedBox(height: 2),
                 Text(

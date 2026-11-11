@@ -8,6 +8,7 @@ import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/map_colombia/presentation/state/map_providers.dart';
 import 'package:via_justa/features/municipality/domain/municipality.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
@@ -115,6 +116,9 @@ class _PilotView extends ConsumerWidget {
         trailingIcon: Icons.arrow_forward,
         onPressed: () {
           ref.read(selectedMunicipalityProvider.notifier).select(municipality);
+          ref
+              .read(authControllerProvider.notifier)
+              .saveCurrentMunicipality(municipality.code);
           context.go(AppRoutes.home);
         },
       ),
