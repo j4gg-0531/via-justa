@@ -24,6 +24,14 @@ const int kMaxContributionCop = 20000000;
 /// Longitud máxima permitida para la nota o referencia opcional del lugar.
 const int kMaxPlaceNoteLength = 120;
 
+/// Identificador de la categoría comparable de taxi urbano.
+const String kTaxiMinimalCategoryId = 'transport_taxi_minimal';
+
+/// Indica si la categoría requiere seleccionar tanto punto de origen como punto de destino.
+bool categoryRequiresDestination(String categoryId) {
+  return categoryId.trim() == kTaxiMinimalCategoryId;
+}
+
 /// Valida que el identificador de categoría no esté vacío (Paso 1 del wizard M10).
 bool isValidContributionCategory(String categoryId) {
   return categoryId.trim().isNotEmpty;
@@ -53,6 +61,28 @@ bool isValidContributionZone(String zoneId) {
   return zoneId.trim().isNotEmpty;
 }
 
+/// Valida los datos de ubicación del Paso 3 según la categoría seleccionada:
+/// - Todas las categorías exigen una zona de origen/establecimiento válida.
+/// - Cuando la categoría es taxi (`transport_taxi_minimal`), exige además que
+///   el usuario haya seleccionado un destino en el mapa.
+bool isValidContributionLocation({
+  required String categoryId,
+  required String zoneId,
+  String? destinationZoneId,
+  double? destinationLatitude,
+  double? destinationLongitude,
+}) {
+  if (!isValidContributionZone(zoneId)) return false;
+  if (categoryRequiresDestination(categoryId)) {
+    final hasDestZone =
+        destinationZoneId != null && destinationZoneId.trim().isNotEmpty;
+    final hasDestCoords =
+        destinationLatitude != null && destinationLongitude != null;
+    return hasDestZone || hasDestCoords;
+  }
+  return true;
+}
+
 /// Limpia y recorta la nota opcional de referencia del lugar (máximo 120 caracteres).
 /// Retorna `null` si queda vacía.
 String? sanitizeContributionNote(String rawNote) {
@@ -72,6 +102,13 @@ class PriceContributionRecord {
     required this.zoneId,
     required this.amountCop,
     required this.createdAtIso,
+    this.destinationZoneId,
+    this.originLatitude,
+    this.originLongitude,
+    this.destinationLatitude,
+    this.destinationLongitude,
+    this.distanceKm,
+    this.distanceRange,
     this.placeNote,
     this.isDemo = true,
   });
@@ -80,6 +117,13 @@ class PriceContributionRecord {
   final String categoryId;
   final String municipalityCode;
   final String zoneId;
+  final String? destinationZoneId;
+  final double? originLatitude;
+  final double? originLongitude;
+  final double? destinationLatitude;
+  final double? destinationLongitude;
+  final double? distanceKm;
+  final String? distanceRange;
   final int amountCop;
   final String? placeNote;
   final String createdAtIso;
@@ -92,6 +136,9 @@ class PriceContributionRecord {
       'category_id': categoryId,
       'municipality_code': municipalityCode,
       'zone_id': zoneId,
+      if (destinationZoneId != null) 'destination_zone_id': destinationZoneId,
+      if (distanceKm != null) 'distance_km': distanceKm,
+      if (distanceRange != null) 'distance_range': distanceRange,
       'amount_cop': amountCop,
       'place_name': placeNote,
       'is_demo': isDemo,

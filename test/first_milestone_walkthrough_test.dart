@@ -16,10 +16,12 @@ import 'package:via_justa/features/municipality/presentation/state/municipality_
 import 'package:via_justa/features/onboarding/domain/profile_type.dart';
 import 'package:via_justa/features/onboarding/presentation/pages/profile_selection_page.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
+import 'package:via_justa/features/prices/domain/price_verdict_repository.dart';
 import 'package:via_justa/features/prices/presentation/pages/contribute_price_page.dart';
 import 'package:via_justa/features/prices/presentation/pages/price_map_page.dart';
 import 'package:via_justa/features/prices/presentation/pages/price_result_page.dart';
 import 'package:via_justa/features/prices/presentation/state/price_contribution_provider.dart';
+import 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart';
 import 'package:via_justa/features/profile/presentation/pages/profile_page.dart';
 import 'package:via_justa/features/scan/presentation/pages/scan_page.dart';
 
@@ -153,6 +155,16 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ScanPage), findsOneWidget);
 
+      // Seleccionar destino en el mapa para la categoría de Taxi
+      final pickDestBtn = find.text('price_verdict.pick_point_on_map_btn');
+      await tester.ensureVisible(pickDestBtn);
+      await tester.tap(pickDestBtn);
+      await tester.pumpAndSettle();
+      final confirmMapBtn = find.text('price_verdict.confirm_map_point_cta');
+      await tester.ensureVisible(confirmMapBtn);
+      await tester.tap(confirmMapBtn);
+      await tester.pumpAndSettle();
+
       final evaluateBtn = find.text('price_verdict.evaluate_cta');
       await tester.ensureVisible(evaluateBtn);
       await tester.tap(evaluateBtn);
@@ -160,10 +172,10 @@ void main() {
       expect(find.byType(PriceResultPage), findsOneWidget);
       expect(find.text('price_verdict.orientative_disclaimer'), findsOneWidget);
 
-      // Alternar variante M20 (muestra insuficiente N < 3) en la pantalla de resultado
-      final insufficientChip = find.text('price_verdict.scenario_insufficient');
-      await tester.ensureVisible(insufficientChip);
-      await tester.tap(insufficientChip);
+      // Verificar variante M20 (muestra insuficiente N < 3) en la pantalla de resultado
+      await container
+          .read(priceScanProvider.notifier)
+          .evaluateScenario(DemoPriceScenario.insufficientSample);
       await tester.pumpAndSettle();
       expect(
         find.text('price_verdict.insufficient_no_threshold'),
@@ -185,7 +197,7 @@ void main() {
       await tester.tap(nextStepBtn); // Paso 1 -> Paso 2
       await tester.pumpAndSettle();
 
-      final presetAmount = find.text(r'$12.000 COP');
+      final presetAmount = find.text(r'$16.000 COP');
       await tester.ensureVisible(presetAmount);
       await tester.tap(presetAmount);
       await tester.pumpAndSettle();

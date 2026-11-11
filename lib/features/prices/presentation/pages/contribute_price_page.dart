@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
-import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/core/widgets/vj_text_field.dart';
@@ -16,9 +15,10 @@ import 'package:via_justa/features/prices/domain/price_contribution.dart';
 import 'package:via_justa/features/prices/domain/price_verdict.dart';
 import 'package:via_justa/features/prices/presentation/state/price_contribution_provider.dart';
 import 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart';
+import 'package:via_justa/features/prices/presentation/widgets/map_point_picker_sheet.dart';
 import 'package:via_justa/features/prices/presentation/widgets/zone_map_picker_card.dart';
 
-/// Pantalla 14 (M10) · Asistente en 4 pasos para aportar un precio ciudadano (DEMO).
+/// Pantalla 14 (M10) · Asistente en 4 pasos para aportar un precio ciudadano.
 class ContributePricePage extends ConsumerStatefulWidget {
   const ContributePricePage({super.key});
 
@@ -91,6 +91,34 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
     }
   }
 
+  Future<void> _openDestinationMapSheet({
+    required BuildContext context,
+    required List<MunicipalityZone> zones,
+    required PriceContributionWizardState wizard,
+    required String cityName,
+    required String languageCode,
+  }) async {
+    final picked = await showMapPointPickerSheet(
+      context: context,
+      title: 'price_verdict.taxi_destination_label'.tr(),
+      subtitle: 'price_verdict.taxi_destination_sheet_subtitle'.tr(
+        namedArgs: {'city': cityName},
+      ),
+      zones: zones,
+      initialZoneId: wizard.selectedDestinationZoneId ?? wizard.selectedZoneId,
+      initialLatitude: wizard.destinationLatitude,
+      initialLongitude: wizard.destinationLongitude,
+      languageCode: languageCode,
+      allowGpsButton: false,
+    );
+    if (!mounted || picked == null) return;
+    ref.read(priceContributionProvider.notifier).selectPreciseDestination(
+          destinationZoneId: picked.zoneId,
+          latitude: picked.latitude,
+          longitude: picked.longitude,
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
     final wizard = ref.watch(priceContributionProvider);
@@ -99,6 +127,7 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
     final zonesAsync = ref.watch(municipalityZonesProvider);
     final activeCategory = ref.watch(activeContributionCategoryProvider);
     final activeZone = ref.watch(activeContributionZoneProvider);
+    final activeDestZone = ref.watch(activeContributionDestinationZoneProvider);
     final cityName = ref.watch(activeCityNameProvider);
     final municipality = ref.watch(selectedMunicipalityProvider);
     final municipalityCode = municipality?.code ?? '20001';
@@ -124,7 +153,7 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
             children: [
               const SizedBox(height: AppSpacing.md),
 
-              // Cabecera con botón Atrás, título e insignia DEMO
+              // Cabecera con botón Atrás y título
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -150,7 +179,6 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
                           style:
                               textTheme.headlineMedium?.copyWith(fontSize: 22),
                         ),
-                        VjBadge(label: 'common.demo_badge'.tr()),
                       ],
                     ),
                   ),
@@ -159,19 +187,18 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
 
               const SizedBox(height: AppSpacing.md),
 
-              // Si ya se completó el aporte (Paso 4 confirmado), mostrar pantalla de éxito DEMO
               if (wizard.isCompleted)
                 _CompletedContributionView(
                   record: wizard.submittedRecord!,
                   category: activeCategory,
                   zone: activeZone,
+                  destinationZone: activeDestZone,
                   cityName: cityName,
                   languageCode: languageCode,
                   onAnotherContribution: _startNewContribution,
                   onFinish: () => _handleBack(context),
                 )
               else ...[
-                // Indicador de progreso de los 4 pasos
                 _StepProgressHeader(
                   currentStep: wizard.currentStep,
                   displayStepNumber: wizard.displayStepNumber,
@@ -179,7 +206,6 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
 
                 const SizedBox(height: AppSpacing.lg),
 
-                // Contenido del paso activo (0, 1, 2 o 3)
                 if (wizard.currentStep == 0)
                   _Step1CategorySelection(
                     categoriesAsync: categoriesAsync,
@@ -201,6 +227,7 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
                     wizard: wizard,
                     zonesAsync: zonesAsync,
                     activeZone: activeZone,
+                    activeDestinationZone: activeDestZone,
                     cityName: cityName,
                     municipalityCode: municipalityCode,
                     languageCode: languageCode,
@@ -219,6 +246,13 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
                           normalizedY: normY,
                           zones: zones,
                         ),
+                    onPickDestinationOnMap: (zones) => _openDestinationMapSheet(
+                      context: context,
+                      zones: zones,
+                      wizard: wizard,
+                      cityName: cityName,
+                      languageCode: languageCode,
+                    ),
                     onNoteChanged: notifier.setRawPlaceNote,
                   )
                 else
@@ -226,6 +260,7 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
                     wizard: wizard,
                     category: activeCategory,
                     zone: activeZone,
+                    destinationZone: activeDestZone,
                     cityName: cityName,
                     languageCode: languageCode,
                     onEditStep: notifier.goToStep,
@@ -233,7 +268,6 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
 
                 const SizedBox(height: AppSpacing.xl),
 
-                // Botones de navegación del Wizard (Anterior / Siguiente o Confirmar)
                 Row(
                   children: [
                     if (wizard.currentStep > 0) ...[
@@ -487,12 +521,13 @@ class _Step2AmountInput extends StatelessWidget {
   }
 }
 
-/// Paso 3: Ubicación por permiso GPS o selección en mapa por zona + nota opcional sin PII.
+/// Paso 3: Ubicación por permiso GPS o selección precisa en mapa (y destino cuando la categoría es taxi).
 class _Step3ZoneAndNoteSelection extends StatelessWidget {
   const _Step3ZoneAndNoteSelection({
     required this.wizard,
     required this.zonesAsync,
     required this.activeZone,
+    required this.activeDestinationZone,
     required this.cityName,
     required this.municipalityCode,
     required this.languageCode,
@@ -502,12 +537,14 @@ class _Step3ZoneAndNoteSelection extends StatelessWidget {
     required this.onToggleManualMap,
     required this.onZoneTapped,
     required this.onMapPointTapped,
+    required this.onPickDestinationOnMap,
     required this.onNoteChanged,
   });
 
   final PriceContributionWizardState wizard;
   final AsyncValue<List<MunicipalityZone>> zonesAsync;
   final MunicipalityZone? activeZone;
+  final MunicipalityZone? activeDestinationZone;
   final String cityName;
   final String municipalityCode;
   final String languageCode;
@@ -521,6 +558,7 @@ class _Step3ZoneAndNoteSelection extends StatelessWidget {
     double normalizedY,
     List<MunicipalityZone> zones,
   ) onMapPointTapped;
+  final ValueChanged<List<MunicipalityZone>> onPickDestinationOnMap;
   final ValueChanged<String> onNoteChanged;
 
   @override
@@ -538,23 +576,115 @@ class _Step3ZoneAndNoteSelection extends StatelessWidget {
               'price_verdict.load_error'.tr(),
               style: textTheme.bodySmall,
             ),
-            data: (zones) => ZoneMapPickerCard(
-              selectedZoneId: wizard.selectedZoneId,
-              locationPermission: wizard.locationPermission,
-              isManualMapOpen: wizard.isManualMapOpen,
-              shouldShowMapPicker: wizard.shouldShowMapPicker,
-              pinAlignmentX: wizard.pinAlignmentX,
-              pinAlignmentY: wizard.pinAlignmentY,
-              zones: zones,
-              activeZone: activeZone,
-              cityName: cityName,
-              languageCode: languageCode,
-              onRequestGpsPermission: onRequestGpsPermission,
-              onDenyGpsPermission: onDenyGpsPermission,
-              onToggleManualMap: onToggleManualMap,
-              onZoneTapped: onZoneTapped,
-              onMapPointTapped: (normX, normY) =>
-                  onMapPointTapped(normX, normY, zones),
+            data: (zones) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ZoneMapPickerCard(
+                  selectedZoneId: wizard.selectedZoneId,
+                  locationPermission: wizard.locationPermission,
+                  isManualMapOpen: wizard.isManualMapOpen,
+                  shouldShowMapPicker: wizard.shouldShowMapPicker,
+                  pinAlignmentX: wizard.pinAlignmentX,
+                  pinAlignmentY: wizard.pinAlignmentY,
+                  zones: zones,
+                  activeZone: activeZone,
+                  cityName: cityName,
+                  languageCode: languageCode,
+                  onRequestGpsPermission: onRequestGpsPermission,
+                  onDenyGpsPermission: onDenyGpsPermission,
+                  onToggleManualMap: onToggleManualMap,
+                  onZoneTapped: onZoneTapped,
+                  onMapPointTapped: (normX, normY) =>
+                      onMapPointTapped(normX, normY, zones),
+                ),
+                if (wizard.requiresDestination) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    'price_verdict.taxi_destination_label'.tr(),
+                    style: textTheme.titleMedium?.copyWith(fontSize: 14),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'price_verdict.taxi_destination_sheet_subtitle'.tr(
+                      namedArgs: {'city': cityName},
+                    ),
+                    style: textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: activeDestinationZone != null
+                          ? AppColors.primarySoft
+                          : AppColors.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      border: Border.all(
+                        color: wizard.destinationError
+                            ? AppColors.semaphoreRed
+                            : (activeDestinationZone != null
+                                ? AppColors.primary
+                                : AppColors.border),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.flag_outlined,
+                          color: activeDestinationZone != null
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                activeDestinationZone
+                                        ?.localizedName(languageCode) ??
+                                    'price_verdict.taxi_destination_placeholder'
+                                        .tr(),
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontSize: 14,
+                                  color: activeDestinationZone != null
+                                      ? AppColors.textPrimary
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                              if (activeDestinationZone != null &&
+                                  activeDestinationZone!
+                                      .localizedSectorHint(languageCode)
+                                      .isNotEmpty)
+                                Text(
+                                  activeDestinationZone!
+                                      .localizedSectorHint(languageCode),
+                                  style: textTheme.bodySmall,
+                                ),
+                            ],
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => onPickDestinationOnMap(zones),
+                          icon: const Icon(Icons.map_outlined, size: 18),
+                          label: Text(
+                            'price_verdict.pick_point_on_map_btn'.tr(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (wizard.destinationError) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'price_contribute.error_destination_required'.tr(),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppColors.semaphoreRed,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ],
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -574,12 +704,13 @@ class _Step3ZoneAndNoteSelection extends StatelessWidget {
   }
 }
 
-/// Paso 4: Resumen de los datos antes de confirmar y aviso obligatorio de honestidad DEMO.
+/// Paso 4: Resumen de los datos antes de confirmar.
 class _Step4ReviewAndConfirm extends StatelessWidget {
   const _Step4ReviewAndConfirm({
     required this.wizard,
     required this.category,
     required this.zone,
+    required this.destinationZone,
     required this.cityName,
     required this.languageCode,
     required this.onEditStep,
@@ -588,6 +719,7 @@ class _Step4ReviewAndConfirm extends StatelessWidget {
   final PriceContributionWizardState wizard;
   final PriceCategory? category;
   final MunicipalityZone? zone;
+  final MunicipalityZone? destinationZone;
   final String cityName;
   final String languageCode;
   final ValueChanged<int> onEditStep;
@@ -600,6 +732,10 @@ class _Step4ReviewAndConfirm extends StatelessWidget {
     final unitName = category?.localizedUnit(languageCode) ?? '';
     final zoneName =
         zone?.localizedFullLabel(languageCode) ?? wizard.selectedZoneId;
+    final destName = destinationZone?.localizedName(languageCode);
+    final locationSummary = destName != null
+        ? '$cityName · ${zone?.localizedName(languageCode) ?? wizard.selectedZoneId} → $destName'
+        : '$cityName · $zoneName';
     final formattedAmount = wizard.parsedAmount != null
         ? formatCop(wizard.parsedAmount!)
         : wizard.rawAmount;
@@ -632,8 +768,10 @@ class _Step4ReviewAndConfirm extends StatelessWidget {
               ),
               const Divider(height: AppSpacing.lg, color: AppColors.border),
               _SummaryRow(
-                label: 'price_verdict.zone_field_label'.tr(),
-                value: '$cityName · $zoneName',
+                label: destName != null
+                    ? 'price_contribute.route_summary_label'.tr()
+                    : 'price_verdict.zone_field_label'.tr(),
+                value: locationSummary,
                 onEdit: () => onEditStep(2),
               ),
               if (note != null) ...[
@@ -681,12 +819,13 @@ class _Step4ReviewAndConfirm extends StatelessWidget {
   }
 }
 
-/// Estado final cuando el aporte ya se guardó localmente en modo DEMO.
+/// Estado final cuando el aporte ya se guardó.
 class _CompletedContributionView extends StatelessWidget {
   const _CompletedContributionView({
     required this.record,
     required this.category,
     required this.zone,
+    required this.destinationZone,
     required this.cityName,
     required this.languageCode,
     required this.onAnotherContribution,
@@ -696,6 +835,7 @@ class _CompletedContributionView extends StatelessWidget {
   final PriceContributionRecord record;
   final PriceCategory? category;
   final MunicipalityZone? zone;
+  final MunicipalityZone? destinationZone;
   final String cityName;
   final String languageCode;
   final VoidCallback onAnotherContribution;
@@ -707,6 +847,10 @@ class _CompletedContributionView extends StatelessWidget {
     final categoryName =
         category?.localizedName(languageCode) ?? record.categoryId;
     final zoneName = zone?.localizedFullLabel(languageCode) ?? record.zoneId;
+    final destName = destinationZone?.localizedName(languageCode);
+    final locationLabel = destName != null
+        ? '$cityName · ${zone?.localizedName(languageCode) ?? record.zoneId} → $destName'
+        : '$cityName · $zoneName';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -759,7 +903,7 @@ class _CompletedContributionView extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '$cityName · $zoneName',
+                locationLabel,
                 style: textTheme.bodySmall?.copyWith(
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w600,

@@ -32,6 +32,11 @@ class _DelayedFakeVerdictRepository implements PriceVerdictRepository {
     required String municipalityCode,
     String zoneId = 'vup_centro',
     required int submittedCop,
+    String? destinationZoneId,
+    double? originLatitude,
+    double? originLongitude,
+    double? destinationLatitude,
+    double? destinationLongitude,
     bool includeEventContext = false,
   }) {
     final completer = Completer<PriceVerdict>();
@@ -355,6 +360,29 @@ void main() {
       expect(parsed.zoneId, 'vup_norte');
       expect(parsed.referenceCop, 12000);
       expect(parsed.n, 8);
+      final suggestion = resolvePriceSuggestion(parsed);
+      expect(suggestion, isNotNull);
+      expect(suggestion!.titleKey, 'price_verdict.suggestion_section_title');
+      expect(suggestion.bodyKey, 'price_verdict.suggestion_yellow_body');
+      expect(suggestion.formattedReferenceCop, r'$12.000 COP');
+      expect(suggestion.formattedRecommendedCapCop, r'$13.800 COP');
+      expect(
+        buildVerdictHeaderTitle(
+          categoryId: 'transport_taxi_minimal',
+          categoryName: 'Taxi',
+          originZoneName: 'Zona Centro',
+          destinationZoneName: 'Zona Norte',
+        ),
+        'Taxi: Zona Centro → Zona Norte',
+      );
+      expect(
+        buildVerdictHeaderTitle(
+          categoryId: 'food_corrientazo',
+          categoryName: 'Almuerzo',
+          originZoneName: 'Zona Centro',
+        ),
+        'Almuerzo · Zona Centro',
+      );
     });
   });
 
@@ -429,7 +457,24 @@ void main() {
       expect(container.read(priceScanProvider).selectedZoneId, 'vup_norte');
 
       // 3. User later grants GPS permission -> auto-detects vup_centro and closes manual map
+      // 3. User later grants GPS permission -> auto-detects vup_centro and closes manual map
       await notifier.grantLocationPermissionAndDetect();
+      expect(container.read(priceScanProvider).isTaxiCategory, isTrue);
+      final withoutDest = await notifier.submitEvaluation();
+      expect(withoutDest, isFalse);
+      expect(container.read(priceScanProvider).destinationError, isTrue);
+      notifier.selectDestinationPoint(
+        zoneId: 'vup_norte',
+        latitude: 10.4885,
+        longitude: -73.2535,
+      );
+      expect(container.read(priceScanProvider).destinationError, isFalse);
+      final withDest = await notifier.submitEvaluation();
+      expect(withDest, isTrue);
+      expect(
+        container.read(priceScanProvider).verdictAsync.value?.destinationZoneId,
+        'vup_norte',
+      );
       expect(
         container.read(priceScanProvider).locationPermission,
         LocationPermissionStatus.granted,

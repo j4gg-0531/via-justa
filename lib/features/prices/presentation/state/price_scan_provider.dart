@@ -1,16 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:via_justa/core/supabase/supabase_providers.dart';
-import 'package:via_justa/features/contracts/presentation/state/contract_analysis_provider.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis.dart';
+import 'package:via_justa/features/contracts/presentation/state/contract_analysis_provider.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/data/demo_price_verdict_repository.dart';
 import 'package:via_justa/features/prices/data/supabase_price_verdict_repository.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_category.dart';
+import 'package:via_justa/features/prices/domain/price_contribution.dart';
 import 'package:via_justa/features/prices/domain/price_verdict.dart';
 import 'package:via_justa/features/prices/domain/price_verdict_repository.dart';
 
-/// Proveedor del repositorio de veredictos de precio (Ãºnico lugar que conoce la implementaciÃ³n concreta).
+/// Proveedor del repositorio de veredictos de precio (único lugar que conoce la implementación concreta).
 final priceVerdictRepositoryProvider = Provider<PriceVerdictRepository>((ref) {
   final client = ref.watch(supabaseClientProvider);
   if (client != null) {
@@ -19,7 +20,7 @@ final priceVerdictRepositoryProvider = Provider<PriceVerdictRepository>((ref) {
   return const DemoPriceVerdictRepository();
 });
 
-/// CatÃ¡logo de zonas del municipio activo para segmentar las medianas estadÃ­sticas (ej. Norte, Centro, Sur, Oriente, Occidente en Valledupar).
+/// Catálogo de zonas del municipio activo para segmentar las medianas estadísticas (ej. Norte, Centro, Sur, Oriente, Occidente en Valledupar).
 final municipalityZonesProvider = FutureProvider<List<MunicipalityZone>>((ref) {
   final municipality = ref.watch(selectedMunicipalityProvider);
   final code = municipality?.code ?? '20001';
@@ -28,21 +29,25 @@ final municipalityZonesProvider = FutureProvider<List<MunicipalityZone>>((ref) {
       .getZones(municipalityCode: code);
 });
 
-/// CatÃ¡logo de categorÃ­as comparables obtenido desde el repositorio.
+/// Catálogo de categorías comparables obtenido desde el repositorio.
 final priceCategoriesProvider = FutureProvider<List<PriceCategory>>((ref) {
   return ref.watch(priceVerdictRepositoryProvider).getCategories();
 });
 
-
-/// Ejemplo demostrativo de anÃ¡lisis de contrato para la pestaÃ±a Contratos.
+/// Ejemplo demostrativo de análisis de contrato para el modo DEMO sin backend.
 final demoContractAnalysisProvider = FutureProvider<ContractAnalysis>((ref) {
   return ref.watch(contractAnalysisRepositoryProvider).getDemoSampleAnalysis();
 });
 
-/// Estado del formulario y evaluaciÃ³n del semÃ¡foro de precios por zona del municipio (M06 / M07 / M20).
+/// Estado del formulario y evaluación del semáforo de precios por zona o trayecto (M06 / M07 / M20).
 class PriceScanState {
   const PriceScanState({
     this.selectedZoneId = 'vup_centro',
+    this.originLatitude,
+    this.originLongitude,
+    this.destinationZoneId,
+    this.destinationLatitude,
+    this.destinationLongitude,
     this.locationPermission = LocationPermissionStatus.prompt,
     this.isManualMapOpen = false,
     this.pinNormalizedX = 0.50,
@@ -50,12 +55,18 @@ class PriceScanState {
     this.selectedCategoryId = 'transport_taxi_minimal',
     this.rawAmount = '12500',
     this.includeEventContext = false,
-    this.selectedScenario = DemoPriceScenario.yellowModerate,
+    this.selectedScenario,
     this.amountError = false,
+    this.destinationError = false,
     this.verdictAsync = const AsyncData<PriceVerdict?>(null),
   });
 
   final String selectedZoneId;
+  final double? originLatitude;
+  final double? originLongitude;
+  final String? destinationZoneId;
+  final double? destinationLatitude;
+  final double? destinationLongitude;
   final LocationPermissionStatus locationPermission;
   final bool isManualMapOpen;
   final double pinNormalizedX;
@@ -65,23 +76,33 @@ class PriceScanState {
   final bool includeEventContext;
   final DemoPriceScenario? selectedScenario;
   final bool amountError;
+  final bool destinationError;
   final AsyncValue<PriceVerdict?> verdictAsync;
 
   /// Monto formateado listo para mostrar en controles auxiliares.
   int? get parsedAmount => parseCopAmount(rawAmount);
 
-  /// Coordenada horizontal del pin del usuario en rango de alineaciÃ³n [-1.0, 1.0].
+  /// Indica si la categoría activa es taxi y requiere tanto origen como destino.
+  bool get isTaxiCategory => categoryRequiresDestination(selectedCategoryId);
+
+  /// Coordenada horizontal del pin del usuario en rango de alineación [-1.0, 1.0].
   double get pinAlignmentX => (pinNormalizedX * 2) - 1;
 
-  /// Coordenada vertical del pin del usuario en rango de alineaciÃ³n [-1.0, 1.0].
+  /// Coordenada vertical del pin del usuario en rango de alineación [-1.0, 1.0].
   double get pinAlignmentY => (pinNormalizedY * 2) - 1;
 
-  /// Indica si se debe mostrar el mapa manual para elegir zona (cuando se deniega permiso o se abre manualmente).
+  /// Indica si se debe mostrar el mapa manual para elegir zona.
   bool get shouldShowMapPicker =>
       locationPermission == LocationPermissionStatus.denied || isManualMapOpen;
 
   PriceScanState copyWith({
     String? selectedZoneId,
+    double? originLatitude,
+    double? originLongitude,
+    String? destinationZoneId,
+    double? destinationLatitude,
+    double? destinationLongitude,
+    bool clearDestination = false,
     LocationPermissionStatus? locationPermission,
     bool? isManualMapOpen,
     double? pinNormalizedX,
@@ -92,10 +113,22 @@ class PriceScanState {
     DemoPriceScenario? selectedScenario,
     bool clearScenario = false,
     bool? amountError,
+    bool? destinationError,
     AsyncValue<PriceVerdict?>? verdictAsync,
   }) {
     return PriceScanState(
       selectedZoneId: selectedZoneId ?? this.selectedZoneId,
+      originLatitude: originLatitude ?? this.originLatitude,
+      originLongitude: originLongitude ?? this.originLongitude,
+      destinationZoneId: clearDestination
+          ? null
+          : (destinationZoneId ?? this.destinationZoneId),
+      destinationLatitude: clearDestination
+          ? null
+          : (destinationLatitude ?? this.destinationLatitude),
+      destinationLongitude: clearDestination
+          ? null
+          : (destinationLongitude ?? this.destinationLongitude),
       locationPermission: locationPermission ?? this.locationPermission,
       isManualMapOpen: isManualMapOpen ?? this.isManualMapOpen,
       pinNormalizedX: pinNormalizedX ?? this.pinNormalizedX,
@@ -106,21 +139,22 @@ class PriceScanState {
       selectedScenario:
           clearScenario ? null : (selectedScenario ?? this.selectedScenario),
       amountError: amountError ?? this.amountError,
+      destinationError: destinationError ?? this.destinationError,
       verdictAsync: verdictAsync ?? this.verdictAsync,
     );
   }
 }
 
-/// Controlador de escaneo y evaluaciÃ³n de precios por zona del municipio.
+/// Controlador de escaneo y evaluación de precios por zona o trayecto de taxi.
 /// Gestiona concurrencia mediante `_requestToken` para descartar respuestas obsoletas
-/// y limpiar resultados previos al iniciar una nueva bÃºsqueda.
+/// y limpiar resultados previos al iniciar una nueva búsqueda.
 class PriceScanNotifier extends Notifier<PriceScanState> {
   int _requestToken = 0;
 
   @override
   PriceScanState build() => const PriceScanState();
 
-  /// Concede permiso de ubicaciÃ³n del telÃ©fono y autodetecta la zona actual por GPS.
+  /// Concede permiso de ubicación del teléfono y autodetecta la zona actual por GPS.
   Future<void> grantLocationPermissionAndDetect({
     String municipalityCode = '20001',
   }) async {
@@ -133,15 +167,18 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
       locationPermission: LocationPermissionStatus.granted,
       isManualMapOpen: false,
       selectedZoneId: detectedZone.id,
+      originLatitude: detectedZone.centerLat,
+      originLongitude: detectedZone.centerLng,
       pinNormalizedX: detectedZone.normalizedX,
       pinNormalizedY: detectedZone.normalizedY,
       clearScenario: true,
       amountError: false,
+      destinationError: false,
       verdictAsync: const AsyncData<PriceVerdict?>(null),
     );
   }
 
-  /// Deniega el permiso de ubicaciÃ³n del telÃ©fono y habilita el mapa interactivo para selecciÃ³n manual.
+  /// Deniega el permiso de ubicación del teléfono y habilita el mapa interactivo para selección manual.
   void denyLocationPermissionAndOpenMap() {
     _requestToken++;
     state = state.copyWith(
@@ -151,7 +188,7 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
     );
   }
 
-  /// Abre o cierra el mapa interactivo de selecciÃ³n manual de zona.
+  /// Abre o cierra el mapa interactivo de selección manual de zona.
   void toggleManualMapPicker(bool open) {
     state = state.copyWith(isManualMapOpen: open);
   }
@@ -162,17 +199,23 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
     final zones = ref.read(municipalityZonesProvider).value;
     double? nextX;
     double? nextY;
+    double? nextLat;
+    double? nextLng;
     if (zones != null) {
       for (final z in zones) {
         if (z.id == zoneId) {
           nextX = z.normalizedX;
           nextY = z.normalizedY;
+          nextLat = z.centerLat;
+          nextLng = z.centerLng;
           break;
         }
       }
     }
     state = state.copyWith(
       selectedZoneId: zoneId,
+      originLatitude: nextLat,
+      originLongitude: nextLng,
       pinNormalizedX: nextX,
       pinNormalizedY: nextY,
       clearScenario: true,
@@ -181,8 +224,46 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
     );
   }
 
+  /// Selecciona el punto de origen (o ubicación del establecimiento) desde el bottom sheet del mapa.
+  void selectOriginPoint({
+    required String zoneId,
+    required double latitude,
+    required double longitude,
+    required double normalizedX,
+    required double normalizedY,
+  }) {
+    _requestToken++;
+    state = state.copyWith(
+      selectedZoneId: zoneId,
+      originLatitude: latitude,
+      originLongitude: longitude,
+      pinNormalizedX: normalizedX,
+      pinNormalizedY: normalizedY,
+      clearScenario: true,
+      amountError: false,
+      verdictAsync: const AsyncData<PriceVerdict?>(null),
+    );
+  }
+
+  /// Selecciona el punto de destino en el mapa cuando la categoría es taxi.
+  void selectDestinationPoint({
+    required String zoneId,
+    required double latitude,
+    required double longitude,
+  }) {
+    _requestToken++;
+    state = state.copyWith(
+      destinationZoneId: zoneId,
+      destinationLatitude: latitude,
+      destinationLongitude: longitude,
+      destinationError: false,
+      clearScenario: true,
+      verdictAsync: const AsyncData<PriceVerdict?>(null),
+    );
+  }
+
   /// Selecciona una zona al tocar un punto `(normalizedX, normalizedY)` en el mapa del municipio.
-  /// Usa la funciÃ³n pura `resolveNearestZoneByNormalizedPoint` en `domain/`.
+  /// Usa la función pura `resolveNearestZoneByNormalizedPoint` en `domain/`.
   void selectPointOnMap({
     required double normalizedX,
     required double normalizedY,
@@ -201,6 +282,8 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
 
     state = state.copyWith(
       selectedZoneId: resolvedZone.id,
+      originLatitude: resolvedZone.centerLat,
+      originLongitude: resolvedZone.centerLng,
       pinNormalizedX: clampedX,
       pinNormalizedY: clampedY,
       isManualMapOpen: true,
@@ -210,13 +293,14 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
     );
   }
 
-  /// Cambia la categorÃ­a comparable seleccionada y descarta cualquier veredicto anterior.
+  /// Cambia la categoría comparable seleccionada y descarta cualquier veredicto anterior.
   void selectCategory(String categoryId) {
     _requestToken++;
     state = state.copyWith(
       selectedCategoryId: categoryId,
       clearScenario: true,
       amountError: false,
+      destinationError: false,
       verdictAsync: const AsyncData<PriceVerdict?>(null),
     );
   }
@@ -232,7 +316,7 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
     );
   }
 
-  /// Activa o desactiva la simulaciÃ³n de temporada de evento DEMO.
+  /// Activa o desactiva la simulación de temporada de evento DEMO.
   void setIncludeEventContext(bool value) {
     _requestToken++;
     state = state.copyWith(
@@ -241,7 +325,7 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
     );
   }
 
-  /// Selecciona un escenario rÃ¡pido de demostraciÃ³n sincronizando zona, pin en el mapa, categorÃ­a y monto.
+  /// Selecciona un escenario rápido de demostración sincronizando zona, pin en el mapa, categoría y monto.
   void selectPresetScenario(DemoPriceScenario scenario) {
     _requestToken++;
     switch (scenario) {
@@ -254,28 +338,33 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
           selectedCategoryId: 'food_corrientazo',
           rawAmount: '12000',
           amountError: false,
+          destinationError: false,
           verdictAsync: const AsyncData<PriceVerdict?>(null),
         );
       case DemoPriceScenario.yellowModerate:
         state = state.copyWith(
           selectedScenario: scenario,
           selectedZoneId: 'vup_centro',
+          destinationZoneId: 'vup_norte',
           pinNormalizedX: 0.50,
           pinNormalizedY: 0.50,
           selectedCategoryId: 'transport_taxi_minimal',
           rawAmount: '12500',
           amountError: false,
+          destinationError: false,
           verdictAsync: const AsyncData<PriceVerdict?>(null),
         );
       case DemoPriceScenario.redOvercharge:
         state = state.copyWith(
           selectedScenario: scenario,
           selectedZoneId: 'vup_sur',
+          destinationZoneId: 'vup_centro',
           pinNormalizedX: 0.52,
           pinNormalizedY: 0.82,
           selectedCategoryId: 'transport_taxi_minimal',
           rawAmount: '45000',
           amountError: false,
+          destinationError: false,
           verdictAsync: const AsyncData<PriceVerdict?>(null),
         );
       case DemoPriceScenario.insufficientSample:
@@ -287,6 +376,7 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
           selectedCategoryId: 'services_laundry_load',
           rawAmount: '18000',
           amountError: false,
+          destinationError: false,
           verdictAsync: const AsyncData<PriceVerdict?>(null),
         );
       case DemoPriceScenario.lowPriceAlert:
@@ -298,12 +388,13 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
           selectedCategoryId: 'food_corrientazo',
           rawAmount: '8000',
           amountError: false,
+          destinationError: false,
           verdictAsync: const AsyncData<PriceVerdict?>(null),
         );
     }
   }
 
-  /// EvalÃºa un escenario DEMO explÃ­cito limpiando de inmediato el estado anterior.
+  /// Evalúa un escenario DEMO explícito limpiando de inmediato el estado anterior.
   Future<bool> evaluateScenario(
     DemoPriceScenario scenario, {
     String municipalityCode = '20001',
@@ -336,7 +427,7 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
     }
   }
 
-  /// Valida el monto y evalÃºa la consulta actual contra la mediana de la zona seleccionada.
+  /// Valida el monto y el destino (si es taxi) y evalúa la consulta contra la mediana de la zona o rango de distancia.
   /// Limpia inmediatamente cualquier resultado previo para evitar mostrar datos obsoletos.
   Future<bool> submitEvaluation({String municipalityCode = '20001'}) async {
     final parsed = parseCopAmount(state.rawAmount);
@@ -357,9 +448,22 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
       );
     }
 
+    if (state.isTaxiCategory &&
+        (state.destinationZoneId == null ||
+            state.destinationZoneId!.trim().isEmpty)) {
+      _requestToken++;
+      state = state.copyWith(
+        amountError: false,
+        destinationError: true,
+        verdictAsync: const AsyncData<PriceVerdict?>(null),
+      );
+      return false;
+    }
+
     final currentToken = ++_requestToken;
     state = state.copyWith(
       amountError: false,
+      destinationError: false,
       verdictAsync: const AsyncLoading<PriceVerdict?>(),
     );
 
@@ -371,6 +475,14 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
         zoneId: state.selectedZoneId,
         submittedCop: parsed,
         includeEventContext: state.includeEventContext,
+        destinationZoneId:
+            state.isTaxiCategory ? state.destinationZoneId : null,
+        originLatitude: state.originLatitude,
+        originLongitude: state.originLongitude,
+        destinationLatitude:
+            state.isTaxiCategory ? state.destinationLatitude : null,
+        destinationLongitude:
+            state.isTaxiCategory ? state.destinationLongitude : null,
       );
       if (currentToken != _requestToken) return false;
       state = state.copyWith(
@@ -394,7 +506,7 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
     );
   }
 
-  /// Restablece el estado completo del mÃ³dulo de escaneo de precios.
+  /// Restablece el estado completo del módulo de escaneo de precios.
   void reset() {
     _requestToken++;
     state = const PriceScanState();
@@ -405,7 +517,7 @@ final priceScanProvider = NotifierProvider<PriceScanNotifier, PriceScanState>(
   PriceScanNotifier.new,
 );
 
-/// CategorÃ­a comparable correspondiente al veredicto activo o a la selecciÃ³n actual.
+/// Categoría comparable correspondiente al veredicto activo o a la selección actual.
 final activeVerdictCategoryProvider = Provider<PriceCategory?>((ref) {
   final categoriesAsync = ref.watch(priceCategoriesProvider);
   final scanState = ref.watch(priceScanProvider);
@@ -419,7 +531,7 @@ final activeVerdictCategoryProvider = Provider<PriceCategory?>((ref) {
   return null;
 });
 
-/// Zona del municipio correspondiente al veredicto activo o a la selecciÃ³n actual.
+/// Zona de origen o del establecimiento correspondiente al veredicto activo o a la selección actual.
 final activeVerdictZoneProvider = Provider<MunicipalityZone?>((ref) {
   final zonesAsync = ref.watch(municipalityZonesProvider);
   final scanState = ref.watch(priceScanProvider);
@@ -427,6 +539,21 @@ final activeVerdictZoneProvider = Provider<MunicipalityZone?>((ref) {
   if (zones == null) return null;
   final targetZoneId =
       scanState.verdictAsync.value?.zoneId ?? scanState.selectedZoneId;
+  for (final zone in zones) {
+    if (zone.id == targetZoneId) return zone;
+  }
+  return null;
+});
+
+/// Zona de destino correspondiente al veredicto activo o a la selección actual (para taxi).
+final activeVerdictDestinationZoneProvider = Provider<MunicipalityZone?>((ref) {
+  final zonesAsync = ref.watch(municipalityZonesProvider);
+  final scanState = ref.watch(priceScanProvider);
+  final zones = zonesAsync.value;
+  if (zones == null) return null;
+  final targetZoneId = scanState.verdictAsync.value?.destinationZoneId ??
+      scanState.destinationZoneId;
+  if (targetZoneId == null || targetZoneId.isEmpty) return null;
   for (final zone in zones) {
     if (zone.id == targetZoneId) return zone;
   }

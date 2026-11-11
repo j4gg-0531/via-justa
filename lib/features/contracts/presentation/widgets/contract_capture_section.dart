@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:via_justa/core/supabase/supabase_providers.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
@@ -134,6 +135,7 @@ class _ContractCaptureSectionState
   Widget build(BuildContext context) {
     final captureState = ref.watch(contractCaptureProvider);
     final analysisState = ref.watch(contractAnalysisProvider);
+    final isDemoMode = ref.watch(isDemoModeProvider);
     final samples = ref.watch(syntheticContractSamplesProvider);
     final captureNotifier = ref.read(contractCaptureProvider.notifier);
     final analysisNotifier = ref.read(contractAnalysisProvider.notifier);
@@ -295,7 +297,8 @@ class _ContractCaptureSectionState
 
         const SizedBox(height: AppSpacing.lg),
 
-        // 3. Selector de contratos sintéticos de prueba (ES/EN)
+        // 3. Selector de contratos sintéticos de prueba (solo en modo DEMO)
+        if (isDemoMode)
         VjCard(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(

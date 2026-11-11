@@ -2,7 +2,6 @@ import 'package:via_justa/features/prices/domain/price_contribution.dart';
 import 'package:via_justa/features/prices/domain/price_contribution_repository.dart';
 
 /// Implementación DEMO en memoria del repositorio de aportes ciudadanos de precios (M10).
-/// NOTA: Guarda únicamente en memoria durante la sesión; se reemplaza por Supabase en VJ-11.
 class DemoPriceContributionRepository implements PriceContributionRepository {
   final List<PriceContributionRecord> _sessionRecords =
       <PriceContributionRecord>[];
@@ -15,6 +14,11 @@ class DemoPriceContributionRepository implements PriceContributionRepository {
     required String zoneId,
     required int amountCop,
     String? placeNote,
+    String? destinationZoneId,
+    double? originLatitude,
+    double? originLongitude,
+    double? destinationLatitude,
+    double? destinationLongitude,
   }) async {
     _counter++;
     final record = PriceContributionRecord(
@@ -22,6 +26,11 @@ class DemoPriceContributionRepository implements PriceContributionRepository {
       categoryId: categoryId,
       municipalityCode: municipalityCode,
       zoneId: zoneId,
+      destinationZoneId: destinationZoneId,
+      originLatitude: originLatitude,
+      originLongitude: originLongitude,
+      destinationLatitude: destinationLatitude,
+      destinationLongitude: destinationLongitude,
       amountCop: amountCop,
       placeNote: sanitizeContributionNote(placeNote ?? ''),
       createdAtIso: DateTime.now().toUtc().toIso8601String(),

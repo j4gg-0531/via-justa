@@ -1,21 +1,17 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:via_justa/features/contracts/data/demo_contract_analysis_gateway.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis_gateway.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis_result.dart';
 
 /// Implementación de [ContractAnalysisGateway] que invoca la Edge Function
 /// `analyze_contract` en Supabase con el modelo Gemini (VJ-14).
 ///
-/// Dispone de un [fallback] hacia [DemoContractAnalysisGateway] ante errores
-/// de red o cuando la aplicación se ejecuta sin backend configurado.
+/// Cuando hay cliente de Supabase activo, cualquier error HTTP, de cuota o de red
+/// se traduce a un [ContractAnalysisException] para mostrarse en la interfaz
+/// con opción de reintento, sin caer silenciosamente en datos falsos.
 class SupabaseContractAnalysisGateway implements ContractAnalysisGateway {
-  SupabaseContractAnalysisGateway(
-    this._client, {
-    ContractAnalysisGateway? fallback,
-  }) : _fallback = fallback ?? const DemoContractAnalysisGateway();
+  const SupabaseContractAnalysisGateway(this._client);
 
   final SupabaseClient _client;
-  final ContractAnalysisGateway _fallback;
 
   @override
   Future<Map<String, dynamic>> analyzeContractRaw({
@@ -44,54 +40,30 @@ class SupabaseContractAnalysisGateway implements ContractAnalysisGateway {
         );
       }
 
-      if (status == 429) {
-        throw const ContractAnalysisException(
-          ContractAnalysisError.aiDailyLimitExceeded,
-        );
-      }
-      if (status == 401 || status == 403) {
-        throw const ContractAnalysisException(
-          ContractAnalysisError.authUnauthorized,
-        );
-      }
-      if (status == 413) {
-        throw const ContractAnalysisException(
-          ContractAnalysisError.textTooLong,
-        );
-      }
-      if (status == 400) {
-        throw const ContractAnalysisException(
-          ContractAnalysisError.invalidInputEmpty,
-        );
-      }
       if (status == 504) {
         throw const ContractAnalysisException(
           ContractAnalysisError.timeout,
         );
       }
-      if (status >= 500) {
-        throw const ContractAnalysisException(
-          ContractAnalysisError.aiServiceUnavailable,
-        );
-      }
 
-      return await _fallback.analyzeContractRaw(text: text, locale: locale);
+      throw ContractAnalysisException(
+        ContractAnalysisError.fromHttpStatusCode(status),
+      );
     } on ContractAnalysisException {
       rethrow;
     } on FunctionException catch (e) {
-      if (e.status == 429) {
+      if (e.status == 504) {
         throw const ContractAnalysisException(
-          ContractAnalysisError.aiDailyLimitExceeded,
+          ContractAnalysisError.timeout,
         );
       }
-      if (e.status == 401 || e.status == 403) {
-        throw const ContractAnalysisException(
-          ContractAnalysisError.authUnauthorized,
-        );
-      }
-      return await _fallback.analyzeContractRaw(text: text, locale: locale);
+      throw ContractAnalysisException(
+        ContractAnalysisError.fromHttpStatusCode(e.status),
+      );
     } catch (_) {
-      return await _fallback.analyzeContractRaw(text: text, locale: locale);
+      throw const ContractAnalysisException(
+        ContractAnalysisError.networkUnavailable,
+      );
     }
   }
 }

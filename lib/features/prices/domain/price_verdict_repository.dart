@@ -34,11 +34,16 @@ abstract class PriceVerdictRepository {
   /// Obtiene las categorías comparables activas (`public.price_categories`).
   Future<List<PriceCategory>> getCategories();
 
-  /// Evalúa un monto observado para una categoría, municipio y zona específica.
+  /// Evalúa un monto observado para una categoría, municipio y zona/trayecto específico.
   Future<PriceVerdict> evaluatePrice({
     required String categoryId,
     required String municipalityCode,
     String zoneId = 'vup_centro',
+    String? destinationZoneId,
+    double? originLatitude,
+    double? originLongitude,
+    double? destinationLatitude,
+    double? destinationLongitude,
     required int submittedCop,
     bool includeEventContext = false,
   });

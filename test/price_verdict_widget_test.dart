@@ -36,6 +36,11 @@ class _FailingPriceVerdictRepository implements PriceVerdictRepository {
     required String municipalityCode,
     String zoneId = 'vup_centro',
     required int submittedCop,
+    String? destinationZoneId,
+    double? originLatitude,
+    double? originLongitude,
+    double? destinationLatitude,
+    double? destinationLongitude,
     bool includeEventContext = false,
   }) async {
     throw Exception('Simulated evaluation error');
@@ -120,6 +125,9 @@ void main() {
       expect(find.text('price_verdict.orientative_disclaimer'), findsOneWidget);
       expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
       expect(find.textContaining('promedio', findRichText: true), findsNothing);
+      expect(find.text('price_verdict.evaluated_now'), findsOneWidget);
+      expect(find.text('price_verdict.suggestion_section_title'), findsOneWidget);
+      expect(find.textContaining('Sugerencia de la IA', findRichText: true), findsNothing);
     });
 
     testWidgets('renders yellow and red verdicts with accessible icons and event context banner',
@@ -180,6 +188,7 @@ void main() {
       // Must NOT show reference median or recommended cap when insufficient
       expect(find.text('price_verdict.reference_median_label'), findsNothing);
       expect(find.text('price_verdict.recommended_cap_label'), findsNothing);
+      expect(find.text('price_verdict.suggestion_section_title'), findsNothing);
     });
 
     testWidgets('renders lowPriceWarning when deviation < -40%', (tester) async {

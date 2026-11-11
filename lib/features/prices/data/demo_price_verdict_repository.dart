@@ -11,6 +11,9 @@ PriceVerdict demoVerdictMirror({
   required String categoryId,
   required String municipalityCode,
   String zoneId = 'vup_centro',
+  String? destinationZoneId,
+  double? distanceKm,
+  String? distanceRange,
   required int submittedCop,
   required int sampleCount,
   required int referenceCop,
@@ -21,6 +24,9 @@ PriceVerdict demoVerdictMirror({
       categoryId: categoryId,
       municipalityCode: municipalityCode,
       zoneId: zoneId,
+      destinationZoneId: destinationZoneId,
+      distanceKm: distanceKm,
+      distanceRange: distanceRange,
       level: PriceVerdictLevel.insufficient,
       submittedCop: submittedCop,
       n: sampleCount,
@@ -52,6 +58,9 @@ PriceVerdict demoVerdictMirror({
     categoryId: categoryId,
     municipalityCode: municipalityCode,
     zoneId: zoneId,
+    destinationZoneId: destinationZoneId,
+    distanceKm: distanceKm,
+    distanceRange: distanceRange,
     level: level,
     submittedCop: submittedCop,
     referenceCop: referenceCop,
@@ -79,6 +88,8 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
       sectorHintEn: 'Novalito, San Joaquín, Guatapurí Mall',
       normalizedX: 0.50,
       normalizedY: 0.20,
+      centerLat: 10.4885,
+      centerLng: -73.2535,
       sortOrder: 1,
     ),
     MunicipalityZone(
@@ -90,6 +101,8 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
       sectorHintEn: 'Historic Center, Alfonso López Square, Market',
       normalizedX: 0.50,
       normalizedY: 0.50,
+      centerLat: 10.4742,
+      centerLng: -73.2436,
       sortOrder: 2,
     ),
     MunicipalityZone(
@@ -101,6 +114,8 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
       sectorHintEn: 'Bus Terminal, Fundadores, Mayales',
       normalizedX: 0.52,
       normalizedY: 0.82,
+      centerLat: 10.4452,
+      centerLng: -73.2468,
       sortOrder: 3,
     ),
     MunicipalityZone(
@@ -112,6 +127,8 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
       sectorHintEn: 'Hurtado Riverfront, San Fernando',
       normalizedX: 0.80,
       normalizedY: 0.36,
+      centerLat: 10.4980,
+      centerLng: -73.2610,
       sortOrder: 4,
     ),
     MunicipalityZone(
@@ -123,6 +140,8 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
       sectorHintEn: 'La Nevada, Ciudadela 450 Años, Los Cortijos',
       normalizedX: 0.20,
       normalizedY: 0.52,
+      centerLat: 10.4680,
+      centerLng: -73.2785,
       sortOrder: 5,
     ),
   ];
@@ -131,17 +150,17 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
     PriceCategory(
       id: 'transport_taxi_minimal',
       groupKey: 'transport',
-      nameEs: '[DEMO] Taxi — Carrera mínima urbana',
-      nameEn: '[DEMO] Taxi — Minimum urban ride',
-      unitDescriptionEs: 'Trayecto diurno dentro de la zona seleccionada',
-      unitDescriptionEn: 'Daytime trip within the selected zone',
+      nameEs: 'Taxi — Carrera mínima urbana',
+      nameEn: 'Taxi — Minimum urban ride',
+      unitDescriptionEs: 'Trayecto diurno según origen y destino',
+      unitDescriptionEn: 'Daytime trip by origin and destination',
       sortOrder: 1,
     ),
     PriceCategory(
       id: 'food_corrientazo',
       groupKey: 'food',
-      nameEs: '[DEMO] Almuerzo ejecutivo / corriente',
-      nameEn: '[DEMO] Standard daily lunch',
+      nameEs: 'Almuerzo ejecutivo / corriente',
+      nameEn: 'Standard daily lunch',
       unitDescriptionEs: 'Plato del día con sopa, seco y bebida en la zona',
       unitDescriptionEn: 'Daily lunch menu with soup, main dish, and drink in the zone',
       sortOrder: 2,
@@ -149,8 +168,8 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
     PriceCategory(
       id: 'lodging_standard_night',
       groupKey: 'lodging',
-      nameEs: '[DEMO] Habitación estándar (1 noche)',
-      nameEn: '[DEMO] Standard room (1 night)',
+      nameEs: 'Habitación estándar (1 noche)',
+      nameEn: 'Standard room (1 night)',
       unitDescriptionEs: 'Habitación sencilla o doble con ventilador/A.C. en la zona',
       unitDescriptionEn: 'Single or double room with fan/A.C. in the zone',
       sortOrder: 3,
@@ -158,10 +177,10 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
     PriceCategory(
       id: 'services_laundry_load',
       groupKey: 'services',
-      nameEs: '[DEMO] Lavandería por tanda (Muestra insuficiente)',
-      nameEn: '[DEMO] Laundry per load (Insufficient sample)',
-      unitDescriptionEs: 'Lavado y secado básico hasta 5 kg (zona con N < 3)',
-      unitDescriptionEn: 'Basic wash & dry up to 5 kg (zone with N < 3)',
+      nameEs: 'Lavandería por tanda',
+      nameEn: 'Laundry per load',
+      unitDescriptionEs: 'Lavado y secado básico hasta 5 kg',
+      unitDescriptionEn: 'Basic wash and dry up to 5 kg',
       sortOrder: 4,
     ),
   ];
@@ -189,7 +208,7 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
       ),
       'services_laundry_load': (
         referenceCop: 22000,
-        n: 2, // N < 3 -> estado insufficient (M20)
+        n: 2,
         eventReferenceCop: 22000,
       ),
     },
@@ -211,7 +230,7 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
       ),
       'services_laundry_load': (
         referenceCop: 18000,
-        n: 1, // N < 3 -> estado insufficient (M20)
+        n: 1,
         eventReferenceCop: 18000,
       ),
     },
@@ -308,8 +327,6 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
   Future<MunicipalityZone> detectCurrentZoneByGps({
     String municipalityCode = '20001',
   }) async {
-    // En modo DEMO simula la autodetección por GPS en el sector Centro de Valledupar;
-    // en Fase B resuelve las coordenadas GPS reales del teléfono contra PostGIS.
     return demoZonesValledupar[1]; // vup_centro
   }
 
@@ -323,6 +340,11 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
     required String categoryId,
     required String municipalityCode,
     String zoneId = 'vup_centro',
+    String? destinationZoneId,
+    double? originLatitude,
+    double? originLongitude,
+    double? destinationLatitude,
+    double? destinationLongitude,
     required int submittedCop,
     bool includeEventContext = false,
   }) async {
@@ -344,6 +366,7 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
       categoryId: categoryId,
       municipalityCode: municipalityCode,
       zoneId: zoneId,
+      destinationZoneId: destinationZoneId,
       submittedCop: submittedCop,
       sampleCount: benchmark.n,
       referenceCop: benchmark.referenceCop,

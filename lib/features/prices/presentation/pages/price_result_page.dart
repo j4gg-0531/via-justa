@@ -7,7 +7,6 @@ import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
-import 'package:via_justa/features/prices/domain/price_verdict_repository.dart';
 import 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart';
 import 'package:via_justa/features/prices/presentation/widgets/price_verdict_card.dart';
 
@@ -49,6 +48,7 @@ class PriceResultPage extends ConsumerWidget {
     final scanState = ref.watch(priceScanProvider);
     final category = ref.watch(activeVerdictCategoryProvider);
     final zone = ref.watch(activeVerdictZoneProvider);
+    final destinationZone = ref.watch(activeVerdictDestinationZoneProvider);
     final municipality = ref.watch(selectedMunicipalityProvider);
     final textTheme = Theme.of(context).textTheme;
     final notifier = ref.read(priceScanProvider.notifier);
@@ -83,56 +83,6 @@ class PriceResultPage extends ConsumerWidget {
                     ),
                   ),
                 ],
-              ),
-
-              const SizedBox(height: AppSpacing.md),
-
-              // Selector rápido en la vista de resultado para alternar las 4 variantes en sustentación
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _QuickVariantButton(
-                      label: 'price_verdict.scenario_green'.tr(),
-                      selected: scanState.selectedScenario ==
-                          DemoPriceScenario.greenFair,
-                      onTap: () => notifier.evaluateScenario(
-                        DemoPriceScenario.greenFair,
-                        municipalityCode: municipality?.code ?? '20001',
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    _QuickVariantButton(
-                      label: 'price_verdict.scenario_yellow'.tr(),
-                      selected: scanState.selectedScenario ==
-                          DemoPriceScenario.yellowModerate,
-                      onTap: () => notifier.evaluateScenario(
-                        DemoPriceScenario.yellowModerate,
-                        municipalityCode: municipality?.code ?? '20001',
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    _QuickVariantButton(
-                      label: 'price_verdict.scenario_red'.tr(),
-                      selected: scanState.selectedScenario ==
-                          DemoPriceScenario.redOvercharge,
-                      onTap: () => notifier.evaluateScenario(
-                        DemoPriceScenario.redOvercharge,
-                        municipalityCode: municipality?.code ?? '20001',
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    _QuickVariantButton(
-                      label: 'price_verdict.scenario_insufficient'.tr(),
-                      selected: scanState.selectedScenario ==
-                          DemoPriceScenario.insufficientSample,
-                      onTap: () => notifier.evaluateScenario(
-                        DemoPriceScenario.insufficientSample,
-                        municipalityCode: municipality?.code ?? '20001',
-                      ),
-                    ),
-                  ],
-                ),
               ),
 
               const SizedBox(height: AppSpacing.lg),
@@ -197,6 +147,7 @@ class PriceResultPage extends ConsumerWidget {
                         verdict: verdict,
                         category: category,
                         zone: zone,
+                        destinationZone: destinationZone,
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       VjButton(
@@ -219,35 +170,6 @@ class PriceResultPage extends ConsumerWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _QuickVariantButton extends StatelessWidget {
-  const _QuickVariantButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ActionChip(
-      label: Text(label),
-      onPressed: onTap,
-      backgroundColor: selected ? AppColors.primary : AppColors.surface,
-      side: BorderSide(
-        color: selected ? AppColors.primary : AppColors.border,
-      ),
-      labelStyle: TextStyle(
-        color: selected ? Colors.white : AppColors.textPrimary,
-        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-        fontSize: 12,
       ),
     );
   }
