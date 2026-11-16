@@ -41,6 +41,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       container.listen(registerBusinessProvider, (_, _) {});
       await container.read(municipalityZonesProvider.future);
+      await container.read(priceCategoriesProvider.future);
       final notifier = container.read(registerBusinessProvider.notifier);
       fillRegistration(notifier);
       notifier.setHours('mon', const BusinessDayHours(enabled: true));
@@ -79,6 +80,24 @@ void main() {
           findsOneWidget,
         );
         expect(tester.takeException(), isNull);
+        if (step == 2) {
+          final compareBtn = find.text(
+            'businessRegistration.compareZonePrice'.tr(),
+          );
+          await tester.ensureVisible(compareBtn);
+          await tester.pumpAndSettle();
+          await tester.tap(compareBtn);
+          await tester.pumpAndSettle();
+          expect(
+            find.text('businessRegistration.priceNoticeTitle'.tr()),
+            findsOneWidget,
+          );
+          expect(
+            find.text('businessRegistration.priceNoticePrivateHint'.tr()),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+        }
         final action = find.text(
           (step == 3
                   ? 'businessRegistration.publish'

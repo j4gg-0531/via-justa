@@ -7,7 +7,9 @@ import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/features/businesses/domain/business_draft.dart';
+import 'package:via_justa/features/businesses/domain/business_price_notice.dart';
 import 'package:via_justa/features/businesses/presentation/state/register_business_provider.dart';
+import 'package:via_justa/features/prices/domain/price_verdict.dart';
 import 'package:via_justa/features/prices/presentation/widgets/map_point_picker_sheet.dart';
 
 class RegisterBusinessPage extends ConsumerStatefulWidget {
@@ -608,10 +610,18 @@ class _DishEditor extends ConsumerWidget {
   final BusinessDishDraft dish;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(registerBusinessProvider);
     final notifier = ref.read(registerBusinessProvider.notifier);
+    final languageCode =
+        EasyLocalization.of(context)?.locale.languageCode ?? 'es';
+    final categories = state.comparableCategories;
+    final selectedCategoryId = state.dishCategoryId(index);
+    final noticeAsync = state.dishPriceNotices[index];
+
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.lg),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TextFormField(
             initialValue: dish.name,
@@ -629,10 +639,179 @@ class _DishEditor extends ConsumerWidget {
             ),
             onChanged: (value) => notifier.setDish(index, price: value),
           ),
+          if (categories.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            DropdownButtonFormField<String?>(
+              key: ValueKey('dish-cat-$index-$selectedCategoryId'),
+              initialValue: selectedCategoryId,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: 'businessRegistration.dishComparableCategory'.tr(),
+              ),
+              items: [
+                DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text(
+                    'businessRegistration.dishNoCategory'.tr(),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                for (final category in categories)
+                  DropdownMenuItem<String?>(
+                    value: category.id,
+                    child: Text(
+                      '${category.localizedName(languageCode)} · ${category.localizedUnit(languageCode)}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: (value) => notifier.setDish(
+                index,
+                priceCategoryId: value,
+                clearCategory: value == null,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            VjButton(
+              label: 'businessRegistration.compareZonePrice'.tr(),
+              variant: VjButtonVariant.outlined,
+              onPressed: state.canCompareDish(index)
+                  ? () => notifier.compareDishPrice(index)
+                  : null,
+            ),
+          ],
+          if (noticeAsync != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            noticeAsync.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (_, _) => Text(
+                'businessRegistration.priceNoticeError'.tr(),
+              ),
+              data: (notice) => _DishPriceNoticeCard(
+                notice: notice,
+                languageCode: languageCode,
+              ),
+            ),
+          ],
           TextButton.icon(
             onPressed: () => notifier.removeDish(index),
             icon: const Icon(Icons.delete_outline),
             label: Text('businessRegistration.removeDish'.tr()),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DishPriceNoticeCard extends StatelessWidget {
+  const _DishPriceNoticeCard({
+    required this.notice,
+    required this.languageCode,
+  });
+
+  final BusinessPriceNotice notice;
+  final String languageCode;
+
+  Color _accentColor() {
+    switch (notice.level) {
+      case PriceVerdictLevel.green:
+        return AppColors.semaphoreGreen;
+      case PriceVerdictLevel.yellow:
+        return AppColors.semaphoreAmber;
+      case PriceVerdictLevel.red:
+        return AppColors.semaphoreRed;
+      case PriceVerdictLevel.insufficient:
+        return AppColors.textSecondary;
+    }
+  }
+
+  IconData _icon() {
+    switch (notice.level) {
+      case PriceVerdictLevel.green:
+        return Icons.check_circle_outline;
+      case PriceVerdictLevel.yellow:
+        return Icons.info_outline;
+      case PriceVerdictLevel.red:
+        return Icons.warning_amber_rounded;
+      case PriceVerdictLevel.insufficient:
+        return Icons.help_outline;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final accent = _accentColor();
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: accent),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(_icon(), color: accent, size: 20),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  'businessRegistration.priceNoticeTitle'.tr(),
+                  style: textTheme.labelLarge?.copyWith(color: accent),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            '${notice.localizedCategoryName(languageCode)} · ${notice.localizedUnitDescription(languageCode)}',
+            style: textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (notice.isInsufficient)
+            Text(
+              'businessRegistration.priceNoticeInsufficient'.tr(
+                args: [notice.sampleCount.toString()],
+              ),
+              style: textTheme.bodyMedium,
+            )
+          else ...[
+            Text(
+              'businessRegistration.priceNoticeLevels.${notice.level.name}'.tr(),
+              style: textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'businessRegistration.priceNoticeMedian'.tr(
+                args: [notice.formattedMedianCop],
+              ),
+            ),
+            Text(
+              'businessRegistration.priceNoticeDifference'.tr(
+                args: [
+                  notice.formattedDifferenceCop,
+                  notice.formattedDeviationPct,
+                ],
+              ),
+            ),
+            Text(
+              'businessRegistration.priceNoticeSamples'.tr(
+                args: [notice.sampleCount.toString()],
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'businessRegistration.priceNoticePrivateHint'.tr(),
+            style: textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),

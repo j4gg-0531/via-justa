@@ -75,6 +75,19 @@ class RegisterBusinessState {
         priceCategories.asData?.value ?? const <PriceCategory>[],
       );
 
+  String? dishCategoryId(int index) {
+    if (index < 0 || index >= draft.dishes.length) return null;
+    return effectiveDishCategoryId(draft.dishes[index], comparableCategories);
+  }
+
+  bool canCompareDish(int index) {
+    if (index < 0 || index >= draft.dishes.length) return false;
+    return canCompareBusinessDishPrice(
+      draft.dishes[index],
+      comparableCategories,
+    );
+  }
+
   RegisterBusinessState copyWith({
     BusinessDraft? draft,
     int? step,

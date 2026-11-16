@@ -71,6 +71,48 @@ void main() {
         ['services_laundry_load'],
       );
     });
+
+    test(
+      'canCompareBusinessDishPrice valida categoría equivalente y monto entero válido',
+      () {
+        final foodCategories = comparableCategoriesForBusinessType(
+          BusinessType.restaurant,
+          _categories,
+        );
+        expect(
+          canCompareBusinessDishPrice(
+            const BusinessDishDraft(
+              name: 'Almuerzo',
+              price: '15000',
+              priceCategoryId: 'food_corrientazo',
+            ),
+            foodCategories,
+          ),
+          isTrue,
+        );
+        expect(
+          canCompareBusinessDishPrice(
+            const BusinessDishDraft(
+              name: 'Almuerzo',
+              price: '15000',
+            ),
+            foodCategories,
+          ),
+          isFalse,
+        );
+        expect(
+          canCompareBusinessDishPrice(
+            const BusinessDishDraft(
+              name: 'Almuerzo',
+              price: '100',
+              priceCategoryId: 'food_corrientazo',
+            ),
+            foodCategories,
+          ),
+          isFalse,
+        );
+      },
+    );
   });
 
   group('buildBusinessPriceNotice', () {

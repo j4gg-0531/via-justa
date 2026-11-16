@@ -29,6 +29,31 @@ List<PriceCategory> comparableCategoriesForBusinessType(
       .toList();
 }
 
+/// Resuelve el identificador de categoría comparable activo para un plato o servicio.
+String? effectiveDishCategoryId(
+  BusinessDishDraft dish,
+  List<PriceCategory> comparableCategories,
+) {
+  final id = dish.priceCategoryId;
+  if (id == null) return null;
+  for (final category in comparableCategories) {
+    if (category.id == id) return id;
+  }
+  return null;
+}
+
+/// Indica si un plato o servicio tiene categoría comparable y precio válido para consultar el aviso zonal.
+bool canCompareBusinessDishPrice(
+  BusinessDishDraft dish,
+  List<PriceCategory> comparableCategories,
+) {
+  if (comparableCategories.isEmpty) return false;
+  final categoryId = effectiveDishCategoryId(dish, comparableCategories);
+  if (categoryId == null) return false;
+  final price = int.tryParse(dish.price.trim());
+  return price != null && price >= 500 && price <= 20000000;
+}
+
 /// Aviso privado y orientativo de comparación de precio por zona para el dueño del negocio.
 class BusinessPriceNotice {
   const BusinessPriceNotice({
