@@ -344,7 +344,8 @@
     "section_hours": "Horario",
     "hours_not_specified": "Horario no especificado",
     "section_location": "Ubicación",
-    "section_ratings": "Valoraciones"
+    "section_ratings": "Valoraciones",
+    "action_launch_error": "No se pudo abrir el enlace externo."
   },
   "profile": {
     "edit_name_title": "Editar nombre",

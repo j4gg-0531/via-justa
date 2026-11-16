@@ -344,7 +344,8 @@
     "section_hours": "Hours",
     "hours_not_specified": "Hours not specified",
     "section_location": "Location",
-    "section_ratings": "Ratings"
+    "section_ratings": "Ratings",
+    "action_launch_error": "Could not open the external link."
   },
   "profile": {
     "edit_name_title": "Edit name",

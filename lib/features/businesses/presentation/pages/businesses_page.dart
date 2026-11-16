@@ -29,24 +29,20 @@ class BusinessesPage extends ConsumerWidget {
     }
   }
 
-  void _showInfoDialog(
-    BuildContext context, {
-    required String title,
-    required String body,
-  }) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text('common.close'.tr()),
-          ),
-        ],
-      ),
-    );
+  Future<void> _contactBusiness(
+    BuildContext context,
+    WidgetRef ref,
+    Business business,
+    String localeCode,
+  ) async {
+    final ok = await ref
+        .read(businessExternalActionProvider.notifier)
+        .openCardContact(business, localeCode: localeCode);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('business_detail.action_launch_error'.tr())),
+      );
+    }
   }
 
   Future<void> _confirmWithdraw(
@@ -254,10 +250,11 @@ class BusinessesPage extends ConsumerWidget {
                             ownerBusy: ownerBusy,
                             onTap: () =>
                                 _openBusinessDetail(context, business.id),
-                            onContactTap: () => _showInfoDialog(
+                            onContactTap: () => _contactBusiness(
                               context,
-                              title: 'businesses.contact_dialog_title'.tr(),
-                              body: 'businesses.contact_dialog_body'.tr(),
+                              ref,
+                              business,
+                              localeCode,
                             ),
                             onEditTap: isOwner
                                 ? () => context.push(

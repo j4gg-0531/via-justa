@@ -26,6 +26,18 @@ class BusinessDetailPage extends ConsumerWidget {
   final void Function(BusinessDetail detail)? onWhatsappTap;
   final void Function(BusinessDetail detail)? onDirectionsTap;
 
+  Future<void> _runExternalAction(
+    BuildContext context,
+    Future<bool> Function() action,
+  ) async {
+    final ok = await action();
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('business_detail.action_launch_error'.tr())),
+      );
+    }
+  }
+
   Future<void> _confirmWithdraw(
     BuildContext context,
     WidgetRef ref,
@@ -155,7 +167,20 @@ class BusinessDetailPage extends ConsumerWidget {
                     label: 'business_detail.action_order'.tr(),
                     trailingIcon: Icons.north_east,
                     onPressed: detail.canOrderExternal
-                        ? () => onOrderTap?.call(detail)
+                        ? () {
+                            if (onOrderTap != null) {
+                              onOrderTap!(detail);
+                            } else {
+                              _runExternalAction(
+                                context,
+                                () => ref
+                                    .read(
+                                      businessExternalActionProvider.notifier,
+                                    )
+                                    .openOrder(detail),
+                              );
+                            }
+                          }
                         : null,
                   ),
                   const SizedBox(height: AppSpacing.sm),
@@ -164,7 +189,23 @@ class BusinessDetailPage extends ConsumerWidget {
                     variant: VjButtonVariant.outlined,
                     trailingIcon: Icons.north_east,
                     onPressed: detail.canWhatsapp
-                        ? () => onWhatsappTap?.call(detail)
+                        ? () {
+                            if (onWhatsappTap != null) {
+                              onWhatsappTap!(detail);
+                            } else {
+                              _runExternalAction(
+                                context,
+                                () => ref
+                                    .read(
+                                      businessExternalActionProvider.notifier,
+                                    )
+                                    .openWhatsapp(
+                                      detail,
+                                      localeCode: localeCode,
+                                    ),
+                              );
+                            }
+                          }
                         : null,
                   ),
                   if (detail.canOrderExternal &&
@@ -281,7 +322,20 @@ class BusinessDetailPage extends ConsumerWidget {
                     variant: VjButtonVariant.outlined,
                     trailingIcon: Icons.north_east,
                     onPressed: detail.canDirections
-                        ? () => onDirectionsTap?.call(detail)
+                        ? () {
+                            if (onDirectionsTap != null) {
+                              onDirectionsTap!(detail);
+                            } else {
+                              _runExternalAction(
+                                context,
+                                () => ref
+                                    .read(
+                                      businessExternalActionProvider.notifier,
+                                    )
+                                    .openDirections(detail),
+                              );
+                            }
+                          }
                         : null,
                   ),
 

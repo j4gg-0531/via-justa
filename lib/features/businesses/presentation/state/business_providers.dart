@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:via_justa/core/supabase/supabase_providers.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
+import 'package:via_justa/features/businesses/data/device_business_external_launcher.dart';
 import 'package:via_justa/features/businesses/data/local_business_repository.dart';
 import 'package:via_justa/features/businesses/data/supabase_business_repository.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/domain/business_detail.dart';
+import 'package:via_justa/features/businesses/domain/business_external_actions.dart';
 import 'package:via_justa/features/businesses/domain/business_filter.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 import 'package:via_justa/features/businesses/presentation/state/register_business_provider.dart';
@@ -187,3 +189,52 @@ final businessDetailProvider = FutureProvider.autoDispose
       final repository = ref.watch(businessRepositoryProvider);
       return repository.getBusinessDetail(businessId);
     });
+
+/// Provider del adaptador que abre enlaces externos de negocios.
+final businessExternalLauncherProvider = Provider<BusinessExternalLauncher>((
+  ref,
+) {
+  return const DeviceBusinessExternalLauncher();
+});
+
+/// Controlador de acciones externas de un negocio (menú/pedidos, WhatsApp, Google Maps y contacto).
+class BusinessExternalActionNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  Future<bool> _launch(Uri? uri) async {
+    if (uri == null || state) return false;
+    state = true;
+    try {
+      final ok = await ref
+          .read(businessExternalLauncherProvider)
+          .launchExternalUri(uri);
+      if (ref.mounted) state = false;
+      return ok;
+    } catch (_) {
+      if (ref.mounted) state = false;
+      return false;
+    }
+  }
+
+  Future<bool> openOrder(BusinessDetail detail) {
+    return _launch(resolveBusinessOrderUri(detail));
+  }
+
+  Future<bool> openWhatsapp(BusinessDetail detail, {String localeCode = 'es'}) {
+    return _launch(resolveBusinessWhatsappUri(detail, localeCode: localeCode));
+  }
+
+  Future<bool> openDirections(BusinessDetail detail) {
+    return _launch(resolveBusinessDirectionsUri(detail));
+  }
+
+  Future<bool> openCardContact(Business business, {String localeCode = 'es'}) {
+    return _launch(resolveBusinessCardContactUri(business, localeCode: localeCode));
+  }
+}
+
+final businessExternalActionProvider =
+    NotifierProvider<BusinessExternalActionNotifier, bool>(
+      BusinessExternalActionNotifier.new,
+    );

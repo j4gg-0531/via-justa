@@ -13,6 +13,8 @@ import 'package:via_justa/features/prices/domain/price_map_repository.dart';
 import 'package:via_justa/features/prices/presentation/pages/price_map_page.dart';
 import 'package:via_justa/features/prices/presentation/state/price_map_providers.dart';
 
+import 'business_external_actions_test.dart' show FakeBusinessExternalLauncher;
+
 class _DetailTestBusinessRepository implements BusinessRepository {
   const _DetailTestBusinessRepository({required this.detail});
 
@@ -280,6 +282,52 @@ void main() {
 
       expect(find.byType(BusinessDetailPage), findsOneWidget);
       expect(find.text('business_detail.section_info'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'botones de la ficha lanzan enlaces de menú, WhatsApp con mensaje sugerido y Google Maps',
+    (tester) async {
+      final detail = _sampleDetail();
+      final launcher = FakeBusinessExternalLauncher();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            businessRepositoryProvider.overrideWithValue(
+              _DetailTestBusinessRepository(detail: detail),
+            ),
+            businessExternalLauncherProvider.overrideWithValue(launcher),
+          ],
+          child: const MaterialApp(
+            home: BusinessDetailPage(businessId: 'biz-cocina-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('business_detail.action_order'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('business_detail.action_whatsapp'));
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('business_detail.action_directions'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('business_detail.action_directions'));
+      await tester.pumpAndSettle();
+
+      expect(launcher.launchedUris.length, 3);
+      expect(launcher.launchedUris[0].toString(), 'https://vinapp.co/cocina');
+      expect(launcher.launchedUris[1].host, 'wa.me');
+      expect(
+        launcher.launchedUris[1].queryParameters['text'],
+        contains('Cocina del Patio'),
+      );
+      expect(launcher.launchedUris[2].host, 'www.google.com');
     },
   );
 }
