@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:via_justa/core/router/app_router.dart';
+import 'package:via_justa/core/security/external_uri_guard.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
@@ -161,9 +162,20 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
     }
 
     await _focusItemOnMap(item);
-    final uri = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=${item.latitude},${item.longitude}',
+    final uri = ExternalUriGuard.buildSafeGoogleMapsDirectionsUri(
+      latitude: item.latitude,
+      longitude: item.longitude,
     );
+    if (uri == null || !ExternalUriGuard.isAllowedExternalUri(uri)) {
+      if (context.mounted) {
+        _showInfoDialog(
+          context,
+          title: 'price_map.action_route'.tr(),
+          body: 'price_map.demo_route_body'.tr(namedArgs: {'name': item.name}),
+        );
+      }
+      return;
+    }
     try {
       final launched = await launchUrl(
         uri,
@@ -202,8 +214,8 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
       return;
     }
 
-    final sanitizedDigits = rawPhone.replaceAll(RegExp(r'[^0-9+]'), '');
-    if (sanitizedDigits.isEmpty) {
+    final telUri = ExternalUriGuard.buildSafeTelUri(rawPhone);
+    if (telUri == null || !ExternalUriGuard.isAllowedExternalUri(telUri)) {
       _showInfoDialog(
         context,
         title: 'businesses.contact_dialog_title'.tr(),
@@ -211,8 +223,6 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
       );
       return;
     }
-
-    final telUri = Uri(scheme: 'tel', path: sanitizedDigits);
     try {
       final launched = await launchUrl(telUri);
       if (!launched && context.mounted) {
