@@ -30,7 +30,6 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.via_justa"
         // Compatible con Google Maps SDK for Android y ML Kit Text Recognition (minSdk >= 23).
         minSdk = maxOf(flutter.minSdkVersion, 23)
@@ -42,8 +41,16 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // H-03 (OWASP M7: Insufficient Binary Protections / M8: Security Misconfiguration):
+            // Deshabilita depuracion en release, activa ofuscacion y reduccion de codigo con R8
+            // y aplica las reglas de preservacion en android/app/proguard-rules.pro.
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             signingConfig = signingConfigs.getByName("debug")
         }
     }
