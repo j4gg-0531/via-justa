@@ -4,15 +4,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
+import 'package:via_justa/features/businesses/domain/business_filter.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 import 'package:via_justa/features/businesses/presentation/pages/businesses_page.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 
 class _SeededBusinessRepository implements BusinessRepository {
-  _SeededBusinessRepository({this.fail = false});
+  _SeededBusinessRepository({this.fail = false, this.customItems});
 
   bool fail;
   int calls = 0;
+  final List<Business>? customItems;
 
   static const items = <Business>[
     Business(
@@ -43,10 +45,16 @@ class _SeededBusinessRepository implements BusinessRepository {
   ];
 
   @override
-  Future<List<Business>> getBusinesses() async {
+  Future<List<Business>> getBusinesses({
+    BusinessCategory? category,
+    String? searchQuery,
+    String localeCode = 'es',
+    int limit = kBusinessCatalogPageSize,
+    int offset = 0,
+  }) async {
     calls++;
     if (fail) throw Exception('connection failed');
-    return items;
+    return customItems ?? items;
   }
 }
 
@@ -96,7 +104,7 @@ void main() {
   );
 
   testWidgets(
-    'filtra por categoría y muestra acciones de editar y retirar solo al dueño',
+    'filtra por categoría, busca sin tildes y muestra acciones de editar y retirar solo al dueño',
     (tester) async {
       final repo = _SeededBusinessRepository();
       final container = ProviderContainer(
@@ -128,6 +136,61 @@ void main() {
       expect(find.text('Taxis del Valle'), findsOneWidget);
       expect(find.text('Cocina del Patio'), findsNothing);
       expect(find.text('businesses.action_edit'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'paginación muestra botón cargar más negocios y amplía resultados al pulsarlo',
+    (tester) async {
+      final repo = _SeededBusinessRepository(
+        customItems: const [
+          Business(
+            id: 'b1',
+            name: 'Negocio Uno',
+            category: BusinessCategory.food,
+            address: 'Calle 1',
+            phone: '111',
+            municipalityCode: '20001',
+          ),
+          Business(
+            id: 'b2',
+            name: 'Negocio Dos',
+            category: BusinessCategory.food,
+            address: 'Calle 2',
+            phone: '222',
+            municipalityCode: '20001',
+          ),
+        ],
+      );
+      final container = ProviderContainer(
+        overrides: [businessRepositoryProvider.overrideWithValue(repo)],
+      );
+      addTearDown(container.dispose);
+      container.read(businessCatalogPageLimitProvider.notifier).setLimit(1);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: BusinessesPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Negocio Uno'), findsOneWidget);
+      expect(find.text('Negocio Dos'), findsNothing);
+      expect(find.text('businesses.load_more'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.text('businesses.load_more'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('businesses.load_more'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Negocio Uno'), findsOneWidget);
+      expect(find.text('Negocio Dos'), findsOneWidget);
+      expect(find.text('businesses.load_more'), findsNothing);
     },
   );
 

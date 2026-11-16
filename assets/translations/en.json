@@ -329,6 +329,7 @@
     "action_edit": "Edit",
     "action_withdraw": "Withdraw",
     "withdraw_error": "Could not withdraw the business. Check your connection and try again.",
+    "load_more": "Load more businesses",
     "no_results": "There are no businesses in this zone yet"
   },
   "profile": {

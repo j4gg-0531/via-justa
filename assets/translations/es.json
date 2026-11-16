@@ -329,6 +329,7 @@
     "action_edit": "Editar",
     "action_withdraw": "Retirar",
     "withdraw_error": "No se pudo retirar el negocio. Comprueba tu conexión e inténtalo de nuevo.",
+    "load_more": "Cargar más negocios",
     "no_results": "Aún no hay negocios en esta zona"
   },
   "profile": {

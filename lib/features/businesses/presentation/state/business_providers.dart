@@ -65,17 +65,46 @@ final businessOwnerActionProvider =
       BusinessOwnerActionNotifier.new,
     );
 
+/// Notifier para el límite acumulado de paginación del catálogo de negocios.
+class BusinessCatalogPageLimitNotifier extends Notifier<int> {
+  @override
+  int build() => kBusinessCatalogPageSize;
+
+  void loadMore({int step = kBusinessCatalogPageSize}) {
+    final safeStep = step < 1 ? kBusinessCatalogPageSize : step;
+    state = state + safeStep;
+  }
+
+  void setLimit(int limit) {
+    state = limit < 1 ? 1 : limit;
+  }
+
+  void reset() {
+    state = kBusinessCatalogPageSize;
+  }
+}
+
+/// Provider del límite actual de elementos cargados en el directorio de negocios.
+final businessCatalogPageLimitProvider =
+    NotifierProvider<BusinessCatalogPageLimitNotifier, int>(
+      BusinessCatalogPageLimitNotifier.new,
+    );
+
 /// Notifier para la categoría seleccionada en el filtro.
 class BusinessCategoryNotifier extends Notifier<BusinessCategory?> {
   @override
   BusinessCategory? build() => null;
 
   void selectCategory(BusinessCategory? category) {
+    if (state == category) return;
     state = category;
+    ref.read(businessCatalogPageLimitProvider.notifier).reset();
   }
 
   void clear() {
+    if (state == null) return;
     state = null;
+    ref.read(businessCatalogPageLimitProvider.notifier).reset();
   }
 }
 
@@ -91,11 +120,15 @@ class BusinessSearchQueryNotifier extends Notifier<String> {
   String build() => '';
 
   void updateQuery(String query) {
+    if (state == query) return;
     state = query;
+    ref.read(businessCatalogPageLimitProvider.notifier).reset();
   }
 
   void clear() {
+    if (state.isEmpty) return;
     state = '';
+    ref.read(businessCatalogPageLimitProvider.notifier).reset();
   }
 }
 
@@ -105,23 +138,44 @@ final businessSearchQueryProvider =
       BusinessSearchQueryNotifier.new,
     );
 
-/// Provider que carga la lista completa de comercios desde el repositorio.
+/// Provider que carga la lista paginada de comercios desde el repositorio.
 final allBusinessesProvider = FutureProvider<List<Business>>((ref) async {
   final repository = ref.watch(businessRepositoryProvider);
-  return repository.getBusinesses();
+  final category = ref.watch(businessCategoryProvider);
+  final query = ref.watch(businessSearchQueryProvider);
+  final limit = ref.watch(businessCatalogPageLimitProvider);
+  return repository.getBusinesses(
+    category: category,
+    searchQuery: query,
+    limit: limit,
+    offset: 0,
+  );
 });
 
-/// Provider que combina la lista, la consulta y la categoría mediante la función pura de dominio.
+/// Provider que combina la lista, la consulta, la categoría y la paginación mediante funciones puras de dominio.
 final filteredBusinessesProvider = Provider<AsyncValue<List<Business>>>((ref) {
   final businessesAsync = ref.watch(allBusinessesProvider);
   final query = ref.watch(businessSearchQueryProvider);
   final category = ref.watch(businessCategoryProvider);
+  final limit = ref.watch(businessCatalogPageLimitProvider);
 
   return businessesAsync.whenData((businesses) {
-    return filterBusinesses(
+    final filtered = filterBusinesses(
       businesses,
       query: query,
       category: category,
     );
+    return paginateBusinesses(filtered, limit: limit);
   });
+});
+
+/// Indica si hay más páginas disponibles para cargar en el directorio.
+final canLoadMoreBusinessesProvider = Provider<bool>((ref) {
+  final filtered = ref.watch(filteredBusinessesProvider).asData?.value;
+  final limit = ref.watch(businessCatalogPageLimitProvider);
+  if (filtered == null) return false;
+  return canLoadMoreBusinesses(
+    currentCount: filtered.length,
+    currentLimit: limit,
+  );
 });

@@ -75,6 +75,7 @@ class BusinessesPage extends ConsumerWidget {
     final selectedCategory = ref.watch(businessCategoryProvider);
     final currentOwnerId = ref.watch(currentBusinessOwnerIdProvider);
     final ownerBusy = ref.watch(businessOwnerActionProvider);
+    final canLoadMore = ref.watch(canLoadMoreBusinessesProvider);
     final textTheme = Theme.of(context).textTheme;
     final localeCode =
         Localizations.maybeLocaleOf(context)?.languageCode ?? 'es';
@@ -266,6 +267,23 @@ class BusinessesPage extends ConsumerWidget {
                 );
               },
             ),
+
+            // Botón de paginación ("Cargar más negocios")
+            if (canLoadMore)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xl,
+                  ),
+                  child: VjButton(
+                    label: 'businesses.load_more'.tr(),
+                    variant: VjButtonVariant.outlined,
+                    onPressed: () => ref
+                        .read(businessCatalogPageLimitProvider.notifier)
+                        .loadMore(),
+                  ),
+                ),
+              ),
 
             // Registro de negocio (para dueños locales)
             SliverToBoxAdapter(
