@@ -15,7 +15,7 @@ class _FakePriceMapRepository implements PriceMapRepository {
     return const [
       PriceMapItem(
         id: 'fake_1',
-        name: '[DEMO] Clínica del Cesar',
+        name: 'Clínica del Cesar',
         description: 'Urgencias médicas',
         category: PriceMapCategory.services,
         pinKind: PriceMapPinKind.hospital,
@@ -29,6 +29,7 @@ class _FakePriceMapRepository implements PriceMapRepository {
         phone: '6055700000',
         sourceType: 'business',
         municipalityCode: '20001',
+        isDemo: false,
       ),
       PriceMapItem(
         id: 'fake_2',
@@ -118,6 +119,25 @@ void main() {
         'zone_id': 'vup_norte',
         'amount_cop': 15000,
         'is_demo': false,
+      },
+      <String, dynamic>{
+        'id': 'biz-demo',
+        'source_type': 'business',
+        'name_es': '[DEMO] Restaurante El Pilón',
+        'name_en': '[DEMO] El Pilón Restaurant',
+        'description_es': 'Muestra demo',
+        'description_en': 'Demo sample',
+        'map_category': 'services',
+        'pin_kind': 'food',
+        'pin_status': 'info',
+        'pin_label': '',
+        'badge_text': 'Centro',
+        'latitude': 10.47,
+        'longitude': -73.24,
+        'normalized_x': 0.5,
+        'normalized_y': 0.5,
+        'municipality_code': '20001',
+        'is_demo': true,
       },
       <String, dynamic>{
         'id': 'biz-1',

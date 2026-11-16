@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/features/home/presentation/pages/home_page.dart';
 import 'package:via_justa/features/onboarding/domain/profile_type.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
@@ -18,26 +20,27 @@ Widget _buildHome(ProfileType? profile) {
     overrides: [
       profileTypeProvider.overrideWith(() => _FakeProfileTypeNotifier(profile)),
     ],
-    child: const MaterialApp(
-      home: HomePage(),
-    ),
+    child: const MaterialApp(home: HomePage()),
   );
 }
 
 void main() {
-  testWidgets('renders visitor view by default or when visitor profile is active',
-      (tester) async {
-    await tester.pumpWidget(_buildHome(ProfileType.visitor));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'renders visitor view by default or when visitor profile is active',
+    (tester) async {
+      await tester.pumpWidget(_buildHome(ProfileType.visitor));
+      await tester.pumpAndSettle();
 
-    expect(find.text('home.visitor_banner_title'), findsOneWidget);
-    expect(find.text('home.visitor_banner_badge'), findsOneWidget);
-    expect(find.text('home.profile_tag_visitor'), findsOneWidget);
-    expect(find.text('home.tools_title'), findsOneWidget);
-  });
+      expect(find.text('home.visitor_banner_title'), findsOneWidget);
+      expect(find.text('home.visitor_banner_badge'), findsOneWidget);
+      expect(find.text('home.profile_tag_visitor'), findsOneWidget);
+      expect(find.text('home.tools_title'), findsOneWidget);
+    },
+  );
 
-  testWidgets('renders settler view with procedures and documents cards',
-      (tester) async {
+  testWidgets('renders settler view with procedures and documents cards', (
+    tester,
+  ) async {
     await tester.pumpWidget(_buildHome(ProfileType.settler));
     await tester.pumpAndSettle();
 
@@ -56,9 +59,30 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('renders resident view with local business action',
-      (tester) async {
-    await tester.pumpWidget(_buildHome(ProfileType.resident));
+  testWidgets('renders resident view with local business action', (
+    tester,
+  ) async {
+    final router = GoRouter(
+      routes: [
+        GoRoute(path: '/', builder: (_, _) => const HomePage()),
+        GoRoute(
+          path: AppRoutes.businessRegister,
+          builder: (_, _) =>
+              const Scaffold(body: Text('registration-destination')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          profileTypeProvider.overrideWith(
+            () => _FakeProfileTypeNotifier(ProfileType.resident),
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('home.resident_card_title'), findsOneWidget);
@@ -66,13 +90,11 @@ void main() {
     expect(find.text('home.profile_tag_resident'), findsOneWidget);
     expect(find.text('businesses.register_action'), findsOneWidget);
 
-    // Tapping register business opens dialog
+    // El acceso de residentes abre el formulario de registro.
     await tester.tap(find.text('businesses.register_action'));
     await tester.pumpAndSettle();
 
-    expect(find.text('businesses.register_dialog_body'), findsOneWidget);
-    await tester.tap(find.text('common.close'));
-    await tester.pumpAndSettle();
+    expect(find.text('registration-destination'), findsOneWidget);
   });
 
   testWidgets('contribute price card opens demo dialog', (tester) async {
