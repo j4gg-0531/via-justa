@@ -13,10 +13,27 @@ class ViaJustaApp extends ConsumerWidget {
       title: 'Vía Justa',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
+      scrollBehavior: const AppScrollBehavior(),
       routerConfig: ref.watch(routerProvider),
       localizationsDelegates: context.localizationDelegates,
       supportedLocales: context.supportedLocales,
       locale: context.locale,
     );
+  }
+}
+
+/// Comportamiento de scroll global sin efecto elástico ni resplandor en bordes.
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    // Se omite el indicador de overscroll (estiramiento/resplandor) para
+    // mantener el scroll fluido sin deformar el contenido al llegar al límite.
+    return child;
   }
 }
