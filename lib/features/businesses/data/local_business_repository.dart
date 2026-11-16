@@ -1,6 +1,7 @@
 import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/domain/business_detail.dart';
 import 'package:via_justa/features/businesses/domain/business_filter.dart';
+import 'package:via_justa/features/businesses/domain/business_rating.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 
 /// Repositorio local sin comercios de demostración (los negocios demo se retiraron de la experiencia).
@@ -24,5 +25,13 @@ class LocalBusinessRepository implements BusinessRepository {
     String localeCode = 'es',
   }) async {
     throw StateError('Business not found: $businessId');
+  }
+
+  @override
+  Future<BusinessRatingSummary> rateBusiness({
+    required String businessId,
+    required int stars,
+  }) async {
+    throw StateError('Rating requires Supabase connection: $businessId');
   }
 }

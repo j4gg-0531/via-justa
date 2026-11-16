@@ -6,6 +6,7 @@ import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/domain/business_detail.dart';
 import 'package:via_justa/features/businesses/domain/business_filter.dart';
+import 'package:via_justa/features/businesses/domain/business_rating.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 import 'package:via_justa/features/businesses/presentation/pages/businesses_page.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
@@ -67,6 +68,19 @@ class _SeededBusinessRepository implements BusinessRepository {
     final source = customItems ?? items;
     final match = source.firstWhere((item) => item.id == businessId);
     return BusinessDetail.fromBusiness(match, localeCode: localeCode);
+  }
+
+  @override
+  Future<BusinessRatingSummary> rateBusiness({
+    required String businessId,
+    required int stars,
+  }) async {
+    return BusinessRatingSummary(
+      businessId: businessId,
+      myRating: stars,
+      ratingAverage: stars.toDouble(),
+      ratingCount: 1,
+    );
   }
 }
 

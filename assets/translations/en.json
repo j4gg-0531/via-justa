@@ -345,6 +345,13 @@
     "hours_not_specified": "Hours not specified",
     "section_location": "Location",
     "section_ratings": "Ratings",
+    "your_rating": "Your rating",
+    "save_rating": "Save rating",
+    "rating_saved": "Your rating was saved successfully.",
+    "star_label": "{} stars",
+    "owner_cannot_rate": "As the owner, you cannot rate your own business.",
+    "auth_required_to_rate": "Sign in to your account to rate this business.",
+    "rating_error": "Could not save your rating. Please try again.",
     "action_launch_error": "Could not open the external link."
   },
   "profile": {

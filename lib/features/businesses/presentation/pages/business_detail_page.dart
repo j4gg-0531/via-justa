@@ -8,6 +8,7 @@ import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/features/businesses/domain/business_detail.dart';
+import 'package:via_justa/features/businesses/domain/business_rating.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 
@@ -350,6 +351,10 @@ class BusinessDetailPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   _RatingSummaryRow(detail: detail),
+                  const SizedBox(height: AppSpacing.md),
+                  const Divider(),
+                  const SizedBox(height: AppSpacing.md),
+                  _BusinessRatingInteractiveSection(detail: detail),
 
                   if (isOwner) ...[
                     const SizedBox(height: AppSpacing.xl),
@@ -504,6 +509,100 @@ class _RatingSummaryRow extends StatelessWidget {
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _BusinessRatingInteractiveSection extends ConsumerWidget {
+  const _BusinessRatingInteractiveSection({required this.detail});
+
+  final BusinessDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ratingState = ref.watch(businessRatingControllerProvider);
+    final ratingNotifier = ref.read(businessRatingControllerProvider.notifier);
+    final eligibility = ratingState.eligibilityFor(detail);
+    final selectedStars = ratingState.effectiveStarsFor(detail);
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'business_detail.your_rating'.tr(),
+          style: textTheme.titleMedium,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        if (eligibility == BusinessRatingEligibility.ownerForbidden)
+          Text(
+            'business_detail.owner_cannot_rate'.tr(),
+            style: textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          )
+        else if (eligibility == BusinessRatingEligibility.requiresAuth)
+          Text(
+            'business_detail.auth_required_to_rate'.tr(),
+            style: textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          )
+        else ...[
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: AppSpacing.xs,
+            children: [
+              for (var star = 1; star <= 5; star++)
+                IconButton(
+                  key: ValueKey('rate-star-$star'),
+                  onPressed: ratingState.submitting
+                      ? null
+                      : () => ratingNotifier.selectStars(detail.id, star),
+                  tooltip: 'business_detail.star_label'.tr(
+                    args: [star.toString()],
+                  ),
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                  ),
+                  icon: Icon(
+                    selectedStars != null && star <= selectedStars
+                        ? Icons.star
+                        : Icons.star_border,
+                    color: AppColors.primary,
+                    size: 32,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          VjButton(
+            label: 'business_detail.save_rating'.tr(),
+            onPressed: selectedStars == null || ratingState.submitting
+                ? null
+                : () => ratingNotifier.submitRating(detail),
+          ),
+          if (ratingState.savedBusinessId == detail.id) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'business_detail.rating_saved'.tr(),
+              style: textTheme.bodyMedium?.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          if (ratingState.errorBusinessId == detail.id) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'business_detail.rating_error'.tr(),
+              style: textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ],
       ],
     );
   }
