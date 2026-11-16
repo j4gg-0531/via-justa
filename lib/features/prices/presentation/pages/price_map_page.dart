@@ -1191,7 +1191,7 @@ class _SemaphoreStatusBadge extends StatelessWidget {
         return VjBadge(
           label: isDemo
               ? 'businesses.demo_badge'.tr()
-              : 'businesses.verified_badge'.tr(),
+              : 'businesses.published_badge'.tr(),
         );
     }
   }

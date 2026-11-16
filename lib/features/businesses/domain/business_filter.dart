@@ -46,3 +46,25 @@ bool canLoadMoreBusinesses({
 }) {
   return currentLimit > 0 && currentCount >= currentLimit;
 }
+
+/// Combina una página recién recibida con la lista acumulada sin duplicar identificadores.
+({List<Business> items, int addedCount}) mergeBusinessPage(
+  List<Business> currentItems,
+  List<Business> nextPage,
+) {
+  if (nextPage.isEmpty) {
+    return (items: currentItems, addedCount: 0);
+  }
+  final seenIds = <String>{
+    for (final item in currentItems) item.id,
+  };
+  final merged = List<Business>.of(currentItems);
+  var added = 0;
+  for (final item in nextPage) {
+    if (seenIds.add(item.id)) {
+      merged.add(item);
+      added++;
+    }
+  }
+  return (items: List<Business>.unmodifiable(merged), addedCount: added);
+}

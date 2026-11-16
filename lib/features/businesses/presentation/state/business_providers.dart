@@ -28,6 +28,11 @@ final businessRepositoryProvider = Provider<BusinessRepository>((ref) {
   return const LocalBusinessRepository();
 });
 
+/// Tamaño de cada página solicitada al catálogo de negocios.
+final businessCatalogPageSizeProvider = Provider<int>(
+  (ref) => kBusinessCatalogPageSize,
+);
+
 /// Identificador del usuario autenticado con sesión real para acciones de dueño.
 final currentBusinessOwnerIdProvider = Provider<String?>((ref) {
   final auth = ref.watch(
@@ -54,7 +59,7 @@ class BusinessOwnerActionNotifier extends Notifier<bool> {
       await repo.withdraw(businessId: businessId, ownerId: ownerId);
       if (!ref.mounted) return true;
       state = false;
-      ref.invalidate(allBusinessesProvider);
+      ref.invalidate(businessCatalogProvider);
       ref.invalidate(allPriceMapItemsProvider);
       return true;
     } catch (_) {
@@ -69,31 +74,6 @@ final businessOwnerActionProvider =
       BusinessOwnerActionNotifier.new,
     );
 
-/// Notifier para el límite acumulado de paginación del catálogo de negocios.
-class BusinessCatalogPageLimitNotifier extends Notifier<int> {
-  @override
-  int build() => kBusinessCatalogPageSize;
-
-  void loadMore({int step = kBusinessCatalogPageSize}) {
-    final safeStep = step < 1 ? kBusinessCatalogPageSize : step;
-    state = state + safeStep;
-  }
-
-  void setLimit(int limit) {
-    state = limit < 1 ? 1 : limit;
-  }
-
-  void reset() {
-    state = kBusinessCatalogPageSize;
-  }
-}
-
-/// Provider del límite actual de elementos cargados en el directorio de negocios.
-final businessCatalogPageLimitProvider =
-    NotifierProvider<BusinessCatalogPageLimitNotifier, int>(
-      BusinessCatalogPageLimitNotifier.new,
-    );
-
 /// Notifier para la categoría seleccionada en el filtro.
 class BusinessCategoryNotifier extends Notifier<BusinessCategory?> {
   @override
@@ -102,13 +82,11 @@ class BusinessCategoryNotifier extends Notifier<BusinessCategory?> {
   void selectCategory(BusinessCategory? category) {
     if (state == category) return;
     state = category;
-    ref.read(businessCatalogPageLimitProvider.notifier).reset();
   }
 
   void clear() {
     if (state == null) return;
     state = null;
-    ref.read(businessCatalogPageLimitProvider.notifier).reset();
   }
 }
 
@@ -126,13 +104,11 @@ class BusinessSearchQueryNotifier extends Notifier<String> {
   void updateQuery(String query) {
     if (state == query) return;
     state = query;
-    ref.read(businessCatalogPageLimitProvider.notifier).reset();
   }
 
   void clear() {
     if (state.isEmpty) return;
     state = '';
-    ref.read(businessCatalogPageLimitProvider.notifier).reset();
   }
 }
 
@@ -142,46 +118,135 @@ final businessSearchQueryProvider =
       BusinessSearchQueryNotifier.new,
     );
 
-/// Provider que carga la lista paginada de comercios desde el repositorio.
-final allBusinessesProvider = FutureProvider<List<Business>>((ref) async {
-  final repository = ref.watch(businessRepositoryProvider);
-  final category = ref.watch(businessCategoryProvider);
-  final query = ref.watch(businessSearchQueryProvider);
-  final limit = ref.watch(businessCatalogPageLimitProvider);
-  return repository.getBusinesses(
-    category: category,
-    searchQuery: query,
-    limit: limit,
-    offset: 0,
-  );
+/// Estado paginado del catálogo de negocios (acumula bloques por `offset`).
+class BusinessCatalogState {
+  const BusinessCatalogState({
+    this.items = const <Business>[],
+    this.hasMore = false,
+    this.isLoadingMore = false,
+    this.loadMoreError = false,
+  });
+
+  final List<Business> items;
+  final bool hasMore;
+  final bool isLoadingMore;
+  final bool loadMoreError;
+
+  BusinessCatalogState copyWith({
+    List<Business>? items,
+    bool? hasMore,
+    bool? isLoadingMore,
+    bool? loadMoreError,
+  }) {
+    return BusinessCatalogState(
+      items: items ?? this.items,
+      hasMore: hasMore ?? this.hasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      loadMoreError: loadMoreError ?? this.loadMoreError,
+    );
+  }
+}
+
+/// Notifier asíncrono que carga y acumula páginas reales mediante `offset` y `limit`.
+class BusinessCatalogNotifier extends AsyncNotifier<BusinessCatalogState> {
+  int _generation = 0;
+
+  @override
+  Future<BusinessCatalogState> build() async {
+    _generation++;
+    final repository = ref.watch(businessRepositoryProvider);
+    final category = ref.watch(businessCategoryProvider);
+    final query = ref.watch(businessSearchQueryProvider);
+    final pageSize = ref.watch(businessCatalogPageSizeProvider);
+
+    final firstPage = await repository.getBusinesses(
+      category: category,
+      searchQuery: query,
+      limit: pageSize,
+      offset: 0,
+    );
+
+    final merged = mergeBusinessPage(const <Business>[], firstPage);
+    return BusinessCatalogState(
+      items: merged.items,
+      hasMore: firstPage.length >= pageSize,
+    );
+  }
+
+  /// Carga el siguiente bloque usando el tamaño acumulado como `offset` real.
+  Future<void> loadMore() async {
+    final current = state.asData?.value;
+    if (current == null || current.isLoadingMore || !current.hasMore) return;
+
+    final generation = _generation;
+    final repository = ref.read(businessRepositoryProvider);
+    final category = ref.read(businessCategoryProvider);
+    final query = ref.read(businessSearchQueryProvider);
+    final pageSize = ref.read(businessCatalogPageSizeProvider);
+
+    state = AsyncData(
+      current.copyWith(isLoadingMore: true, loadMoreError: false),
+    );
+
+    try {
+      final nextPage = await repository.getBusinesses(
+        category: category,
+        searchQuery: query,
+        limit: pageSize,
+        offset: current.items.length,
+      );
+      if (!ref.mounted || generation != _generation) return;
+
+      final merged = mergeBusinessPage(current.items, nextPage);
+      state = AsyncData(
+        BusinessCatalogState(
+          items: merged.items,
+          hasMore: nextPage.length >= pageSize && merged.addedCount > 0,
+        ),
+      );
+    } catch (_) {
+      if (!ref.mounted || generation != _generation) return;
+      state = AsyncData(
+        current.copyWith(isLoadingMore: false, loadMoreError: true),
+      );
+    }
+  }
+}
+
+/// Provider principal del catálogo paginado de negocios.
+final businessCatalogProvider =
+    AsyncNotifierProvider<BusinessCatalogNotifier, BusinessCatalogState>(
+      BusinessCatalogNotifier.new,
+    );
+
+/// Lista acumulada de comercios cargados desde el repositorio.
+final allBusinessesProvider = Provider<AsyncValue<List<Business>>>((ref) {
+  return ref.watch(businessCatalogProvider).whenData((catalog) => catalog.items);
 });
 
-/// Provider que combina la lista, la consulta, la categoría y la paginación mediante funciones puras de dominio.
+/// Provider que combina la lista cargada, la consulta y la categoría mediante la función pura de dominio.
 final filteredBusinessesProvider = Provider<AsyncValue<List<Business>>>((ref) {
   final businessesAsync = ref.watch(allBusinessesProvider);
   final query = ref.watch(businessSearchQueryProvider);
   final category = ref.watch(businessCategoryProvider);
-  final limit = ref.watch(businessCatalogPageLimitProvider);
 
   return businessesAsync.whenData((businesses) {
-    final filtered = filterBusinesses(
+    return filterBusinesses(
       businesses,
       query: query,
       category: category,
     );
-    return paginateBusinesses(filtered, limit: limit);
   });
 });
 
 /// Indica si hay más páginas disponibles para cargar en el directorio.
 final canLoadMoreBusinessesProvider = Provider<bool>((ref) {
-  final filtered = ref.watch(filteredBusinessesProvider).asData?.value;
-  final limit = ref.watch(businessCatalogPageLimitProvider);
-  if (filtered == null) return false;
-  return canLoadMoreBusinesses(
-    currentCount: filtered.length,
-    currentLimit: limit,
-  );
+  return ref.watch(businessCatalogProvider).asData?.value.hasMore ?? false;
+});
+
+/// Indica si actualmente se está solicitando la página siguiente del directorio.
+final isLoadingMoreBusinessesProvider = Provider<bool>((ref) {
+  return ref.watch(businessCatalogProvider).asData?.value.isLoadingMore ?? false;
 });
 
 /// Provider que carga la ficha completa de un negocio por su identificador.

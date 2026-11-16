@@ -14,10 +14,15 @@ void main() {
   late List<({String method, String path, String body})> requests;
   var published = false;
   String? error;
+  bool failUpdateRpc = false;
+  List<String> removedPathsOnEdit = const ['owner/existing-id/old_photo.png'];
+
   setUp(() async {
     requests = [];
     published = false;
     error = null;
+    failUpdateRpc = false;
+    removedPathsOnEdit = const ['owner/existing-id/old_photo.png'];
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) async {
       final body = await utf8.decoder.bind(request).join();
@@ -37,6 +42,26 @@ void main() {
             'hint': null,
           }),
         );
+      } else if (request.uri.path.endsWith('update_own_business')) {
+        if (failUpdateRpc) {
+          request.response.statusCode = 400;
+          request.response.write(
+            jsonEncode({
+              'message': '[BUSINESS_INVALID_DISH]',
+              'code': '22023',
+              'details': null,
+              'hint': null,
+            }),
+          );
+        } else {
+          request.response.write(
+            jsonEncode({
+              'id': 'existing-id',
+              'status': 'approved',
+              'removed_photo_paths': removedPathsOnEdit,
+            }),
+          );
+        }
       } else if (request.uri.path.endsWith('submit_business')) {
         request.response.write(
           jsonEncode({
@@ -151,16 +176,84 @@ void main() {
     expect(await publish(draft), 'business-id');
     expect(requests.length, 1);
   });
-  test('editar negocio actualiza datos, platos y fotos sin duplicar', () async {
-    final result = await publish(draft, businessId: 'existing-id');
-    expect(result, 'existing-id');
-    expect(requests.map((r) => '${r.method} ${r.path}'), [
-      'PATCH /rest/v1/businesses',
-      'DELETE /rest/v1/business_dishes',
-      'POST /rest/v1/business_dishes',
-      'DELETE /rest/v1/business_photos',
-    ]);
-  });
+  test(
+    'editar negocio sube nuevas fotos primero, llama RPC transaccional y limpia fotos viejas después',
+    () async {
+      final result = await publish(
+        draft.copyWith(
+          photos: [
+            BusinessPhoto(
+              bytes: Uint8List.fromList('kept'.codeUnits),
+              extension: 'png',
+              mimeType: 'image/png',
+              storagePath: 'owner/existing-id/kept_0.png',
+            ),
+            BusinessPhoto(
+              bytes: Uint8List.fromList('new-img'.codeUnits),
+              extension: 'png',
+              mimeType: 'image/png',
+            ),
+          ],
+        ),
+        businessId: 'existing-id',
+      );
+      expect(result, 'existing-id');
+      expect(requests.map((r) => '${r.method} ${r.path}'), [
+        'POST /storage/v1/object/business-media/owner/existing-id/edit_samerequest_1.png',
+        'POST /rest/v1/rpc/update_own_business',
+        'DELETE /storage/v1/object/business-media',
+      ]);
+
+      final rpcPayload = jsonDecode(requests[1].body) as Map<String, dynamic>;
+      expect(rpcPayload['p_photos'], [
+        {
+          'storage_path': 'owner/existing-id/kept_0.png',
+          'position': 0,
+          'is_cover': true,
+        },
+        {
+          'storage_path': 'owner/existing-id/edit_samerequest_1.png',
+          'position': 1,
+          'is_cover': false,
+        },
+      ]);
+      final cleanupPayload =
+          jsonDecode(requests[2].body) as Map<String, dynamic>;
+      expect(cleanupPayload['prefixes'], ['owner/existing-id/old_photo.png']);
+    },
+  );
+  test(
+    'si la RPC transaccional de edición falla, limpia únicamente las fotos nuevas recién subidas',
+    () async {
+      failUpdateRpc = true;
+      await expectLater(
+        publish(
+          draft.copyWith(
+            photos: [
+              BusinessPhoto(
+                bytes: Uint8List.fromList('new-img'.codeUnits),
+                extension: 'png',
+                mimeType: 'image/png',
+              ),
+            ],
+          ),
+          businessId: 'existing-id',
+        ),
+        throwsA(isA<BusinessRegistrationFailure>()),
+      );
+
+      expect(requests.map((r) => '${r.method} ${r.path}'), [
+        'POST /storage/v1/object/business-media/owner/existing-id/edit_samerequest_0.png',
+        'POST /rest/v1/rpc/update_own_business',
+        'DELETE /storage/v1/object/business-media',
+      ]);
+      final rollbackCleanup =
+          jsonDecode(requests[2].body) as Map<String, dynamic>;
+      expect(rollbackCleanup['prefixes'], [
+        'owner/existing-id/edit_samerequest_0.png',
+      ]);
+    },
+  );
   test('retirar negocio limpia archivos de Storage y elimina fila', () async {
     await repository.withdraw(businessId: 'existing-id', ownerId: 'owner');
     expect(requests.map((r) => '${r.method} ${r.path}'), [
