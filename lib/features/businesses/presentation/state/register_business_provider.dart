@@ -6,11 +6,13 @@ import 'package:via_justa/features/auth/presentation/state/auth_controller.dart'
 import 'package:via_justa/features/businesses/data/device_business_photo_repository.dart';
 import 'package:via_justa/features/businesses/data/supabase_business_registration_repository.dart';
 import 'package:via_justa/features/businesses/domain/business_draft.dart';
+import 'package:via_justa/features/businesses/domain/business_price_notice.dart';
 import 'package:via_justa/features/businesses/domain/business_registration_repository.dart';
 import 'package:via_justa/features/businesses/domain/business_validator.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
+import 'package:via_justa/features/prices/domain/price_category.dart';
 import 'package:via_justa/features/prices/presentation/state/price_map_providers.dart';
 import 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart';
 
@@ -40,6 +42,8 @@ class RegisterBusinessState {
     this.municipalityName = '',
     this.zones = const AsyncLoading(),
     this.zoneName = '',
+    this.priceCategories = const AsyncLoading(),
+    this.dishPriceNotices = const <int, AsyncValue<BusinessPriceNotice>>{},
   });
   final BusinessDraft draft;
   final int step;
@@ -54,12 +58,22 @@ class RegisterBusinessState {
   final String municipalityName;
   final AsyncValue<List<MunicipalityZone>> zones;
   final String zoneName;
+  final AsyncValue<List<PriceCategory>> priceCategories;
+  final Map<int, AsyncValue<BusinessPriceNotice>> dishPriceNotices;
+
   bool get available => ownerId != null && municipalityCode != null;
   bool get isEditing => editingId != null;
   bool get canAddPhoto => draft.photos.length < 5;
   bool get canAddDish => draft.dishes.length < 5;
   String get initialZoneId =>
       draft.zoneId ?? zones.asData?.value.firstOrNull?.id ?? '';
+
+  /// Categorías del catálogo de precios que tienen unidad equivalente para este tipo de negocio.
+  List<PriceCategory> get comparableCategories =>
+      comparableCategoriesForBusinessType(
+        draft.type,
+        priceCategories.asData?.value ?? const <PriceCategory>[],
+      );
 
   RegisterBusinessState copyWith({
     BusinessDraft? draft,
@@ -72,6 +86,8 @@ class RegisterBusinessState {
     bool? withdrawn,
     AsyncValue<List<MunicipalityZone>>? zones,
     String? zoneName,
+    AsyncValue<List<PriceCategory>>? priceCategories,
+    Map<int, AsyncValue<BusinessPriceNotice>>? dishPriceNotices,
   }) => RegisterBusinessState(
     draft: draft ?? this.draft,
     step: step ?? this.step,
@@ -86,6 +102,10 @@ class RegisterBusinessState {
     municipalityName: municipalityName,
     zones: zones ?? this.zones,
     zoneName: zoneName ?? this.zoneName,
+    priceCategories: priceCategories ?? this.priceCategories,
+    dishPriceNotices: Map.unmodifiable(
+      dishPriceNotices ?? this.dishPriceNotices,
+    ),
   );
 }
 
@@ -131,6 +151,9 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
         error: state.error,
       );
     });
+    ref.listen(priceCategoriesProvider, (_, next) {
+      state = state.copyWith(priceCategories: next, error: state.error);
+    });
     return RegisterBusinessState(
       ownerId: repository != null && !auth.$2 ? auth.$1 : null,
       municipalityCode:
@@ -139,6 +162,7 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
           : null,
       municipalityName: municipality?.name ?? '',
       zones: ref.read(municipalityZonesProvider),
+      priceCategories: ref.read(priceCategoriesProvider),
     );
   }
 
@@ -153,9 +177,15 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
   }
 
-  void _edit(BusinessDraft draft) {
+  void _edit(
+    BusinessDraft draft, {
+    Map<int, AsyncValue<BusinessPriceNotice>>? dishPriceNotices,
+  }) {
     if (state.busy || state.locked || state.publishedId != null) return;
-    state = state.copyWith(draft: draft);
+    state = state.copyWith(
+      draft: draft,
+      dishPriceNotices: dishPriceNotices,
+    );
   }
 
   Future<void> loadEdit(String businessId, String languageCode) async {
@@ -189,6 +219,7 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
         busy: false,
         draft: loaded,
         zoneName: zoneName,
+        dishPriceNotices: const <int, AsyncValue<BusinessPriceNotice>>{},
       );
     } catch (error) {
       if (ref.mounted && generation == _generation) {
@@ -211,7 +242,14 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
 
   void setType(BusinessType type) {
     if (state.isEditing) return;
-    _edit(state.draft.copyWith(type: type));
+    final clearedDishes = [
+      for (final dish in state.draft.dishes)
+        BusinessDishDraft(name: dish.name, price: dish.price),
+    ];
+    _edit(
+      state.draft.copyWith(type: type, dishes: clearedDishes),
+      dishPriceNotices: const <int, AsyncValue<BusinessPriceNotice>>{},
+    );
   }
 
   void setWhatsappConsent(bool value) =>
@@ -233,6 +271,7 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
         longitude: point.longitude,
         zoneId: point.zoneId,
       ),
+      dishPriceNotices: const <int, AsyncValue<BusinessPriceNotice>>{},
     );
     state = state.copyWith(zoneName: zone.localizedName(languageCode));
   }
@@ -241,25 +280,143 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
 
   void addDish() {
     if (state.draft.dishes.length >= 5) return;
+    final defaultCategoryId = state.comparableCategories.firstOrNull?.id;
     _edit(
       state.draft.copyWith(
-        dishes: [...state.draft.dishes, const BusinessDishDraft()],
+        dishes: [
+          ...state.draft.dishes,
+          BusinessDishDraft(priceCategoryId: defaultCategoryId),
+        ],
       ),
     );
   }
 
-  void setDish(int index, {String? name, String? price}) {
+  void setDish(
+    int index, {
+    String? name,
+    String? price,
+    String? priceCategoryId,
+    bool clearCategory = false,
+  }) {
+    if (index < 0 || index >= state.draft.dishes.length) return;
+    final current = state.draft.dishes[index];
+    final nextCategoryId = clearCategory
+        ? null
+        : (priceCategoryId ?? current.priceCategoryId);
     final dishes = [...state.draft.dishes];
     dishes[index] = BusinessDishDraft(
-      name: name ?? dishes[index].name,
-      price: price ?? dishes[index].price,
+      name: name ?? current.name,
+      price: price ?? current.price,
+      priceCategoryId: nextCategoryId,
     );
-    _edit(state.draft.copyWith(dishes: dishes));
+    final notices = {...state.dishPriceNotices};
+    if (price != null || priceCategoryId != null || clearCategory) {
+      notices.remove(index);
+    }
+    _edit(state.draft.copyWith(dishes: dishes), dishPriceNotices: notices);
   }
 
-  void removeDish(int index) => _edit(
-    state.draft.copyWith(dishes: [...state.draft.dishes]..removeAt(index)),
-  );
+  void removeDish(int index) {
+    if (index < 0 || index >= state.draft.dishes.length) return;
+    final updatedNotices = <int, AsyncValue<BusinessPriceNotice>>{};
+    for (final entry in state.dishPriceNotices.entries) {
+      if (entry.key < index) {
+        updatedNotices[entry.key] = entry.value;
+      } else if (entry.key > index) {
+        updatedNotices[entry.key - 1] = entry.value;
+      }
+    }
+    _edit(
+      state.draft.copyWith(dishes: [...state.draft.dishes]..removeAt(index)),
+      dishPriceNotices: updatedNotices,
+    );
+  }
+
+  /// Compara de forma privada y orientativa el precio de un plato o servicio con la mediana de la zona,
+  /// reutilizando el semáforo existente (`priceVerdictRepositoryProvider`).
+  Future<void> compareDishPrice(int index) async {
+    if (state.busy ||
+        state.locked ||
+        index < 0 ||
+        index >= state.draft.dishes.length) {
+      return;
+    }
+    final dish = state.draft.dishes[index];
+    final amountCop = int.tryParse(dish.price.trim());
+    final categoryId =
+        dish.priceCategoryId ?? state.comparableCategories.firstOrNull?.id;
+    if (amountCop == null ||
+        amountCop < 500 ||
+        amountCop > 20000000 ||
+        categoryId == null) {
+      return;
+    }
+
+    PriceCategory? category = state.comparableCategories
+        .where((c) => c.id == categoryId)
+        .firstOrNull;
+    if (category == null) {
+      final loadedCategories = await ref.read(priceCategoriesProvider.future);
+      category = comparableCategoriesForBusinessType(
+        state.draft.type,
+        loadedCategories,
+      ).where((c) => c.id == categoryId).firstOrNull;
+    }
+    if (category == null) return;
+
+    final generation = _generation;
+    final zoneId = state.draft.zoneId?.trim().isNotEmpty == true
+        ? state.draft.zoneId!
+        : (state.initialZoneId.isNotEmpty ? state.initialZoneId : 'vup_centro');
+    final municipalityCode = state.municipalityCode ?? '20001';
+
+    state = state.copyWith(
+      dishPriceNotices: {
+        ...state.dishPriceNotices,
+        index: const AsyncLoading<BusinessPriceNotice>(),
+      },
+      error: state.error,
+    );
+
+    try {
+      final verdict = await ref
+          .read(priceVerdictRepositoryProvider)
+          .evaluatePrice(
+            categoryId: category.id,
+            municipalityCode: municipalityCode,
+            zoneId: zoneId,
+            destinationZoneId: category.groupKey == 'transport' ? zoneId : null,
+            originLatitude: state.draft.latitude,
+            originLongitude: state.draft.longitude,
+            destinationLatitude: state.draft.latitude,
+            destinationLongitude: state.draft.longitude,
+            submittedCop: amountCop,
+          );
+      if (!ref.mounted || generation != _generation) return;
+      final notice = buildBusinessPriceNotice(
+        category: category,
+        verdict: verdict,
+      );
+      state = state.copyWith(
+        dishPriceNotices: {
+          ...state.dishPriceNotices,
+          index: AsyncData<BusinessPriceNotice>(notice),
+        },
+        error: state.error,
+      );
+    } catch (err, st) {
+      if (ref.mounted && generation == _generation) {
+        state = state.copyWith(
+          dishPriceNotices: {
+            ...state.dishPriceNotices,
+            index: AsyncError<BusinessPriceNotice>(err, st),
+          },
+          error: state.error,
+        );
+      }
+    }
+  }
+
   void removePhoto(int index) => _edit(
     state.draft.copyWith(photos: [...state.draft.photos]..removeAt(index)),
   );

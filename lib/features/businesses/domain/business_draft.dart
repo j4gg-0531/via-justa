@@ -24,9 +24,14 @@ class BusinessPhoto {
 }
 
 class BusinessDishDraft {
-  const BusinessDishDraft({this.name = '', this.price = ''});
+  const BusinessDishDraft({
+    this.name = '',
+    this.price = '',
+    this.priceCategoryId,
+  });
   final String name;
   final String price;
+  final String? priceCategoryId;
 }
 
 class BusinessDayHours {

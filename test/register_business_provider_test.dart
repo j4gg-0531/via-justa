@@ -260,6 +260,39 @@ void main() {
     expect(repository.withdrawnBusinessIds, ['own-business-1']);
     expect(container.read(registerBusinessProvider).withdrawn, isTrue);
   });
+  test(
+    'comparar precio de plato por zona reutiliza semáforo y permite mantener el precio y publicar',
+    () async {
+      fillRegistration(notifier);
+      await container.read(priceCategoriesProvider.future);
+      notifier.addDish();
+      notifier.setDish(
+        0,
+        name: 'Almuerzo ejecutivo',
+        price: '20000',
+        priceCategoryId: 'food_corrientazo',
+      );
+      await notifier.compareDishPrice(0);
+
+      final notice = container
+          .read(registerBusinessProvider)
+          .dishPriceNotices[0]
+          ?.value;
+      expect(notice, isNotNull);
+      expect(notice!.categoryId, 'food_corrientazo');
+      expect(notice.enteredCop, 20000);
+      expect(notice.sampleCount, greaterThanOrEqualTo(3));
+      expect(notice.medianCop, isNotNull);
+      expect(notice.differenceCop, 20000 - notice.medianCop!);
+
+      // El aviso es orientativo y permite mantener el precio y publicar
+      await notifier.submit();
+      expect(
+        container.read(registerBusinessProvider).publishedId,
+        'business-id',
+      );
+    },
+  );
   test('galería cancelada, inválida y límite de cinco fotos', () async {
     final photos = _FakePhotos();
     final photoContainer = ProviderContainer(
