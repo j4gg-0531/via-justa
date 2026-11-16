@@ -1,8 +1,8 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:via_justa/core/router/app_router.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
@@ -12,7 +12,7 @@ import 'package:via_justa/core/widgets/vj_search_field.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 
-/// Pantalla 21 (M21) · Directorio de comercios de muestra en Valledupar con buscador y categorías.
+/// Pantalla 21 (M21) · Directorio de comercios publicados en Valledupar con buscador y categorías.
 class BusinessesPage extends ConsumerWidget {
   const BusinessesPage({super.key});
 
@@ -36,11 +36,48 @@ class BusinessesPage extends ConsumerWidget {
     );
   }
 
+  Future<void> _confirmWithdraw(
+    BuildContext context,
+    WidgetRef ref,
+    Business business,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('businessRegistration.withdrawTitle'.tr()),
+        content: Text('businessRegistration.withdrawBody'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text('businessRegistration.stay'.tr()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text('businessRegistration.withdrawConfirm'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final ok = await ref
+        .read(businessOwnerActionProvider.notifier)
+        .withdraw(business.id);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('businesses.withdraw_error'.tr())),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final businessesAsync = ref.watch(filteredBusinessesProvider);
     final selectedCategory = ref.watch(businessCategoryProvider);
+    final currentOwnerId = ref.watch(currentBusinessOwnerIdProvider);
+    final ownerBusy = ref.watch(businessOwnerActionProvider);
     final textTheme = Theme.of(context).textTheme;
+    final localeCode =
+        Localizations.maybeLocaleOf(context)?.languageCode ?? 'es';
 
     return Scaffold(
       body: SafeArea(
@@ -64,39 +101,6 @@ class BusinessesPage extends ConsumerWidget {
                     Text(
                       'businesses.subtitle'.tr(),
                       style: textTheme.bodyMedium,
-                    ),
-
-                    const SizedBox(height: AppSpacing.md),
-
-                    // Banner de muestra local
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        color: AppColors.primarySoft,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.info_outline,
-                            color: AppColors.primary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Text(
-                              'businesses.demo_banner'.tr(),
-                              style: textTheme.bodySmall?.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
 
                     const SizedBox(height: AppSpacing.lg),
@@ -126,7 +130,8 @@ class BusinessesPage extends ConsumerWidget {
                           const SizedBox(width: AppSpacing.sm),
                           _CategoryChip(
                             label: 'businesses.category_food'.tr(),
-                            selected: selectedCategory == BusinessCategory.food,
+                            selected:
+                                selectedCategory == BusinessCategory.food,
                             icon: Icons.restaurant,
                             onTap: () => ref
                                 .read(businessCategoryProvider.notifier)
@@ -180,11 +185,19 @@ class BusinessesPage extends ConsumerWidget {
               error: (err, stack) => SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.xl),
-                  child: Center(
-                    child: Text(
-                      'municipality.load_error'.tr(),
-                      style: textTheme.bodyLarge,
-                    ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'municipality.load_error'.tr(),
+                        style: textTheme.bodyLarge,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      VjButton(
+                        label: 'common.retry'.tr(),
+                        onPressed: () => ref.invalidate(allBusinessesProvider),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -205,26 +218,45 @@ class BusinessesPage extends ConsumerWidget {
                 }
 
                 return SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xl,
+                  ),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final business = businesses[index];
+                        final isOwner =
+                            currentOwnerId != null &&
+                            business.ownerId == currentOwnerId;
+                        final description = business.localizedDescription(
+                          localeCode,
+                        );
                         return Padding(
                           padding: const EdgeInsets.only(bottom: AppSpacing.md),
                           child: _BusinessCard(
                             business: business,
+                            description: description,
+                            isOwner: isOwner,
+                            ownerBusy: ownerBusy,
                             onTap: () => _showInfoDialog(
                               context,
                               title: business.name,
                               body:
-                                  '${business.description}\n\n${business.address}\nTel: ${business.phone}',
+                                  '$description\n\n${business.address}\nTel: ${business.phone}',
                             ),
                             onContactTap: () => _showInfoDialog(
                               context,
                               title: 'businesses.contact_dialog_title'.tr(),
                               body: 'businesses.contact_dialog_body'.tr(),
                             ),
+                            onEditTap: isOwner
+                                ? () => context.push(
+                                    AppRoutes.businessEditPath(business.id),
+                                  )
+                                : null,
+                            onWithdrawTap: isOwner
+                                ? () => _confirmWithdraw(context, ref, business)
+                                : null,
                           ),
                         );
                       },
@@ -268,7 +300,8 @@ class BusinessesPage extends ConsumerWidget {
                       const SizedBox(height: AppSpacing.md),
                       VjButton(
                         label: 'businesses.register_action'.tr(),
-                        onPressed: () => context.push(AppRoutes.businessRegister),
+                        onPressed: () =>
+                            context.push(AppRoutes.businessRegister),
                       ),
                     ],
                   ),
@@ -328,13 +361,23 @@ class _CategoryChip extends StatelessWidget {
 class _BusinessCard extends StatelessWidget {
   const _BusinessCard({
     required this.business,
+    required this.description,
     required this.onTap,
     required this.onContactTap,
+    this.isOwner = false,
+    this.ownerBusy = false,
+    this.onEditTap,
+    this.onWithdrawTap,
   });
 
   final Business business;
+  final String description;
   final VoidCallback onTap;
   final VoidCallback onContactTap;
+  final bool isOwner;
+  final bool ownerBusy;
+  final VoidCallback? onEditTap;
+  final VoidCallback? onWithdrawTap;
 
   @override
   Widget build(BuildContext context) {
@@ -356,16 +399,14 @@ class _BusinessCard extends StatelessWidget {
                 ),
               ),
               VjBadge(
-                label: business.isVerified
-                    ? 'businesses.verified_badge'.tr()
-                    : 'businesses.demo_badge'.tr(),
+                label: 'businesses.verified_badge'.tr(),
               ),
             ],
           ),
-          if (business.description.isNotEmpty) ...[
+          if (description.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xs),
             Text(
-              business.description,
+              description,
               style: textTheme.bodyMedium,
             ),
           ],
@@ -387,9 +428,31 @@ class _BusinessCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
             children: [
+              if (isOwner) ...[
+                TextButton.icon(
+                  onPressed: ownerBusy ? null : onEditTap,
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: Text('businesses.action_edit'.tr()),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    minimumSize: const Size(48, 48),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: ownerBusy ? null : onWithdrawTap,
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  label: Text('businesses.action_withdraw'.tr()),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    minimumSize: const Size(48, 48),
+                  ),
+                ),
+              ],
               TextButton.icon(
                 onPressed: onContactTap,
                 icon: const Icon(Icons.phone, size: 16),

@@ -326,7 +326,10 @@
     "register_dialog_body": "The business registration form for local owners will be enabled in upcoming project steps.",
     "contact_dialog_title": "Demo contact",
     "contact_dialog_body": "In the pilot MVP, contact actions will connect directly via WhatsApp or phone call with the registered business.",
-    "no_results": "No businesses found with the current filter."
+    "action_edit": "Edit",
+    "action_withdraw": "Withdraw",
+    "withdraw_error": "Could not withdraw the business. Check your connection and try again.",
+    "no_results": "There are no businesses in this zone yet"
   },
   "profile": {
     "edit_name_title": "Edit name",
@@ -454,6 +457,14 @@
     "previous": "Previous step",
     "back": "Back",
     "publish": "Publish business",
+    "saveChanges": "Save changes",
+    "editTitle": "Edit business",
+    "withdraw": "Withdraw business",
+    "withdrawTitle": "Withdraw business?",
+    "withdrawBody": "Your business will stop appearing in the directory and map, and its published photos will be deleted.",
+    "withdrawConfirm": "Withdraw business",
+    "withdrawnTitle": "Business withdrawn",
+    "withdrawnBody": "Your business was withdrawn from the directory and map.",
     "retry": "Retry publishing",
     "retryHint": "Your submission keeps its data. Retry or cancel preparation to edit it.",
     "cancelAttempt": "Cancel preparation and edit",

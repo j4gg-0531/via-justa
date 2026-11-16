@@ -44,12 +44,28 @@ void main() {
             'status': published ? 'approved' : 'pending',
           }),
         );
+      } else if (request.uri.path.contains('/storage/v1/object/list/')) {
+        request.response.write(
+          jsonEncode([
+            {
+              'name': 'photo_0.png',
+              'id': 'file-1',
+              'updated_at': '2026-01-01T00:00:00Z',
+              'created_at': '2026-01-01T00:00:00Z',
+              'last_accessed_at': '2026-01-01T00:00:00Z',
+              'metadata': <String, dynamic>{},
+            },
+          ]),
+        );
+      } else if (request.uri.path.contains('/storage/') &&
+          request.method == 'DELETE') {
+        request.response.write('[]');
       } else if (request.uri.path.contains('/storage/')) {
         request.response.write(
           jsonEncode({'Key': 'business-media/owner/business-id/photo_0.png'}),
         );
       } else {
-        request.response.write('{}');
+        request.response.write('[]');
       }
       await request.response.close();
     });
@@ -83,15 +99,22 @@ void main() {
       BusinessField.whatsapp: '+57 3001234567',
       BusinessField.orderUrl: 'https://vinapp.co/menu',
     },
+    latitude: 10.47,
+    longitude: -73.24,
+    whatsappConsent: true,
     dishes: [BusinessDishDraft(name: 'Almuerzo', price: '15000')],
   );
-  Future<String> publish(BusinessDraft value, {String owner = 'owner'}) =>
-      repository.publish(
-        draft: value,
-        requestId: 'same-request',
-        ownerId: owner,
-        municipalityCode: '20001',
-      );
+  Future<String> publish(
+    BusinessDraft value, {
+    String owner = 'owner',
+    String? businessId,
+  }) => repository.publish(
+    draft: value,
+    requestId: 'same-request',
+    ownerId: owner,
+    municipalityCode: '20001',
+    businessId: businessId,
+  );
   test('serializa contrato y finaliza después de enlazar fotos', () async {
     final result = await publish(
       draft.copyWith(
@@ -127,6 +150,24 @@ void main() {
     published = true;
     expect(await publish(draft), 'business-id');
     expect(requests.length, 1);
+  });
+  test('editar negocio actualiza datos, platos y fotos sin duplicar', () async {
+    final result = await publish(draft, businessId: 'existing-id');
+    expect(result, 'existing-id');
+    expect(requests.map((r) => '${r.method} ${r.path}'), [
+      'PATCH /rest/v1/businesses',
+      'DELETE /rest/v1/business_dishes',
+      'POST /rest/v1/business_dishes',
+      'DELETE /rest/v1/business_photos',
+    ]);
+  });
+  test('retirar negocio limpia archivos de Storage y elimina fila', () async {
+    await repository.withdraw(businessId: 'existing-id', ownerId: 'owner');
+    expect(requests.map((r) => '${r.method} ${r.path}'), [
+      'POST /storage/v1/object/list/business-media',
+      'DELETE /storage/v1/object/business-media',
+      'DELETE /rest/v1/businesses',
+    ]);
   });
   test('sesión diferente no realiza solicitudes', () async {
     await expectLater(

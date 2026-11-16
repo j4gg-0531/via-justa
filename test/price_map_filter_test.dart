@@ -92,6 +92,43 @@ void main() {
       );
       expect(noMatch, isEmpty);
     });
+
+    test('excludes demo businesses while keeping real businesses', () {
+      const mixed = <PriceMapItem>[
+        PriceMapItem(
+          id: 'demo_biz',
+          name: '[DEMO] Comercio de muestra',
+          description: 'Muestra',
+          category: PriceMapCategory.services,
+          pinKind: PriceMapPinKind.food,
+          status: PricePinStatus.info,
+          pinLabel: '',
+          badgeText: '',
+          normalizedX: 0.5,
+          normalizedY: 0.5,
+          sourceType: 'business',
+          municipalityCode: '20001',
+          isDemo: true,
+        ),
+        PriceMapItem(
+          id: 'real_biz',
+          name: 'Cocina del Patio',
+          description: 'Comida casera',
+          category: PriceMapCategory.services,
+          pinKind: PriceMapPinKind.food,
+          status: PricePinStatus.info,
+          pinLabel: '',
+          badgeText: '',
+          normalizedX: 0.5,
+          normalizedY: 0.5,
+          sourceType: 'business',
+          municipalityCode: '20001',
+          isDemo: false,
+        ),
+      ];
+      final result = filterPriceMapItems(mixed);
+      expect(result.map((e) => e.id), ['real_biz']);
+    });
   });
 
   group('sectionTitleKeyForMapCategory', () {

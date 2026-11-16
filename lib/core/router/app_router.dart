@@ -55,6 +55,8 @@ class AppRoutes {
   static const businessRegister = '/businesses/register';
   static const profile = '/profile';
 
+  static String businessEditPath(String id) => '$businessRegister?id=$id';
+
   static String departmentPath(String code) => '/department/$code';
   static String municipalityPath(String code) => '/municipality/$code';
 }
@@ -152,7 +154,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.businessRegister,
-        builder: (context, state) => const RegisterBusinessPage(),
+        builder: (context, state) => RegisterBusinessPage(
+          businessId: state.uri.queryParameters['id'],
+        ),
       ),
 
       // Experiencia principal dentro del municipio: StatefulShellRoute con 5 ramas y estado independiente

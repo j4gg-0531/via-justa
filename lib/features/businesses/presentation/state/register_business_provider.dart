@@ -33,6 +33,8 @@ class RegisterBusinessState {
     this.locked = false,
     this.error,
     this.publishedId,
+    this.editingId,
+    this.withdrawn = false,
     this.ownerId,
     this.municipalityCode,
     this.municipalityName = '',
@@ -45,12 +47,15 @@ class RegisterBusinessState {
   final bool locked;
   final String? error;
   final String? publishedId;
+  final String? editingId;
+  final bool withdrawn;
   final String? ownerId;
   final String? municipalityCode;
   final String municipalityName;
   final AsyncValue<List<MunicipalityZone>> zones;
   final String zoneName;
   bool get available => ownerId != null && municipalityCode != null;
+  bool get isEditing => editingId != null;
   bool get canAddPhoto => draft.photos.length < 5;
   bool get canAddDish => draft.dishes.length < 5;
   String get initialZoneId =>
@@ -63,6 +68,8 @@ class RegisterBusinessState {
     bool? locked,
     String? error,
     String? publishedId,
+    String? editingId,
+    bool? withdrawn,
     AsyncValue<List<MunicipalityZone>>? zones,
     String? zoneName,
   }) => RegisterBusinessState(
@@ -72,6 +79,8 @@ class RegisterBusinessState {
     locked: locked ?? this.locked,
     error: error,
     publishedId: publishedId ?? this.publishedId,
+    editingId: editingId ?? this.editingId,
+    withdrawn: withdrawn ?? this.withdrawn,
     ownerId: ownerId,
     municipalityCode: municipalityCode,
     municipalityName: municipalityName,
@@ -96,7 +105,31 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
     final municipality = ref.watch(selectedMunicipalityProvider);
     final repository = ref.watch(businessRegistrationRepositoryProvider);
     ref.listen(municipalityZonesProvider, (_, next) {
-      state = state.copyWith(zones: next, error: state.error);
+      final currentDraft = state.draft;
+      String resolvedZoneName = state.zoneName;
+      BusinessDraft updatedDraft = currentDraft;
+      final zoneList = next.asData?.value;
+      if (zoneList != null &&
+          zoneList.isNotEmpty &&
+          currentDraft.latitude != null &&
+          currentDraft.longitude != null &&
+          currentDraft.zoneId == null) {
+        final nearest = resolveNearestZoneByCoordinates(
+          zones: zoneList,
+          latitude: currentDraft.latitude!,
+          longitude: currentDraft.longitude!,
+        );
+        if (nearest != null) {
+          updatedDraft = currentDraft.copyWith(zoneId: nearest.id);
+          resolvedZoneName = nearest.nameEs;
+        }
+      }
+      state = state.copyWith(
+        zones: next,
+        draft: updatedDraft,
+        zoneName: resolvedZoneName,
+        error: state.error,
+      );
     });
     return RegisterBusinessState(
       ownerId: repository != null && !auth.$2 ? auth.$1 : null,
@@ -125,6 +158,48 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
     state = state.copyWith(draft: draft);
   }
 
+  Future<void> loadEdit(String businessId, String languageCode) async {
+    if (state.editingId == businessId || state.busy || !state.available) return;
+    final generation = _generation;
+    state = state.copyWith(busy: true, editingId: businessId);
+    try {
+      var loaded = await ref
+          .read(businessRegistrationRepositoryProvider)!
+          .loadForEdit(businessId: businessId, ownerId: state.ownerId!);
+      if (!ref.mounted || generation != _generation) return;
+      var zoneName = state.zoneName;
+      final zoneList = state.zones.asData?.value;
+      if (loaded.latitude != null &&
+          loaded.longitude != null &&
+          zoneList != null &&
+          zoneList.isNotEmpty) {
+        final nearest = resolveNearestZoneByCoordinates(
+          zones: zoneList,
+          latitude: loaded.latitude!,
+          longitude: loaded.longitude!,
+        );
+        if (nearest != null) {
+          loaded = loaded.copyWith(zoneId: nearest.id);
+          zoneName = nearest.localizedName(languageCode);
+        }
+      } else if (loaded.latitude != null && loaded.longitude != null) {
+        loaded = loaded.copyWith(zoneId: 'vup_centro');
+      }
+      state = state.copyWith(
+        busy: false,
+        draft: loaded,
+        zoneName: zoneName,
+      );
+    } catch (error) {
+      if (ref.mounted && generation == _generation) {
+        state = state.copyWith(
+          busy: false,
+          error: error is BusinessRegistrationFailure ? error.key : 'network',
+        );
+      }
+    }
+  }
+
   void setField(BusinessField field, String value) {
     _edit(
       state.draft.copyWith(
@@ -134,7 +209,11 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
     );
   }
 
-  void setType(BusinessType type) => _edit(state.draft.copyWith(type: type));
+  void setType(BusinessType type) {
+    if (state.isEditing) return;
+    _edit(state.draft.copyWith(type: type));
+  }
+
   void setWhatsappConsent(bool value) =>
       _edit(state.draft.copyWith(whatsappConsent: value));
   void setPublicationConsent(bool value) =>
@@ -235,7 +314,7 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
       }
     }
     final generation = _generation;
-    state = state.copyWith(busy: true, locked: true);
+    state = state.copyWith(busy: true, locked: !state.isEditing);
     try {
       final id = await ref
           .read(businessRegistrationRepositoryProvider)!
@@ -244,6 +323,7 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
             requestId: _requestId,
             ownerId: state.ownerId!,
             municipalityCode: state.municipalityCode!,
+            businessId: state.editingId,
           );
       if (!ref.mounted || generation != _generation) return;
       _published(id);
@@ -261,6 +341,28 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
     state = state.copyWith(busy: false, locked: false, publishedId: id);
     ref.invalidate(allBusinessesProvider);
     ref.invalidate(allPriceMapItemsProvider);
+  }
+
+  Future<void> withdraw() async {
+    if (state.busy || state.editingId == null || !state.available) return;
+    final generation = _generation;
+    state = state.copyWith(busy: true);
+    try {
+      await ref
+          .read(businessRegistrationRepositoryProvider)!
+          .withdraw(businessId: state.editingId!, ownerId: state.ownerId!);
+      if (!ref.mounted || generation != _generation) return;
+      state = state.copyWith(busy: false, locked: false, withdrawn: true);
+      ref.invalidate(allBusinessesProvider);
+      ref.invalidate(allPriceMapItemsProvider);
+    } catch (error) {
+      if (ref.mounted && generation == _generation) {
+        state = state.copyWith(
+          busy: false,
+          error: error is BusinessRegistrationFailure ? error.key : 'network',
+        );
+      }
+    }
   }
 
   Future<void> discard() async {

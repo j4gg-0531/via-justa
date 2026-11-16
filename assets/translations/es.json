@@ -326,7 +326,10 @@
     "register_dialog_body": "El formulario de registro de negocios para dueños locales se habilitará en las siguientes etapas del proyecto.",
     "contact_dialog_title": "Contacto de demostración",
     "contact_dialog_body": "En el MVP piloto, las acciones de contacto conectarán directamente por WhatsApp o llamada con el comercio registrado.",
-    "no_results": "No se encontraron negocios con el filtro actual."
+    "action_edit": "Editar",
+    "action_withdraw": "Retirar",
+    "withdraw_error": "No se pudo retirar el negocio. Comprueba tu conexión e inténtalo de nuevo.",
+    "no_results": "Aún no hay negocios en esta zona"
   },
   "profile": {
     "edit_name_title": "Editar nombre",
@@ -454,6 +457,14 @@
     "previous": "Paso anterior",
     "back": "Volver",
     "publish": "Publicar negocio",
+    "saveChanges": "Guardar cambios",
+    "editTitle": "Editar negocio",
+    "withdraw": "Retirar negocio",
+    "withdrawTitle": "¿Retirar negocio?",
+    "withdrawBody": "Tu negocio dejará de aparecer en el directorio y en el mapa, y se eliminarán sus fotos publicadas.",
+    "withdrawConfirm": "Retirar negocio",
+    "withdrawnTitle": "Negocio retirado",
+    "withdrawnBody": "Tu negocio se retiró del directorio y del mapa.",
     "retry": "Reintentar publicación",
     "retryHint": "El envío conserva tus datos. Puedes reintentar o cancelar la preparación para corregirlos.",
     "cancelAttempt": "Cancelar preparación y editar",

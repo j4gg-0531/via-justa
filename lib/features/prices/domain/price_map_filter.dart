@@ -10,6 +10,9 @@ List<PriceMapItem> filterPriceMapItems(
   final normalizedQuery = normalizeForSearch(query ?? '');
 
   return items.where((item) {
+    if (item.sourceType == 'business' && item.isDemo) {
+      return false;
+    }
     final matchesCategory = category == null || item.category == category;
     final matchesQuery = normalizedQuery.isEmpty ||
         normalizeForSearch(item.name).contains(normalizedQuery) ||

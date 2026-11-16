@@ -1,26 +1,21 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:via_justa/features/prices/data/local_price_map_repository.dart';
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
 import 'package:via_justa/features/prices/domain/price_map_repository.dart';
 
-/// Repositorio conectado a Supabase que consulta `public.get_municipality_map_items` (VJ-12).
-/// Combina en tiempo real:
-///   1) Reportes de precios (`public.price_reports`) con coordenadas redondeadas a 3 decimales y veredicto.
-///   2) Negocios y servicios aprobados (`public.businesses` con `status = 'approved'`).
+/// Repositorio conectado a Supabase que consulta `public.get_municipality_map_items` (VJ-12 / VJ-16).
+/// Excluye comercios de demostración y propaga errores de conexión sin reemplazar por ejemplos.
 class SupabasePriceMapRepository implements PriceMapRepository {
   const SupabasePriceMapRepository({
-    required this._client,
-    this.includeDemo = true,
+    required this.client,
+    this.includeDemo = false,
     this.bounds,
     this.localeCode = 'es',
-    this.fallbackRepository = const LocalPriceMapRepository(),
   });
 
-  final SupabaseClient _client;
+  final SupabaseClient client;
   final bool includeDemo;
   final MapViewportBounds? bounds;
   final String localeCode;
-  final PriceMapRepository fallbackRepository;
 
   static PriceMapCategory _parseCategory(String? raw) {
     switch (raw) {
@@ -66,7 +61,8 @@ class SupabasePriceMapRepository implements PriceMapRepository {
     }
   }
 
-  /// Parsea una lista de filas JSON devueltas por `public.get_municipality_map_items`.
+  /// Parsea una lista de filas JSON devueltas por `public.get_municipality_map_items`,
+  /// descartando comercios de demostración (`source_type = 'business'` e `is_demo = true`).
   static List<PriceMapItem> parseRows(
     List<dynamic> response, {
     String municipalityCode = '20001',
@@ -74,66 +70,71 @@ class SupabasePriceMapRepository implements PriceMapRepository {
   }) {
     final isEnglish = localeCode.toLowerCase().startsWith('en');
 
-    return response.whereType<Map<String, dynamic>>().map((row) {
-      final nameEs = (row['name_es'] as String?) ?? '';
-      final nameEn = (row['name_en'] as String?) ?? nameEs;
-      final descEs = (row['description_es'] as String?) ?? '';
-      final descEn = (row['description_en'] as String?) ?? descEs;
+    return response
+        .whereType<Map<String, dynamic>>()
+        .where((row) {
+          final sourceType = (row['source_type'] as String?) ?? 'price_report';
+          final isDemo = (row['is_demo'] as bool?) ?? false;
+          return !(sourceType == 'business' && isDemo);
+        })
+        .map((row) {
+          final nameEs = (row['name_es'] as String?) ?? '';
+          final nameEn = (row['name_en'] as String?) ?? nameEs;
+          final descEs = (row['description_es'] as String?) ?? '';
+          final descEn = (row['description_en'] as String?) ?? descEs;
 
-      return PriceMapItem(
-        id: (row['id'] ?? '').toString(),
-        name: isEnglish && nameEn.isNotEmpty ? nameEn : nameEs,
-        description: isEnglish && descEn.isNotEmpty ? descEn : descEs,
-        category: _parseCategory(row['map_category'] as String?),
-        pinKind: _parsePinKind(row['pin_kind'] as String?),
-        status: _parsePinStatus(row['pin_status'] as String?),
-        pinLabel: (row['pin_label'] as String?) ?? '',
-        badgeText: (row['badge_text'] as String?) ?? '',
-        normalizedX: (row['normalized_x'] as num?)?.toDouble() ?? 0.5,
-        normalizedY: (row['normalized_y'] as num?)?.toDouble() ?? 0.5,
-        latitude: (row['latitude'] as num?)?.toDouble() ?? kValleduparCenterLat,
-        longitude:
-            (row['longitude'] as num?)?.toDouble() ?? kValleduparCenterLng,
-        phone: row['phone'] as String?,
-        whatsapp: row['whatsapp'] as String?,
-        address: row['address'] as String?,
-        sourceType: (row['source_type'] as String?) ?? 'price_report',
-        municipalityCode:
-            (row['municipality_code'] as String?) ?? municipalityCode,
-        isDemo: (row['is_demo'] as bool?) ?? false,
-      );
-    }).toList();
+          return PriceMapItem(
+            id: (row['id'] ?? '').toString(),
+            name: isEnglish && nameEn.isNotEmpty ? nameEn : nameEs,
+            description: isEnglish && descEn.isNotEmpty ? descEn : descEs,
+            category: _parseCategory(row['map_category'] as String?),
+            pinKind: _parsePinKind(row['pin_kind'] as String?),
+            status: _parsePinStatus(row['pin_status'] as String?),
+            pinLabel: (row['pin_label'] as String?) ?? '',
+            badgeText: (row['badge_text'] as String?) ?? '',
+            normalizedX: (row['normalized_x'] as num?)?.toDouble() ?? 0.5,
+            normalizedY: (row['normalized_y'] as num?)?.toDouble() ?? 0.5,
+            latitude:
+                (row['latitude'] as num?)?.toDouble() ?? kValleduparCenterLat,
+            longitude:
+                (row['longitude'] as num?)?.toDouble() ?? kValleduparCenterLng,
+            phone: row['phone'] as String?,
+            whatsapp: row['whatsapp'] as String?,
+            address: row['address'] as String?,
+            sourceType: (row['source_type'] as String?) ?? 'price_report',
+            municipalityCode:
+                (row['municipality_code'] as String?) ?? municipalityCode,
+            isDemo: (row['is_demo'] as bool?) ?? false,
+          );
+        })
+        .toList();
   }
 
   @override
   Future<List<PriceMapItem>> getMapItems({
     String municipalityCode = '20001',
   }) async {
-    try {
-      final dynamic response = await _client.rpc(
-        'get_municipality_map_items',
-        params: <String, dynamic>{
-          'p_municipality_code': municipalityCode,
-          'p_category': null,
-          'p_min_lat': bounds?.minLat,
-          'p_max_lat': bounds?.maxLat,
-          'p_min_lng': bounds?.minLng,
-          'p_max_lng': bounds?.maxLng,
-          'p_include_demo': includeDemo,
-          'p_limit': 200,
-        },
-      );
+    final dynamic response = await client.rpc(
+      'get_municipality_map_items',
+      params: <String, dynamic>{
+        'p_municipality_code': municipalityCode,
+        'p_category': null,
+        'p_min_lat': bounds?.minLat,
+        'p_max_lat': bounds?.maxLat,
+        'p_min_lng': bounds?.minLng,
+        'p_max_lng': bounds?.maxLng,
+        'p_include_demo': includeDemo,
+        'p_limit': 200,
+      },
+    );
 
-      if (response is List && response.isNotEmpty) {
-        return parseRows(
-          response,
-          municipalityCode: municipalityCode,
-          localeCode: localeCode,
-        );
-      }
-      return await fallbackRepository.getMapItems(municipalityCode: municipalityCode);
-    } catch (_) {
-      return fallbackRepository.getMapItems(municipalityCode: municipalityCode);
+    if (response is List) {
+      return parseRows(
+        response,
+        municipalityCode: municipalityCode,
+        localeCode: localeCode,
+      );
     }
+    return const <PriceMapItem>[];
   }
 }

@@ -6,6 +6,19 @@ abstract interface class BusinessRegistrationRepository {
     required String requestId,
     required String ownerId,
     required String municipalityCode,
+    String? businessId,
+  });
+
+  /// Carga un negocio propio existente para editarlo.
+  Future<BusinessDraft> loadForEdit({
+    required String businessId,
+    required String ownerId,
+  });
+
+  /// Retira (elimina) un negocio propio publicado o en preparación y limpia sus fotos.
+  Future<void> withdraw({
+    required String businessId,
+    required String ownerId,
   });
 
   /// Cancela la preparación o devuelve el ID si el servidor ya la publicó.

@@ -11,7 +11,8 @@ import 'package:via_justa/features/businesses/presentation/state/register_busine
 import 'package:via_justa/features/prices/presentation/widgets/map_point_picker_sheet.dart';
 
 class RegisterBusinessPage extends ConsumerStatefulWidget {
-  const RegisterBusinessPage({super.key});
+  const RegisterBusinessPage({super.key, this.businessId});
+  final String? businessId;
   @override
   ConsumerState<RegisterBusinessPage> createState() =>
       _RegisterBusinessPageState();
@@ -21,6 +22,25 @@ class _RegisterBusinessPageState extends ConsumerState<RegisterBusinessPage> {
   final _allowExit = ValueNotifier(false);
   final _scrollController = ScrollController();
   bool _askingToExit = false;
+  bool _didRequestEditLoad = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final id = widget.businessId;
+    if (id != null && id.isNotEmpty && !_didRequestEditLoad) {
+      _didRequestEditLoad = true;
+      final languageCode =
+          Localizations.maybeLocaleOf(context)?.languageCode ?? 'es';
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref
+              .read(registerBusinessProvider.notifier)
+              .loadEdit(id, languageCode);
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -29,10 +49,35 @@ class _RegisterBusinessPageState extends ConsumerState<RegisterBusinessPage> {
     super.dispose();
   }
 
+  Future<void> _confirmWithdraw() async {
+    final state = ref.read(registerBusinessProvider);
+    if (state.busy || !state.isEditing) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('businessRegistration.withdrawTitle'.tr()),
+        content: Text('businessRegistration.withdrawBody'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text('businessRegistration.stay'.tr()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text('businessRegistration.withdrawConfirm'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (mounted && confirmed == true) {
+      await ref.read(registerBusinessProvider.notifier).withdraw();
+    }
+  }
+
   Future<void> _exit() async {
     final state = ref.read(registerBusinessProvider);
     if (state.busy || _askingToExit) return;
-    if (state.publishedId == null && state.available) {
+    if (state.publishedId == null && !state.withdrawn && state.available) {
       _askingToExit = true;
       final confirmed = await showDialog<bool>(
         context: context,
@@ -89,7 +134,12 @@ class _RegisterBusinessPageState extends ConsumerState<RegisterBusinessPage> {
         },
         child: Scaffold(
           appBar: AppBar(
-            title: Text('businessRegistration.title'.tr()),
+            title: Text(
+              (state.isEditing
+                      ? 'businessRegistration.editTitle'
+                      : 'businessRegistration.title')
+                  .tr(),
+            ),
             leading: IconButton(
               onPressed: state.busy ? null : _exit,
               tooltip: 'businessRegistration.back'.tr(),
@@ -111,6 +161,24 @@ class _RegisterBusinessPageState extends ConsumerState<RegisterBusinessPage> {
                     const SizedBox(height: AppSpacing.lg),
                     VjButton(
                       label: 'businessRegistration.back'.tr(),
+                      onPressed: _exit,
+                    ),
+                  ] else if (state.withdrawn) ...[
+                    const Icon(
+                      Icons.delete_outline,
+                      size: 48,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      'businessRegistration.withdrawnTitle'.tr(),
+                      style: theme.headlineSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text('businessRegistration.withdrawnBody'.tr()),
+                    const SizedBox(height: AppSpacing.xl),
+                    VjButton(
+                      label: 'businessRegistration.done'.tr(),
                       onPressed: _exit,
                     ),
                   ] else if (state.publishedId != null) ...[
@@ -166,6 +234,8 @@ class _RegisterBusinessPageState extends ConsumerState<RegisterBusinessPage> {
                       label: state.step == 3
                           ? (state.locked
                                     ? 'businessRegistration.retry'
+                                    : state.isEditing
+                                    ? 'businessRegistration.saveChanges'
                                     : 'businessRegistration.publish')
                                 .tr()
                           : 'businessRegistration.next'.tr(),
@@ -191,6 +261,14 @@ class _RegisterBusinessPageState extends ConsumerState<RegisterBusinessPage> {
                         onPressed: state.busy ? null : notifier.discard,
                       ),
                     ],
+                    if (state.isEditing) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      VjButton(
+                        label: 'businessRegistration.withdraw'.tr(),
+                        variant: VjButtonVariant.outlined,
+                        onPressed: state.busy ? null : _confirmWithdraw,
+                      ),
+                    ],
                   ],
                 ],
               ),
@@ -214,7 +292,7 @@ class _StepContent extends ConsumerWidget {
   }) => Padding(
     padding: const EdgeInsets.only(bottom: AppSpacing.lg),
     child: TextFormField(
-      key: ValueKey(field),
+      key: ValueKey('${field.name}-${state.editingId}-${state.busy}'),
       initialValue: state.draft.text(field),
       maxLines: lines,
       keyboardType: keyboard,
@@ -236,6 +314,7 @@ class _StepContent extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DropdownButtonFormField<BusinessType>(
+              key: ValueKey('type-${state.editingId}-${draft.type.name}'),
               initialValue: draft.type,
               isExpanded: true,
               decoration: InputDecoration(
@@ -248,9 +327,11 @@ class _StepContent extends ConsumerWidget {
                     child: Text('businessRegistration.types.${type.name}'.tr()),
                   ),
               ],
-              onChanged: (type) {
-                if (type != null) notifier.setType(type);
-              },
+              onChanged: state.isEditing
+                  ? null
+                  : (type) {
+                      if (type != null) notifier.setType(type);
+                    },
             ),
             const SizedBox(height: AppSpacing.lg),
             _field(ref, BusinessField.name),
@@ -367,7 +448,9 @@ class _StepContent extends ConsumerWidget {
             ),
             for (var index = 0; index < draft.dishes.length; index++)
               _DishEditor(
-                key: ValueKey('dish-$index-${draft.dishes.length}'),
+                key: ValueKey(
+                  'dish-$index-${draft.dishes.length}-${state.editingId}-${state.busy}',
+                ),
                 index: index,
                 dish: draft.dishes[index],
               ),
@@ -474,6 +557,7 @@ class _DayEditor extends ConsumerWidget {
                 SizedBox(
                   width: 120,
                   child: TextFormField(
+                    key: ValueKey('open-$day-${hours.open}'),
                     initialValue: hours.open,
                     decoration: InputDecoration(
                       labelText: 'businessRegistration.open'.tr(),
@@ -493,6 +577,7 @@ class _DayEditor extends ConsumerWidget {
                 SizedBox(
                   width: 120,
                   child: TextFormField(
+                    key: ValueKey('close-$day-${hours.close}'),
                     initialValue: hours.close,
                     decoration: InputDecoration(
                       labelText: 'businessRegistration.close'.tr(),

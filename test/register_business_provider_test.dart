@@ -23,20 +23,55 @@ class TestBusinessAuth extends AuthController {
 
 class FakeRegistrationRepository implements BusinessRegistrationRepository {
   final requests = <String>[];
+  final editedBusinessIds = <String?>[];
+  final withdrawnBusinessIds = <String>[];
   bool fail = false;
   bool cleanupFail = false;
   String? discardedPublishedId;
   Completer<String>? pending;
+  BusinessDraft loadedDraft = const BusinessDraft(
+    fields: {
+      BusinessField.name: 'Cocina del patio',
+      BusinessField.descriptionEs: 'Comida tradicional preparada cada día.',
+      BusinessField.address: 'Calle 10 número 20',
+      BusinessField.whatsapp: '573001234567',
+    },
+    latitude: 10.47,
+    longitude: -73.24,
+    whatsappConsent: true,
+    publicationConsent: true,
+  );
+
   @override
   Future<String> publish({
     required BusinessDraft draft,
     required String requestId,
     required String ownerId,
     required String municipalityCode,
+    String? businessId,
   }) async {
     requests.add(requestId);
+    editedBusinessIds.add(businessId);
     if (fail) throw const BusinessRegistrationFailure('network');
-    return pending == null ? 'business-id' : pending!.future;
+    return pending == null ? (businessId ?? 'business-id') : pending!.future;
+  }
+
+  @override
+  Future<BusinessDraft> loadForEdit({
+    required String businessId,
+    required String ownerId,
+  }) async {
+    if (fail) throw const BusinessRegistrationFailure('network');
+    return loadedDraft;
+  }
+
+  @override
+  Future<void> withdraw({
+    required String businessId,
+    required String ownerId,
+  }) async {
+    if (fail) throw const BusinessRegistrationFailure('network');
+    withdrawnBusinessIds.add(businessId);
   }
 
   @override
@@ -73,7 +108,9 @@ ProviderContainer registrationContainer(FakeRegistrationRepository repository) {
     overrides: [
       authControllerProvider.overrideWith(TestBusinessAuth.new),
       businessRegistrationRepositoryProvider.overrideWithValue(repository),
-      municipalityZonesProvider.overrideWith((ref) async => [registrationZone]),
+      municipalityZonesProvider.overrideWith(
+        (ref) async => [registrationZone],
+      ),
     ],
   );
   container
@@ -199,6 +236,30 @@ void main() {
     }
     expect(container.read(registerBusinessProvider).draft.dishes.length, 5);
   });
+  test('dueño puede cargar, editar y retirar su negocio publicado', () async {
+    await notifier.loadEdit('own-business-1', 'es');
+    expect(container.read(registerBusinessProvider).isEditing, isTrue);
+    expect(
+      container.read(registerBusinessProvider).draft.text(BusinessField.name),
+      'Cocina del patio',
+    );
+    notifier.setType(BusinessType.hotel);
+    expect(
+      container.read(registerBusinessProvider).draft.type,
+      BusinessType.restaurant,
+    );
+    notifier.setField(BusinessField.name, 'Cocina del patio renovada');
+    await notifier.submit();
+    expect(repository.editedBusinessIds, ['own-business-1']);
+    expect(
+      container.read(registerBusinessProvider).publishedId,
+      'own-business-1',
+    );
+
+    await notifier.withdraw();
+    expect(repository.withdrawnBusinessIds, ['own-business-1']);
+    expect(container.read(registerBusinessProvider).withdrawn, isTrue);
+  });
   test('galería cancelada, inválida y límite de cinco fotos', () async {
     final photos = _FakePhotos();
     final photoContainer = ProviderContainer(
@@ -208,10 +269,16 @@ void main() {
     photoContainer.listen(registerBusinessProvider, (_, _) {});
     final controller = photoContainer.read(registerBusinessProvider.notifier);
     await controller.addPhoto();
-    expect(photoContainer.read(registerBusinessProvider).draft.photos, isEmpty);
+    expect(
+      photoContainer.read(registerBusinessProvider).draft.photos,
+      isEmpty,
+    );
     photos.fail = true;
     await controller.addPhoto();
-    expect(photoContainer.read(registerBusinessProvider).error, 'photoInvalid');
+    expect(
+      photoContainer.read(registerBusinessProvider).error,
+      'photoInvalid',
+    );
     photos.fail = false;
     photos.photo = BusinessPhoto(
       bytes: Uint8List(12),
