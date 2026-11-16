@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
+import 'package:via_justa/features/businesses/domain/business_detail.dart';
 import 'package:via_justa/features/businesses/domain/business_filter.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 import 'package:via_justa/features/businesses/presentation/pages/businesses_page.dart';
@@ -55,6 +56,17 @@ class _SeededBusinessRepository implements BusinessRepository {
     calls++;
     if (fail) throw Exception('connection failed');
     return customItems ?? items;
+  }
+
+  @override
+  Future<BusinessDetail> getBusinessDetail(
+    String businessId, {
+    String localeCode = 'es',
+  }) async {
+    if (fail) throw Exception('connection failed');
+    final source = customItems ?? items;
+    final match = source.firstWhere((item) => item.id == businessId);
+    return BusinessDetail.fromBusiness(match, localeCode: localeCode);
   }
 }
 

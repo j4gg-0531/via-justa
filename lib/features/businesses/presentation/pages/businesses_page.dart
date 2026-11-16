@@ -10,11 +10,24 @@ import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/core/widgets/vj_search_field.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
+import 'package:via_justa/features/businesses/presentation/pages/business_detail_page.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 
 /// Pantalla 21 (M21) · Directorio de comercios publicados en Valledupar con buscador y categorías.
 class BusinessesPage extends ConsumerWidget {
   const BusinessesPage({super.key});
+
+  void _openBusinessDetail(BuildContext context, String businessId) {
+    if (GoRouter.maybeOf(context) != null) {
+      context.push(AppRoutes.businessDetailPath(businessId));
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => BusinessDetailPage(businessId: businessId),
+        ),
+      );
+    }
+  }
 
   void _showInfoDialog(
     BuildContext context, {
@@ -78,7 +91,7 @@ class BusinessesPage extends ConsumerWidget {
     final canLoadMore = ref.watch(canLoadMoreBusinessesProvider);
     final textTheme = Theme.of(context).textTheme;
     final localeCode =
-        Localizations.maybeLocaleOf(context)?.languageCode ?? 'es';
+        EasyLocalization.of(context)?.locale.languageCode ?? 'es';
 
     return Scaffold(
       body: SafeArea(
@@ -239,12 +252,8 @@ class BusinessesPage extends ConsumerWidget {
                             description: description,
                             isOwner: isOwner,
                             ownerBusy: ownerBusy,
-                            onTap: () => _showInfoDialog(
-                              context,
-                              title: business.name,
-                              body:
-                                  '$description\n\n${business.address}\nTel: ${business.phone}',
-                            ),
+                            onTap: () =>
+                                _openBusinessDetail(context, business.id),
                             onContactTap: () => _showInfoDialog(
                               context,
                               title: 'businesses.contact_dialog_title'.tr(),

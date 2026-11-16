@@ -1,4 +1,5 @@
 import 'package:via_justa/features/businesses/domain/business.dart';
+import 'package:via_justa/features/businesses/domain/business_detail.dart';
 import 'package:via_justa/features/businesses/domain/business_filter.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 
@@ -15,5 +16,13 @@ class LocalBusinessRepository implements BusinessRepository {
     int offset = 0,
   }) async {
     return const <Business>[];
+  }
+
+  @override
+  Future<BusinessDetail> getBusinessDetail(
+    String businessId, {
+    String localeCode = 'es',
+  }) async {
+    throw StateError('Business not found: $businessId');
   }
 }

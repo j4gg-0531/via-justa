@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:via_justa/features/businesses/data/local_business_repository.dart';
 import 'package:via_justa/features/businesses/data/supabase_business_repository.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
+import 'package:via_justa/features/businesses/domain/business_detail.dart';
 import 'package:via_justa/features/businesses/domain/business_filter.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
@@ -44,6 +45,16 @@ class _MockBusinessRepository implements BusinessRepository {
         municipalityCode: '20001',
       ),
     ];
+  }
+
+  @override
+  Future<BusinessDetail> getBusinessDetail(
+    String businessId, {
+    String localeCode = 'es',
+  }) async {
+    final list = await getBusinesses(localeCode: localeCode);
+    final match = list.firstWhere((item) => item.id == businessId);
+    return BusinessDetail.fromBusiness(match, localeCode: localeCode);
   }
 }
 
@@ -188,6 +199,68 @@ void main() {
         parsed.first.localizedDescription('en'),
         'Home-style vallenato food.',
       );
+    },
+  );
+
+  test(
+    'SupabaseBusinessRepository.parseDetail construye ficha con horarios, platos, acciones y valoraciones',
+    () {
+      final detail = SupabaseBusinessRepository.parseDetail({
+        'id': 'real-1',
+        'name': 'Cocina del Patio',
+        'type': 'restaurant',
+        'category_group': 'food',
+        'description': 'Almuerzos y comida casera.',
+        'description_es': 'Almuerzos y comida casera.',
+        'description_en': 'Home-style lunches.',
+        'address': 'Sector Centro, Valledupar',
+        'latitude': 10.4742,
+        'longitude': -73.2436,
+        'hours': {
+          'mon': [
+            {'open': '11:30', 'close': '16:00'},
+          ],
+          'sun': <Map<String, dynamic>>[],
+        },
+        'actions': {
+          'can_order_external': true,
+          'order_url': 'https://vinapp.co/cocina',
+          'can_whatsapp': true,
+          'whatsapp_url': 'https://wa.me/573001234567',
+          'can_directions': true,
+          'maps_url':
+              'https://www.google.com/maps/dir/?api=1&destination=10.474200,-73.243600',
+          'external_order_disclaimer':
+              'Los pedidos y pagos se realizan directamente con el comercio fuera de Vía Justa.',
+        },
+        'dishes': [
+          {'id': 'd1', 'name': 'Sancocho', 'price_cop': 22000},
+        ],
+        'photos': [
+          {
+            'id': 'p1',
+            'storage_path': 'owner-1/real-1/photo_0.jpg',
+            'position': 0,
+            'is_cover': true,
+          },
+        ],
+        'rating_average': 4.3,
+        'rating_count': 12,
+      }, ownerId: 'owner-1');
+
+      expect(detail.id, 'real-1');
+      expect(detail.ownerId, 'owner-1');
+      expect(detail.canOrderExternal, isTrue);
+      expect(detail.canWhatsapp, isTrue);
+      expect(detail.canDirections, isTrue);
+      expect(detail.dishes.first.formattedPriceCop, r'$22.000 COP');
+      expect(detail.schedule, isNotEmpty);
+      expect(detail.schedule.first.dayKey, 'mon');
+      expect(detail.schedule.first.isOpen, isTrue);
+      expect(detail.schedule.first.rangesText, '11:30 – 16:00');
+      expect(detail.hasRatings, isTrue);
+      expect(detail.formattedRatingAverage, '4,3');
+      expect(detail.ratingCount, 12);
     },
   );
 }

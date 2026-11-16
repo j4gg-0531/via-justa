@@ -332,6 +332,20 @@
     "load_more": "Cargar más negocios",
     "no_results": "Aún no hay negocios en esta zona"
   },
+  "business_detail": {
+    "photo_placeholder": "Foto del negocio",
+    "no_ratings": "Sin valoraciones",
+    "rating_summary": "{} · {} valoraciones",
+    "action_order": "Ver menú y pedir",
+    "action_whatsapp": "WhatsApp",
+    "action_directions": "Cómo llegar",
+    "section_info": "Información",
+    "section_dishes": "Platos o servicios destacados",
+    "section_hours": "Horario",
+    "hours_not_specified": "Horario no especificado",
+    "section_location": "Ubicación",
+    "section_ratings": "Valoraciones"
+  },
   "profile": {
     "edit_name_title": "Editar nombre",
     "edit_name_hint": "Nombre y apellido",

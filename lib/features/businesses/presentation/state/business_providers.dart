@@ -4,6 +4,7 @@ import 'package:via_justa/features/auth/presentation/state/auth_controller.dart'
 import 'package:via_justa/features/businesses/data/local_business_repository.dart';
 import 'package:via_justa/features/businesses/data/supabase_business_repository.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
+import 'package:via_justa/features/businesses/domain/business_detail.dart';
 import 'package:via_justa/features/businesses/domain/business_filter.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 import 'package:via_justa/features/businesses/presentation/state/register_business_provider.dart';
@@ -179,3 +180,10 @@ final canLoadMoreBusinessesProvider = Provider<bool>((ref) {
     currentLimit: limit,
   );
 });
+
+/// Provider que carga la ficha completa de un negocio por su identificador.
+final businessDetailProvider = FutureProvider.autoDispose
+    .family<BusinessDetail, String>((ref, businessId) async {
+      final repository = ref.watch(businessRepositoryProvider);
+      return repository.getBusinessDetail(businessId);
+    });

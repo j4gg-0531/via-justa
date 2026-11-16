@@ -332,6 +332,20 @@
     "load_more": "Load more businesses",
     "no_results": "There are no businesses in this zone yet"
   },
+  "business_detail": {
+    "photo_placeholder": "Business photo",
+    "no_ratings": "No ratings yet",
+    "rating_summary": "{} · {} ratings",
+    "action_order": "View menu and order",
+    "action_whatsapp": "WhatsApp",
+    "action_directions": "Get directions",
+    "section_info": "Information",
+    "section_dishes": "Featured dishes or services",
+    "section_hours": "Hours",
+    "hours_not_specified": "Hours not specified",
+    "section_location": "Location",
+    "section_ratings": "Ratings"
+  },
   "profile": {
     "edit_name_title": "Edit name",
     "edit_name_hint": "First and last name",
