@@ -17,10 +17,14 @@ class BusinessPhoto {
     required this.bytes,
     required this.extension,
     required this.mimeType,
+    this.storagePath,
   });
   final Uint8List bytes;
   final String extension;
   final String mimeType;
+
+  /// Ruta persistida en Storage cuando la foto proviene de un negocio ya guardado.
+  final String? storagePath;
 }
 
 class BusinessDishDraft {

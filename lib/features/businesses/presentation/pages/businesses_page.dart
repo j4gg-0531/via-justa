@@ -85,6 +85,7 @@ class BusinessesPage extends ConsumerWidget {
     final currentOwnerId = ref.watch(currentBusinessOwnerIdProvider);
     final ownerBusy = ref.watch(businessOwnerActionProvider);
     final canLoadMore = ref.watch(canLoadMoreBusinessesProvider);
+    final isLoadingMore = ref.watch(isLoadingMoreBusinessesProvider);
     final textTheme = Theme.of(context).textTheme;
     final localeCode =
         EasyLocalization.of(context)?.locale.languageCode ?? 'es';
@@ -205,7 +206,8 @@ class BusinessesPage extends ConsumerWidget {
                       const SizedBox(height: AppSpacing.md),
                       VjButton(
                         label: 'common.retry'.tr(),
-                        onPressed: () => ref.invalidate(allBusinessesProvider),
+                        onPressed: () =>
+                            ref.invalidate(businessCatalogProvider),
                       ),
                     ],
                   ),
@@ -284,9 +286,11 @@ class BusinessesPage extends ConsumerWidget {
                   child: VjButton(
                     label: 'businesses.load_more'.tr(),
                     variant: VjButtonVariant.outlined,
-                    onPressed: () => ref
-                        .read(businessCatalogPageLimitProvider.notifier)
-                        .loadMore(),
+                    onPressed: isLoadingMore
+                        ? null
+                        : () => ref
+                              .read(businessCatalogProvider.notifier)
+                              .loadMore(),
                   ),
                 ),
               ),
@@ -423,7 +427,7 @@ class _BusinessCard extends StatelessWidget {
                 ),
               ),
               VjBadge(
-                label: 'businesses.verified_badge'.tr(),
+                label: 'businesses.published_badge'.tr(),
               ),
             ],
           ),
