@@ -1,5 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:via_justa/core/router/app_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
@@ -256,7 +258,6 @@ class BusinessesPage extends ConsumerWidget {
                               style: textTheme.titleMedium,
                             ),
                           ),
-                          VjBadge(label: 'common.coming_soon'.tr()),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.xs),
@@ -267,11 +268,7 @@ class BusinessesPage extends ConsumerWidget {
                       const SizedBox(height: AppSpacing.md),
                       VjButton(
                         label: 'businesses.register_action'.tr(),
-                        onPressed: () => _showInfoDialog(
-                          context,
-                          title: 'businesses.register_dialog_title'.tr(),
-                          body: 'businesses.register_dialog_body'.tr(),
-                        ),
+                        onPressed: () => context.push(AppRoutes.businessRegister),
                       ),
                     ],
                   ),

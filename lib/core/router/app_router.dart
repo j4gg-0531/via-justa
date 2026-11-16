@@ -9,6 +9,7 @@ import 'package:via_justa/features/auth/presentation/pages/welcome_page.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_state.dart';
 import 'package:via_justa/features/businesses/presentation/pages/businesses_page.dart';
+import 'package:via_justa/features/businesses/presentation/pages/register_business_page.dart';
 import 'package:via_justa/features/home/presentation/pages/home_page.dart';
 import 'package:via_justa/features/map_colombia/presentation/pages/map_page.dart';
 import 'package:via_justa/features/municipality/presentation/pages/municipality_page.dart';
@@ -51,6 +52,7 @@ class AppRoutes {
   static const map = '/map';
   static const scan = '/scan';
   static const businesses = '/businesses';
+  static const businessRegister = '/businesses/register';
   static const profile = '/profile';
 
   static String departmentPath(String code) => '/department/$code';
@@ -147,6 +149,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.priceContribute,
         builder: (context, state) => const ContributePricePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.businessRegister,
+        builder: (context, state) => const RegisterBusinessPage(),
       ),
 
       // Experiencia principal dentro del municipio: StatefulShellRoute con 5 ramas y estado independiente
