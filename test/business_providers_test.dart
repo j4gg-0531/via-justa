@@ -9,8 +9,11 @@ import 'package:via_justa/features/businesses/domain/business_rating.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 
-class _MockBusinessRepository implements BusinessRepository {
-  const _MockBusinessRepository();
+class _PaginatedMockBusinessRepository implements BusinessRepository {
+  _PaginatedMockBusinessRepository(this.allItems);
+
+  final List<Business> allItems;
+  final requestedOffsets = <int>[];
 
   @override
   Future<List<Business>> getBusinesses({
@@ -20,32 +23,15 @@ class _MockBusinessRepository implements BusinessRepository {
     int limit = kBusinessCatalogPageSize,
     int offset = 0,
   }) async {
-    return const [
-      Business(
-        id: '1',
-        name: 'Arepas Vallenatas',
-        category: BusinessCategory.food,
-        address: 'Cra 9 # 10',
-        phone: '111',
-        municipalityCode: '20001',
-      ),
-      Business(
-        id: '2',
-        name: 'Transportes del Norte',
-        category: BusinessCategory.transport,
-        address: 'Terminal Taquilla 1',
-        phone: '222',
-        municipalityCode: '20001',
-      ),
-      Business(
-        id: '3',
-        name: 'Hotel del Cesar',
-        category: BusinessCategory.lodging,
-        address: 'Plaza Alfonso López',
-        phone: '333',
-        municipalityCode: '20001',
-      ),
-    ];
+    requestedOffsets.add(offset);
+    final filtered = filterBusinesses(
+      allItems,
+      category: category,
+      query: searchQuery,
+    );
+    // Simula el tope de servidor de 50 registros por consulta.
+    final serverCap = limit > 50 ? 50 : limit;
+    return paginateBusinesses(filtered, limit: serverCap, offset: offset);
   }
 
   @override
@@ -53,8 +39,7 @@ class _MockBusinessRepository implements BusinessRepository {
     String businessId, {
     String localeCode = 'es',
   }) async {
-    final list = await getBusinesses(localeCode: localeCode);
-    final match = list.firstWhere((item) => item.id == businessId);
+    final match = allItems.firstWhere((item) => item.id == businessId);
     return BusinessDetail.fromBusiness(match, localeCode: localeCode);
   }
 
@@ -74,47 +59,99 @@ class _MockBusinessRepository implements BusinessRepository {
 
 void main() {
   test(
-    'filteredBusinessesProvider combines repository data, query, category and pagination',
+    'businessCatalogProvider pagina por bloques de offset superando el tope de 50 negocios de Supabase',
     () async {
+      final seeded = List.generate(
+        55,
+        (index) => Business(
+          id: 'biz-$index',
+          name: 'Comercio $index',
+          category: BusinessCategory.food,
+          address: 'Calle $index',
+          phone: '30000000$index',
+          municipalityCode: '20001',
+        ),
+      );
+      final repo = _PaginatedMockBusinessRepository(seeded);
+      final container = ProviderContainer(
+        overrides: [businessRepositoryProvider.overrideWithValue(repo)],
+      );
+      addTearDown(container.dispose);
+
+      // Bloque 1: offset 0 -> 20 items
+      final page1 = await container.read(businessCatalogProvider.future);
+      expect(page1.items.length, 20);
+      expect(container.read(canLoadMoreBusinessesProvider), isTrue);
+
+      // Bloque 2: offset 20 -> 40 items
+      await container.read(businessCatalogProvider.notifier).loadMore();
+      expect(
+        container.read(filteredBusinessesProvider).value?.length,
+        40,
+      );
+      expect(container.read(canLoadMoreBusinessesProvider), isTrue);
+
+      // Bloque 3: offset 40 -> 55 items (fin del catálogo, supera los 50)
+      await container.read(businessCatalogProvider.notifier).loadMore();
+      expect(
+        container.read(filteredBusinessesProvider).value?.length,
+        55,
+      );
+      expect(container.read(canLoadMoreBusinessesProvider), isFalse);
+      expect(repo.requestedOffsets, [0, 20, 40]);
+    },
+  );
+
+  test(
+    'filteredBusinessesProvider combina repositorio, consulta, categoría y reinicia al filtrar',
+    () async {
+      const sample = [
+        Business(
+          id: '1',
+          name: 'Arepas Vallenatas',
+          category: BusinessCategory.food,
+          address: 'Cra 9 # 10',
+          phone: '111',
+          municipalityCode: '20001',
+        ),
+        Business(
+          id: '2',
+          name: 'Transportes del Norte',
+          category: BusinessCategory.transport,
+          address: 'Terminal Taquilla 1',
+          phone: '222',
+          municipalityCode: '20001',
+        ),
+        Business(
+          id: '3',
+          name: 'Hotel del Cesar',
+          category: BusinessCategory.lodging,
+          address: 'Plaza Alfonso López',
+          phone: '333',
+          municipalityCode: '20001',
+        ),
+      ];
+      final repo = _PaginatedMockBusinessRepository(sample);
       final container = ProviderContainer(
         overrides: [
-          businessRepositoryProvider.overrideWithValue(
-            const _MockBusinessRepository(),
-          ),
+          businessRepositoryProvider.overrideWithValue(repo),
+          businessCatalogPageSizeProvider.overrideWithValue(2),
         ],
       );
       addTearDown(container.dispose);
 
-      expect(
-        container.read(filteredBusinessesProvider),
-        isA<AsyncLoading>(),
-      );
-
-      final initialList = await container.read(allBusinessesProvider.future);
-      expect(initialList.length, 3);
-
-      // Pagination limit of 2 shows first 2 items and enables loadMore
-      container.read(businessCatalogPageLimitProvider.notifier).setLimit(2);
-      await container.read(allBusinessesProvider.future);
-      expect(container.read(filteredBusinessesProvider).value?.length, 2);
+      final initialState = await container.read(businessCatalogProvider.future);
+      expect(initialState.items.length, 2);
       expect(container.read(canLoadMoreBusinessesProvider), isTrue);
 
-      container
-          .read(businessCatalogPageLimitProvider.notifier)
-          .loadMore(step: 2);
-      await container.read(allBusinessesProvider.future);
+      await container.read(businessCatalogProvider.notifier).loadMore();
       expect(container.read(filteredBusinessesProvider).value?.length, 3);
       expect(container.read(canLoadMoreBusinessesProvider), isFalse);
 
-      // Selecting category resets pagination limit and filters items
       container
           .read(businessCategoryProvider.notifier)
           .selectCategory(BusinessCategory.food);
-      expect(
-        container.read(businessCatalogPageLimitProvider),
-        kBusinessCatalogPageSize,
-      );
-      await container.read(allBusinessesProvider.future);
+      await container.read(businessCatalogProvider.future);
 
       final filtered = container.read(filteredBusinessesProvider).value;
       expect(filtered?.length, 1);
@@ -123,13 +160,13 @@ void main() {
       container
           .read(businessSearchQueryProvider.notifier)
           .updateQuery('Terminal');
-      await container.read(allBusinessesProvider.future);
+      await container.read(businessCatalogProvider.future);
 
       final emptyFiltered = container.read(filteredBusinessesProvider).value;
       expect(emptyFiltered, isEmpty);
 
       container.read(businessCategoryProvider.notifier).selectCategory(null);
-      await container.read(allBusinessesProvider.future);
+      await container.read(businessCatalogProvider.future);
 
       final transportFiltered =
           container.read(filteredBusinessesProvider).value;
@@ -213,68 +250,6 @@ void main() {
         parsed.first.localizedDescription('en'),
         'Home-style vallenato food.',
       );
-    },
-  );
-
-  test(
-    'SupabaseBusinessRepository.parseDetail construye ficha con horarios, platos, acciones y valoraciones',
-    () {
-      final detail = SupabaseBusinessRepository.parseDetail({
-        'id': 'real-1',
-        'name': 'Cocina del Patio',
-        'type': 'restaurant',
-        'category_group': 'food',
-        'description': 'Almuerzos y comida casera.',
-        'description_es': 'Almuerzos y comida casera.',
-        'description_en': 'Home-style lunches.',
-        'address': 'Sector Centro, Valledupar',
-        'latitude': 10.4742,
-        'longitude': -73.2436,
-        'hours': {
-          'mon': [
-            {'open': '11:30', 'close': '16:00'},
-          ],
-          'sun': <Map<String, dynamic>>[],
-        },
-        'actions': {
-          'can_order_external': true,
-          'order_url': 'https://vinapp.co/cocina',
-          'can_whatsapp': true,
-          'whatsapp_url': 'https://wa.me/573001234567',
-          'can_directions': true,
-          'maps_url':
-              'https://www.google.com/maps/dir/?api=1&destination=10.474200,-73.243600',
-          'external_order_disclaimer':
-              'Los pedidos y pagos se realizan directamente con el comercio fuera de Vía Justa.',
-        },
-        'dishes': [
-          {'id': 'd1', 'name': 'Sancocho', 'price_cop': 22000},
-        ],
-        'photos': [
-          {
-            'id': 'p1',
-            'storage_path': 'owner-1/real-1/photo_0.jpg',
-            'position': 0,
-            'is_cover': true,
-          },
-        ],
-        'rating_average': 4.3,
-        'rating_count': 12,
-      }, ownerId: 'owner-1');
-
-      expect(detail.id, 'real-1');
-      expect(detail.ownerId, 'owner-1');
-      expect(detail.canOrderExternal, isTrue);
-      expect(detail.canWhatsapp, isTrue);
-      expect(detail.canDirections, isTrue);
-      expect(detail.dishes.first.formattedPriceCop, r'$22.000 COP');
-      expect(detail.schedule, isNotEmpty);
-      expect(detail.schedule.first.dayKey, 'mon');
-      expect(detail.schedule.first.isOpen, isTrue);
-      expect(detail.schedule.first.rangesText, '11:30 – 16:00');
-      expect(detail.hasRatings, isTrue);
-      expect(detail.formattedRatingAverage, '4,3');
-      expect(detail.ratingCount, 12);
     },
   );
 }

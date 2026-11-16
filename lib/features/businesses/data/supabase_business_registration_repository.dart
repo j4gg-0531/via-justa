@@ -29,41 +29,29 @@ class SupabaseBusinessRegistrationRepository
           : [],
   };
 
-  Future<void> _syncPhotos({
+  List<Map<String, dynamic>> _dishesPayload(BusinessDraft draft) => [
+    for (final dish in draft.dishes)
+      {'name': dish.name.trim(), 'price_cop': int.parse(dish.price)},
+  ];
+
+  String _newEditPhotoPath({
     required String ownerId,
     required String businessId,
-    required List<BusinessPhoto> photos,
-    required bool deleteRemoved,
-  }) async {
-    for (var index = 0; index < photos.length; index++) {
-      _checkOwner(ownerId);
-      final photo = photos[index];
-      final path = '$ownerId/$businessId/photo_$index.${photo.extension}';
-      await _client.storage
-          .from('business-media')
-          .uploadBinary(
-            path,
-            photo.bytes,
-            fileOptions: FileOptions(
-              contentType: photo.mimeType,
-              upsert: true,
-            ),
-          );
-      _checkOwner(ownerId);
-      await _client.from('business_photos').upsert({
-        'business_id': businessId,
-        'storage_path': path,
-        'position': index,
-        'is_cover': index == 0,
-      }, onConflict: 'business_id,position');
-    }
-    if (deleteRemoved) {
-      _checkOwner(ownerId);
-      await _client
-          .from('business_photos')
-          .delete()
-          .eq('business_id', businessId)
-          .gte('position', photos.length);
+    required String requestId,
+    required int index,
+    required String extension,
+  }) {
+    final cleanToken = requestId.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+    final suffix = cleanToken.isEmpty ? 'batch' : cleanToken.substring(0, cleanToken.length > 16 ? 16 : cleanToken.length);
+    return '$ownerId/$businessId/edit_${suffix}_$index.$extension';
+  }
+
+  Future<void> _bestEffortRemoveStoragePaths(List<String> paths) async {
+    if (paths.isEmpty) return;
+    try {
+      await _client.storage.from('business-media').remove(paths);
+    } catch (_) {
+      // Limpieza en segundo plano: la ficha en BD ya es consistente.
     }
   }
 
@@ -85,51 +73,80 @@ class SupabaseBusinessRegistrationRepository
       final orderUrl = draft.text(BusinessField.orderUrl).trim();
 
       if (businessId != null) {
-        await _client
-            .from('businesses')
-            .update({
-              'name': draft.text(BusinessField.name).trim(),
-              'description_es': draft.text(BusinessField.descriptionEs).trim(),
-              'description_en': draft.text(BusinessField.descriptionEn).trim(),
-              'address': draft.text(BusinessField.address).trim(),
-              'location':
-                  'SRID=4326;POINT(${draft.longitude} ${draft.latitude})',
-              'phone': phone.isEmpty ? null : phone,
-              'whatsapp': whatsapp.isEmpty ? null : whatsapp,
-              'whatsapp_consent_at':
-                  whatsapp.isNotEmpty && draft.whatsappConsent
-                  ? DateTime.now().toUtc().toIso8601String()
-                  : null,
-              'order_url': orderUrl.isEmpty ? null : orderUrl,
-              'hours': _hoursPayload(draft),
-            })
-            .eq('id', businessId)
-            .eq('owner_id', ownerId);
+        final uploadedNewPaths = <String>[];
+        final photoSpecs = <Map<String, dynamic>>[];
 
-        _checkOwner(ownerId);
-        await _client
-            .from('business_dishes')
-            .delete()
-            .eq('business_id', businessId);
-        if (draft.dishes.isNotEmpty) {
-          await _client.from('business_dishes').insert([
-            for (var index = 0; index < draft.dishes.length; index++)
-              {
-                'business_id': businessId,
-                'name': draft.dishes[index].name.trim(),
-                'price_cop': int.parse(draft.dishes[index].price),
-                'sort_order': index,
-              },
-          ]);
+        try {
+          for (var index = 0; index < draft.photos.length; index++) {
+            _checkOwner(ownerId);
+            final photo = draft.photos[index];
+            final existingPath = photo.storagePath?.trim();
+            final String targetPath;
+            if (existingPath != null && existingPath.isNotEmpty) {
+              targetPath = existingPath;
+            } else {
+              targetPath = _newEditPhotoPath(
+                ownerId: ownerId,
+                businessId: businessId,
+                requestId: requestId,
+                index: index,
+                extension: photo.extension,
+              );
+              await _client.storage
+                  .from('business-media')
+                  .uploadBinary(
+                    targetPath,
+                    photo.bytes,
+                    fileOptions: FileOptions(
+                      contentType: photo.mimeType,
+                      upsert: false,
+                    ),
+                  );
+              uploadedNewPaths.add(targetPath);
+            }
+            photoSpecs.add({
+              'storage_path': targetPath,
+              'position': index,
+              'is_cover': index == 0,
+            });
+          }
+
+          _checkOwner(ownerId);
+          final dynamic rawResult = await _client.rpc(
+            'update_own_business',
+            params: {
+              'p_business_id': businessId,
+              'p_name': draft.text(BusinessField.name).trim(),
+              'p_description_es': draft.text(BusinessField.descriptionEs).trim(),
+              'p_description_en': draft.text(BusinessField.descriptionEn).trim(),
+              'p_latitude': draft.latitude,
+              'p_longitude': draft.longitude,
+              'p_address': draft.text(BusinessField.address).trim(),
+              'p_phone': phone.isEmpty ? null : phone,
+              'p_whatsapp': whatsapp.isEmpty ? null : whatsapp,
+              'p_whatsapp_consent': whatsapp.isNotEmpty && draft.whatsappConsent,
+              'p_order_url': orderUrl.isEmpty ? null : orderUrl,
+              'p_hours': _hoursPayload(draft),
+              'p_dishes': _dishesPayload(draft),
+              'p_photos': photoSpecs,
+            },
+          );
+
+          final result = rawResult is Map
+              ? Map<String, dynamic>.from(rawResult)
+              : const <String, dynamic>{};
+          final removedRaw = result['removed_photo_paths'];
+          final removedPaths = <String>[
+            if (removedRaw is List)
+              for (final item in removedRaw)
+                if (item != null && item.toString().isNotEmpty) item.toString(),
+          ];
+          await _bestEffortRemoveStoragePaths(removedPaths);
+          return businessId;
+        } catch (_) {
+          await _bestEffortRemoveStoragePaths(uploadedNewPaths);
+          rethrow;
         }
-
-        await _syncPhotos(
-          ownerId: ownerId,
-          businessId: businessId,
-          photos: draft.photos,
-          deleteRemoved: true,
-        );
-        return businessId;
       }
 
       final raw = await _client.rpc(
@@ -149,22 +166,35 @@ class SupabaseBusinessRegistrationRepository
           'p_publication_consent': draft.publicationConsent,
           'p_order_url': orderUrl,
           'p_hours': _hoursPayload(draft),
-          'p_dishes': [
-            for (final dish in draft.dishes)
-              {'name': dish.name.trim(), 'price_cop': int.parse(dish.price)},
-          ],
+          'p_dishes': _dishesPayload(draft),
           'p_municipality_code': municipalityCode,
         },
       );
       final row = Map<String, dynamic>.from(raw as Map);
       final id = row['id'] as String;
       if (row['status'] == 'approved') return id;
-      await _syncPhotos(
-        ownerId: ownerId,
-        businessId: id,
-        photos: draft.photos,
-        deleteRemoved: false,
-      );
+      for (var index = 0; index < draft.photos.length; index++) {
+        _checkOwner(ownerId);
+        final photo = draft.photos[index];
+        final path = '$ownerId/$id/photo_$index.${photo.extension}';
+        await _client.storage
+            .from('business-media')
+            .uploadBinary(
+              path,
+              photo.bytes,
+              fileOptions: FileOptions(
+                contentType: photo.mimeType,
+                upsert: true,
+              ),
+            );
+        _checkOwner(ownerId);
+        await _client.from('business_photos').upsert({
+          'business_id': id,
+          'storage_path': path,
+          'position': index,
+          'is_cover': index == 0,
+        }, onConflict: 'business_id,position');
+      }
       _checkOwner(ownerId);
       await _client.rpc(
         'publish_business',
@@ -242,6 +272,7 @@ class SupabaseBusinessRegistrationRepository
               mimeType: extension == 'jpg'
                   ? 'image/jpeg'
                   : 'image/$extension',
+              storagePath: storagePath,
             ),
           );
         }
@@ -337,6 +368,8 @@ class SupabaseBusinessRegistrationRepository
       'BUSINESS_LIMIT_REACHED': 'limit',
       'BUSINESS_INVALID_LOCATION': 'location',
       'BUSINESS_PHOTOS_INCOMPLETE': 'photoUpload',
+      'BUSINESS_PHOTO_INVALID_PATH': 'photoUpload',
+      'BUSINESS_PHOTO_NOT_UPLOADED': 'photoUpload',
       'BUSINESS_AUTH_REQUIRED': 'session',
       'BUSINESS_INVALID_ORDER_URL': 'url',
     };

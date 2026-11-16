@@ -56,7 +56,12 @@ class _SeededBusinessRepository implements BusinessRepository {
   }) async {
     calls++;
     if (fail) throw Exception('connection failed');
-    return customItems ?? items;
+    final source = filterBusinesses(
+      customItems ?? items,
+      category: category,
+      query: searchQuery,
+    );
+    return paginateBusinesses(source, limit: limit, offset: offset);
   }
 
   @override
@@ -103,7 +108,7 @@ void main() {
   );
 
   testWidgets(
-    'fallo de conexión muestra error y permite reintentar sin reemplazar por demos',
+    'fallo de conexión muestra error y permite reintentar sin reemplazar por demos ni mostrar Verificado',
     (tester) async {
       final repo = _SeededBusinessRepository(fail: true);
       await tester.pumpWidget(
@@ -125,7 +130,8 @@ void main() {
 
       expect(repo.calls, greaterThan(callsBeforeRetry));
       expect(find.text('Cocina del Patio'), findsOneWidget);
-      expect(find.text('businesses.verified_badge'), findsWidgets);
+      expect(find.text('businesses.published_badge'), findsWidgets);
+      expect(find.text('businesses.verified_badge'), findsNothing);
     },
   );
 
@@ -166,7 +172,7 @@ void main() {
   );
 
   testWidgets(
-    'paginación muestra botón cargar más negocios y amplía resultados al pulsarlo',
+    'paginación muestra botón cargar más negocios y amplía resultados por offset al pulsarlo',
     (tester) async {
       final repo = _SeededBusinessRepository(
         customItems: const [
@@ -186,13 +192,23 @@ void main() {
             phone: '222',
             municipalityCode: '20001',
           ),
+          Business(
+            id: 'b3',
+            name: 'Negocio Tres',
+            category: BusinessCategory.food,
+            address: 'Calle 3',
+            phone: '333',
+            municipalityCode: '20001',
+          ),
         ],
       );
       final container = ProviderContainer(
-        overrides: [businessRepositoryProvider.overrideWithValue(repo)],
+        overrides: [
+          businessRepositoryProvider.overrideWithValue(repo),
+          businessCatalogPageSizeProvider.overrideWithValue(2),
+        ],
       );
       addTearDown(container.dispose);
-      container.read(businessCatalogPageLimitProvider.notifier).setLimit(1);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -203,7 +219,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Negocio Uno'), findsOneWidget);
-      expect(find.text('Negocio Dos'), findsNothing);
+      expect(find.text('Negocio Dos'), findsOneWidget);
+      expect(find.text('Negocio Tres'), findsNothing);
       expect(find.text('businesses.load_more'), findsOneWidget);
 
       await tester.scrollUntilVisible(
@@ -216,6 +233,7 @@ void main() {
 
       expect(find.text('Negocio Uno'), findsOneWidget);
       expect(find.text('Negocio Dos'), findsOneWidget);
+      expect(find.text('Negocio Tres'), findsOneWidget);
       expect(find.text('businesses.load_more'), findsNothing);
     },
   );

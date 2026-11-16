@@ -339,7 +339,7 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
 
   void _published(String id) {
     state = state.copyWith(busy: false, locked: false, publishedId: id);
-    ref.invalidate(allBusinessesProvider);
+    ref.invalidate(businessCatalogProvider);
     ref.invalidate(allPriceMapItemsProvider);
   }
 
@@ -353,7 +353,7 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
           .withdraw(businessId: state.editingId!, ownerId: state.ownerId!);
       if (!ref.mounted || generation != _generation) return;
       state = state.copyWith(busy: false, locked: false, withdrawn: true);
-      ref.invalidate(allBusinessesProvider);
+      ref.invalidate(businessCatalogProvider);
       ref.invalidate(allPriceMapItemsProvider);
     } catch (error) {
       if (ref.mounted && generation == _generation) {
