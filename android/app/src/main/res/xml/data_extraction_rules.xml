@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  H-02 / H-01 (OWASP M8 / M9 — Fugas de datos en reposo y extraccion D2D en Android 12+):
+  Impide que tokens cifrados, caches de OCR (RN-10) o preferencias locales se extraigan
+  hacia backups en la nube o transferencias dispositivo a dispositivo (D2D).
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="external" path="." />
+    </device-transfer>
+</data-extraction-rules>

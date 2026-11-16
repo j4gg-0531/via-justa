@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  H-02 (OWASP Mobile Top 10 2024: M5 Insecure Communication / M8 Security Misconfiguration):
+  Bloquea estrictamente cualquier trafico HTTP en texto claro (cleartextTrafficPermitted="false")
+  y confia unicamente en las autoridades certificadoras del sistema operativo.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

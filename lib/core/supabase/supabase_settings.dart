@@ -6,7 +6,9 @@
 /// flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
 /// ```
 ///
-/// Si faltan ambos, la app arranca en modo DEMO (ver `.env.example`).
+/// Controles de seguridad (OWASP M1 / M5):
+/// - Rechaza URLs en texto claro (`http://`) o malformadas; exige `https://`.
+/// - Rechaza claves privadas de servidor (`service_role`, `sb_secret_`, `sbp_`).
 class SupabaseSettings {
   const SupabaseSettings({required this.url, required this.publishableKey});
 
@@ -20,9 +22,34 @@ class SupabaseSettings {
   /// Clave pública (`anon` / `publishable`). Nunca la `service_role`.
   final String publishableKey;
 
-  bool get isConfigured => url.isNotEmpty && publishableKey.isNotEmpty;
+  /// Verifica que el endpoint utilice exclusivamente HTTPS con un host válido (OWASP M5).
+  bool get isValidHttpsEndpoint {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return false;
+    final parsed = Uri.tryParse(trimmed);
+    if (parsed == null) return false;
+    return parsed.scheme == 'https' &&
+        parsed.host.isNotEmpty &&
+        !parsed.host.contains(' ') &&
+        parsed.userInfo.isEmpty;
+  }
 
-  /// Configuración válida o `null` si el proyecto no se compiló con secretos.
+  /// Verifica que la clave inyectada sea pública y nunca una llave maestra de servidor (OWASP M1).
+  bool get isSafePublishableKey {
+    final trimmed = publishableKey.trim();
+    if (trimmed.isEmpty) return false;
+    final lower = trimmed.toLowerCase();
+    if (lower.contains('service_role') ||
+        lower.startsWith('sb_secret_') ||
+        lower.startsWith('sbp_')) {
+      return false;
+    }
+    return true;
+  }
+
+  bool get isConfigured => isValidHttpsEndpoint && isSafePublishableKey;
+
+  /// Configuración válida o `null` si el proyecto no se compiló con credenciales seguras.
   static SupabaseSettings? fromEnvironment() {
     const settings = SupabaseSettings(
       url: _url,
