@@ -4,10 +4,22 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
+    <!--
+      Controles de seguridad H-01 / H-02 (OWASP M5, M8, M9):
+      - android:usesCleartextTraffic="false" y android:networkSecurityConfig="@xml/network_security_config"
+        obligan a que todo el tráfico vaya por HTTPS.
+      - android:allowBackup="false", android:fullBackupContent y android:dataExtractionRules
+        impiden extracción de tokens de sesión o cachés temporales de contratos (RN-10) vía backup.
+    -->
     <application
         android:label="via_justa"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:usesCleartextTraffic="false"
+        android:networkSecurityConfig="@xml/network_security_config">
         <!-- Clave de Google Maps inyectada desde android/local.properties (MAPS_API_KEY) -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
