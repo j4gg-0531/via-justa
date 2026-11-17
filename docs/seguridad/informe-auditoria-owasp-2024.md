@@ -2,6 +2,7 @@
 
 - **Universidad:** Universidad Popular del Cesar (UNICESAR)
 - **Asignatura:** Programación Móvil — **Profesor:** Alex Vacca
+- **Integrantes:** Isaac Angulo y Juan García
 - **Proyecto:** **Vía Justa** (Aplicación móvil Android en Flutter + Backend en Supabase PostgreSQL 17 / PostGIS / Storage / Edge Functions)
 - **Fecha de entrega:** 16 de noviembre de 2026
 - **Repositorio oficial:** `https://github.com/j4gg-0531/via-justa`
@@ -318,19 +319,7 @@ Todas las mejoras obligatorias exigidas en la página 4 de la guía han sido imp
 
 ---
 
-## 5. Guion para la Demostración en Vivo de 10 Minutos (Entregable 3)
-
-| Minuto | Quién / Qué mostrar | Demostración en vivo ante el profesor |
-|---|---|---|
-| **0:00 – 2:00** | **Conceptos del Data Sheet y Modelo de Amenazas** | Mostrar el diagrama de superficie de ataque (§1.1) y explicar por qué en Vía Justa el teléfono no es de confianza: el semáforo de precios se calcula en PostgreSQL (`calculate_price_verdict`), nunca en el cliente ni con IA, y los contratos (`RN-10`) se procesan con OCR local sin guardarse jamás en la base de datos. |
-| **2:00 – 4:00** | **Técnicas de Auditoría Ejecutadas (Fase 2)** | Ejecutar en terminal `flutter pub outdated` y el comando `git grep` de búsqueda de secretos para demostrar `0` llaves expuestas y mostrar la tabla OWASP Mobile Top 10 (`M1` a `M10`). |
-| **4:00 – 7:00** | **Demostración en Vivo del Hallazgo 1 (`H-01` + `H-02`: Keystore + HTTPS / No-Backup)** | Abrir [`secure_supabase_local_storage.dart`](../../lib/core/supabase/secure_supabase_local_storage.dart), [`supabase_bootstrap.dart`](../../lib/core/supabase/supabase_bootstrap.dart) y [`network_security_config.xml`](../../android/app/src/main/res/xml/network_security_config.xml). Explicar el paso de `SharedPreferences` en texto plano a **Android Keystore (AES-GCM)** con **OAuth PKCE** y cómo `cleartextTrafficPermitted="false"` + `allowBackup="false"` bloquean MITM y extracción por backup. |
-| **7:00 – 9:00** | **Demostración en Vivo del Hallazgo 2 (`H-03` + `H-04` + `H-05`: R8, Guardián de Intents y Servidor)** | Mostrar [`build.gradle.kts`](../../android/app/build.gradle.kts) con R8 activo (`isMinifyEnabled = true`), [`ExternalUriGuard`](../../lib/core/security/external_uri_guard.dart) bloqueando esquemas maliciosos/USSD y ejecutar en vivo `flutter test test/security_controls_test.dart` viendo pasar todas las pruebas de seguridad en verde. |
-| **9:00 – 10:00** | **Cierre y Preguntas del Profesor** | Resumir cómo la defensa en profundidad (Cliente Flutter + Android nativo + Supabase RLS/Triggers) protege a los usuarios de Valledupar. |
-
----
-
-## 6. Tabla de Trazabilidad de Commits y Pull Requests en el Repositorio (Entregable 2)
+## 5. Tabla de Trazabilidad de Commits y Pull Requests en el Repositorio (Entregable 2)
 
 Cada corrección cuenta con su propio commit atómico referenciando explícitamente el identificador del hallazgo (`H-01` a `H-06`):
 
