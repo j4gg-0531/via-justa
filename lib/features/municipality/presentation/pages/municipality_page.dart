@@ -10,8 +10,10 @@ import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/map_colombia/presentation/state/map_providers.dart';
+import 'package:via_justa/features/municipality/domain/city_visual_identity.dart';
 import 'package:via_justa/features/municipality/domain/municipality.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
+import 'package:via_justa/features/municipality/presentation/widgets/city_cultural_illustration.dart';
 
 /// Pantallas 5 y 6 · Detalle de un municipio (piloto o fuera del piloto).
 class MunicipalityPage extends ConsumerWidget {
@@ -97,7 +99,7 @@ class _MunicipalityScaffold extends StatelessWidget {
   }
 }
 
-/// Pantalla 5 · Municipio piloto con acceso al inicio.
+/// Pantalla 5 · Municipio piloto con ilustración cultural (Cañaguate, Acordeón y Guatapurí) y acceso al inicio.
 class _PilotView extends ConsumerWidget {
   const _PilotView({required this.municipality});
 
@@ -109,6 +111,11 @@ class _PilotView extends ConsumerWidget {
     final departmentName = ref
         .watch(departmentByCodeProvider(municipality.departmentCode))
         ?.name;
+    final visualIdentity = CityVisualIdentityCatalog.forMunicipality(
+      municipalityCode: municipality.code,
+      departmentCode: municipality.departmentCode,
+      isPilot: municipality.isPilot,
+    );
 
     return _MunicipalityScaffold(
       action: VjButton(
@@ -125,24 +132,11 @@ class _PilotView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // TODO: reemplazar por foto propia o con licencia y atribución.
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: ExcludeSemantics(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                child: Container(
-                  color: AppColors.primarySoft,
-                  child: const Center(
-                    child: Icon(
-                      Icons.location_city,
-                      size: 56,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+          CityCulturalIllustrationBanner(
+            identity: visualIdentity,
+            cityName: municipality.name,
+            departmentName: departmentName,
+            isPilot: true,
           ),
           const SizedBox(height: AppSpacing.lg),
           VjBadge(
@@ -162,7 +156,7 @@ class _PilotView extends ConsumerWidget {
   }
 }
 
-/// Pantalla 6 · Municipio fuera del piloto: solo registra el interés.
+/// Pantalla 6 · Municipio fuera del piloto: muestra su identidad regional ilustrada y registra el interés.
 class _NotPilotView extends ConsumerWidget {
   const _NotPilotView({required this.municipality});
 
@@ -176,6 +170,11 @@ class _NotPilotView extends ConsumerWidget {
         ?.name;
     final interested = ref.watch(
       isMunicipalityInterestedProvider(municipality.code),
+    );
+    final visualIdentity = CityVisualIdentityCatalog.forMunicipality(
+      municipalityCode: municipality.code,
+      departmentCode: municipality.departmentCode,
+      isPilot: municipality.isPilot,
     );
 
     return _MunicipalityScaffold(
@@ -195,9 +194,29 @@ class _NotPilotView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline, size: 48, color: AppColors.textMuted),
+          CityCulturalIllustrationBanner(
+            identity: visualIdentity,
+            cityName: municipality.name,
+            departmentName: departmentName,
+            isPilot: false,
+          ),
           const SizedBox(height: AppSpacing.md),
-          Text(municipality.name, style: textTheme.headlineMedium),
+          Row(
+            children: [
+              const Icon(
+                Icons.info_outline,
+                size: 24,
+                color: AppColors.textMuted,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  municipality.name,
+                  style: textTheme.headlineMedium,
+                ),
+              ),
+            ],
+          ),
           if (departmentName != null) ...[
             const SizedBox(height: AppSpacing.xs),
             Text(departmentName, style: textTheme.bodyLarge),
