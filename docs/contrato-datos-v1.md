@@ -613,3 +613,27 @@ AS $$ ... $$;
 | 413 | `TEXT_TOO_LONG` | El texto supera el tamaño máximo permitido |
 | 429 | `AI_DAILY_LIMIT_EXCEEDED` | Has alcanzado el límite diario de análisis de contratos |
 | 502 | `AI_SERVICE_UNAVAILABLE` | El servicio de análisis no está disponible temporalmente |
+
+---
+
+## 5. Valoraciones de Negocios con Estrellas (`20261116120000_business_ratings_and_detail_rpc.sql`)
+
+- **Tabla `public.business_ratings`:**
+  - `business_id UUID NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE`
+  - `user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE`
+  - `stars SMALLINT NOT NULL CHECK (stars BETWEEN 1 AND 5)`
+  - `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`
+  - `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`
+  - `PRIMARY KEY (business_id, user_id)` — una valoración por cuenta autenticada y negocio; permite actualizar el propio voto sin duplicar filas.
+- **Reglas en servidor (`private.enforce_business_rating_rules` y RLS):**
+  - Solo usuarios autenticados (`auth.uid() IS NOT NULL`) pueden insertar o actualizar su propia fila (`user_id = auth.uid()`).
+  - El negocio debe existir, estar publicado (`status = 'approved'`) y no ser de demostración (`is_demo = false`).
+  - El dueño no puede valorar su propio comercio (`[BUSINESS_RATING_SELF_FORBIDDEN]`, SQLSTATE `22023`).
+  - Los comentarios escritos quedan fuera del alcance acordado; solo se almacena `stars` (`1..5`).
+- **RPC `public.rate_business(p_business_id uuid, p_stars integer) RETURNS jsonb`:**
+  - Registra o modifica la valoración del usuario autenticado (`ON CONFLICT (business_id, user_id) DO UPDATE`) y devuelve `business_id`, `my_rating`, `rating_average` (redondeado a 1 decimal) y `rating_count`.
+- **Campos añadidos a `public.get_business_detail`:**
+  - `rating_average` (`double precision | null`): promedio de estrellas o `null` cuando `rating_count = 0`.
+  - `rating_count` (`integer`): cantidad total de votos (`0` cuando es un negocio nuevo -> «Sin valoraciones»).
+  - `my_rating` (`integer | null`): voto actual del usuario autenticado que consulta la ficha (o `null`).
+  - `is_owner` (`boolean`): indica si la sesión autenticada actual corresponde al dueño del negocio.

@@ -346,6 +346,13 @@
     "hours_not_specified": "Horario no especificado",
     "section_location": "Ubicación",
     "section_ratings": "Valoraciones",
+    "your_rating": "Tu valoración",
+    "save_rating": "Guardar valoración",
+    "rating_saved": "Tu valoración se guardó correctamente.",
+    "star_label": "{} estrellas",
+    "owner_cannot_rate": "Como dueño no puedes valorar tu propio negocio.",
+    "auth_required_to_rate": "Inicia sesión con tu cuenta para valorar este negocio.",
+    "rating_error": "No se pudo guardar tu valoración. Inténtalo de nuevo.",
     "action_launch_error": "No se pudo abrir el enlace externo."
   },
   "profile": {

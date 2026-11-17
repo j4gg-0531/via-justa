@@ -1,6 +1,7 @@
 import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/domain/business_detail.dart';
 import 'package:via_justa/features/businesses/domain/business_filter.dart';
+import 'package:via_justa/features/businesses/domain/business_rating.dart';
 
 /// Interfaz abstracta del repositorio de negocios.
 abstract interface class BusinessRepository {
@@ -17,5 +18,11 @@ abstract interface class BusinessRepository {
   Future<BusinessDetail> getBusinessDetail(
     String businessId, {
     String localeCode = 'es',
+  });
+
+  /// Registra o modifica la valoración de 1 a 5 estrellas del usuario autenticado.
+  Future<BusinessRatingSummary> rateBusiness({
+    required String businessId,
+    required int stars,
   });
 }

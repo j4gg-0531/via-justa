@@ -5,6 +5,7 @@ import 'package:via_justa/features/businesses/data/supabase_business_repository.
 import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/domain/business_detail.dart';
 import 'package:via_justa/features/businesses/domain/business_filter.dart';
+import 'package:via_justa/features/businesses/domain/business_rating.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 
@@ -40,6 +41,19 @@ class _PaginatedMockBusinessRepository implements BusinessRepository {
   }) async {
     final match = allItems.firstWhere((item) => item.id == businessId);
     return BusinessDetail.fromBusiness(match, localeCode: localeCode);
+  }
+
+  @override
+  Future<BusinessRatingSummary> rateBusiness({
+    required String businessId,
+    required int stars,
+  }) async {
+    return BusinessRatingSummary(
+      businessId: businessId,
+      myRating: stars,
+      ratingAverage: stars.toDouble(),
+      ratingCount: 1,
+    );
   }
 }
 

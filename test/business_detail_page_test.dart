@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:via_justa/features/auth/domain/auth_session.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_state.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/domain/business_detail.dart';
 import 'package:via_justa/features/businesses/domain/business_filter.dart';
+import 'package:via_justa/features/businesses/domain/business_rating.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 import 'package:via_justa/features/businesses/presentation/pages/business_detail_page.dart';
 import 'package:via_justa/features/businesses/presentation/pages/businesses_page.dart';
@@ -15,10 +19,27 @@ import 'package:via_justa/features/prices/presentation/state/price_map_providers
 
 import 'business_external_actions_test.dart' show FakeBusinessExternalLauncher;
 
-class _DetailTestBusinessRepository implements BusinessRepository {
-  const _DetailTestBusinessRepository({required this.detail});
+class _VoterAuthController extends AuthController {
+  @override
+  AuthState build() => const AuthState(
+    session: AuthSession(userId: 'voter-1'),
+    usesDemoData: false,
+  );
+}
 
-  final BusinessDetail detail;
+class _OwnerAuthController extends AuthController {
+  @override
+  AuthState build() => const AuthState(
+    session: AuthSession(userId: 'owner-1'),
+    usesDemoData: false,
+  );
+}
+
+class _DetailTestBusinessRepository implements BusinessRepository {
+  _DetailTestBusinessRepository({required this.detail});
+
+  BusinessDetail detail;
+  final submittedRatings = <int>[];
 
   @override
   Future<List<Business>> getBusinesses({
@@ -55,6 +76,49 @@ class _DetailTestBusinessRepository implements BusinessRepository {
       throw StateError('Unknown business $businessId');
     }
     return detail;
+  }
+
+  @override
+  Future<BusinessRatingSummary> rateBusiness({
+    required String businessId,
+    required int stars,
+  }) async {
+    submittedRatings.add(stars);
+    detail = BusinessDetail(
+      id: detail.id,
+      ownerId: detail.ownerId,
+      name: detail.name,
+      type: detail.type,
+      category: detail.category,
+      municipalityCode: detail.municipalityCode,
+      description: detail.description,
+      descriptionEs: detail.descriptionEs,
+      descriptionEn: detail.descriptionEn,
+      address: detail.address,
+      latitude: detail.latitude,
+      longitude: detail.longitude,
+      phone: detail.phone,
+      whatsapp: detail.whatsapp,
+      orderUrl: detail.orderUrl,
+      whatsappUrl: detail.whatsappUrl,
+      mapsUrl: detail.mapsUrl,
+      canCall: detail.canCall,
+      canWhatsapp: detail.canWhatsapp,
+      canDirections: detail.canDirections,
+      canOrderExternal: detail.canOrderExternal,
+      externalOrderDisclaimer: detail.externalOrderDisclaimer,
+      schedule: detail.schedule,
+      dishes: detail.dishes,
+      ratingAverage: stars.toDouble(),
+      ratingCount: 1,
+      myRating: stars,
+    );
+    return BusinessRatingSummary(
+      businessId: businessId,
+      myRating: stars,
+      ratingAverage: stars.toDouble(),
+      ratingCount: 1,
+    );
   }
 }
 
@@ -328,6 +392,75 @@ void main() {
         contains('Cocina del Patio'),
       );
       expect(launcher.launchedUris[2].host, 'www.google.com');
+    },
+  );
+
+  testWidgets(
+    'usuario autenticado puede votar y modificar su voto de 1 a 5 estrellas, mientras que el dueño está bloqueado',
+    (tester) async {
+      final repo = _DetailTestBusinessRepository(detail: _sampleDetail());
+
+      // 1. Usuario autenticado distinto al dueño vota 4 estrellas y luego modifica a 5
+      await tester.pumpWidget(
+        ProviderScope(
+          key: const ValueKey('voter-scope'),
+          overrides: [
+            authControllerProvider.overrideWith(_VoterAuthController.new),
+            businessRepositoryProvider.overrideWithValue(repo),
+          ],
+          child: const MaterialApp(
+            key: ValueKey('voter-app'),
+            home: BusinessDetailPage(businessId: 'biz-cocina-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('business_detail.save_rating'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('rate-star-4')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('business_detail.save_rating'));
+      await tester.pumpAndSettle();
+
+      expect(repo.submittedRatings, [4]);
+      expect(find.text('business_detail.rating_saved'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('rate-star-5')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('business_detail.save_rating'));
+      await tester.pumpAndSettle();
+
+      expect(repo.submittedRatings, [4, 5]);
+
+      // 2. El dueño del negocio ve el aviso y no puede autovalorarse
+      await tester.pumpWidget(
+        ProviderScope(
+          key: const ValueKey('owner-scope'),
+          overrides: [
+            authControllerProvider.overrideWith(_OwnerAuthController.new),
+            businessRepositoryProvider.overrideWithValue(repo),
+          ],
+          child: const MaterialApp(
+            key: ValueKey('owner-app'),
+            home: BusinessDetailPage(businessId: 'biz-cocina-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('business_detail.owner_cannot_rate'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('business_detail.owner_cannot_rate'), findsOneWidget);
+      expect(find.byKey(const ValueKey('rate-star-5')), findsNothing);
     },
   );
 }

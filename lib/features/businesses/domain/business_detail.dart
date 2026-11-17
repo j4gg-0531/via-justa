@@ -131,6 +131,8 @@ class BusinessDetail {
     this.dishes = const <BusinessDishItem>[],
     this.ratingAverage,
     this.ratingCount = 0,
+    this.myRating,
+    this.isOwner = false,
   });
 
   factory BusinessDetail.fromBusiness(Business business, {String localeCode = 'es'}) {
@@ -208,6 +210,8 @@ class BusinessDetail {
   final List<BusinessDishItem> dishes;
   final double? ratingAverage;
   final int ratingCount;
+  final int? myRating;
+  final bool isOwner;
 
   bool get hasRatings => ratingCount > 0 && ratingAverage != null;
 

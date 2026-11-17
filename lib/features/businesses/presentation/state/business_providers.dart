@@ -8,6 +8,7 @@ import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/domain/business_detail.dart';
 import 'package:via_justa/features/businesses/domain/business_external_actions.dart';
 import 'package:via_justa/features/businesses/domain/business_filter.dart';
+import 'package:via_justa/features/businesses/domain/business_rating.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 import 'package:via_justa/features/businesses/presentation/state/register_business_provider.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
@@ -303,3 +304,116 @@ final businessExternalActionProvider =
     NotifierProvider<BusinessExternalActionNotifier, bool>(
       BusinessExternalActionNotifier.new,
     );
+
+/// Estado del formulario de valoración con estrellas en la ficha del negocio.
+class BusinessRatingControllerState {
+  const BusinessRatingControllerState({
+    this.selectedStarsByBusiness = const <String, int>{},
+    this.submitting = false,
+    this.savedBusinessId,
+    this.errorBusinessId,
+    this.currentUserId,
+    this.usesDemoData = true,
+  });
+
+  final Map<String, int> selectedStarsByBusiness;
+  final bool submitting;
+  final String? savedBusinessId;
+  final String? errorBusinessId;
+  final String? currentUserId;
+  final bool usesDemoData;
+
+  int? effectiveStarsFor(BusinessDetail detail) {
+    return selectedStarsByBusiness[detail.id] ?? detail.myRating;
+  }
+
+  BusinessRatingEligibility eligibilityFor(BusinessDetail detail) {
+    return evaluateBusinessRatingEligibility(
+      currentUserId: currentUserId,
+      usesDemoData: usesDemoData,
+      businessOwnerId: detail.ownerId,
+      isOwnerFlag: detail.isOwner,
+    );
+  }
+
+  BusinessRatingControllerState copyWith({
+    Map<String, int>? selectedStarsByBusiness,
+    bool? submitting,
+    String? savedBusinessId,
+    String? errorBusinessId,
+  }) {
+    return BusinessRatingControllerState(
+      selectedStarsByBusiness: Map.unmodifiable(
+        selectedStarsByBusiness ?? this.selectedStarsByBusiness,
+      ),
+      submitting: submitting ?? this.submitting,
+      savedBusinessId: savedBusinessId,
+      errorBusinessId: errorBusinessId,
+      currentUserId: currentUserId,
+      usesDemoData: usesDemoData,
+    );
+  }
+}
+
+/// Controlador para seleccionar y guardar la valoración de 1 a 5 estrellas de un negocio.
+class BusinessRatingController extends Notifier<BusinessRatingControllerState> {
+  @override
+  BusinessRatingControllerState build() {
+    final auth = ref.watch(
+      authControllerProvider.select(
+        (value) => (value.session?.userId, value.usesDemoData),
+      ),
+    );
+    return BusinessRatingControllerState(
+      currentUserId: auth.$1,
+      usesDemoData: auth.$2,
+    );
+  }
+
+  void selectStars(String businessId, int stars) {
+    if (state.submitting || !isValidBusinessStarRating(stars)) return;
+    state = state.copyWith(
+      selectedStarsByBusiness: {
+        ...state.selectedStarsByBusiness,
+        businessId: stars,
+      },
+    );
+  }
+
+  Future<bool> submitRating(BusinessDetail detail) async {
+    if (state.submitting) return false;
+    final eligibility = state.eligibilityFor(detail);
+    final stars = state.effectiveStarsFor(detail);
+    if (eligibility != BusinessRatingEligibility.allowed ||
+        !isValidBusinessStarRating(stars)) {
+      return false;
+    }
+    state = state.copyWith(submitting: true);
+    try {
+      await ref
+          .read(businessRepositoryProvider)
+          .rateBusiness(businessId: detail.id, stars: stars!);
+      if (!ref.mounted) return true;
+      state = state.copyWith(
+        submitting: false,
+        savedBusinessId: detail.id,
+      );
+      ref.invalidate(businessDetailProvider(detail.id));
+      return true;
+    } catch (_) {
+      if (ref.mounted) {
+        state = state.copyWith(
+          submitting: false,
+          errorBusinessId: detail.id,
+        );
+      }
+      return false;
+    }
+  }
+}
+
+final businessRatingControllerProvider =
+    NotifierProvider.autoDispose<
+      BusinessRatingController,
+      BusinessRatingControllerState
+    >(BusinessRatingController.new);

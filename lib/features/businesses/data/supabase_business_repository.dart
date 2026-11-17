@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/domain/business_detail.dart';
 import 'package:via_justa/features/businesses/domain/business_filter.dart';
+import 'package:via_justa/features/businesses/domain/business_rating.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 
 /// Repositorio conectado a Supabase que consulta `public.get_business_catalog` y
@@ -213,6 +214,8 @@ class SupabaseBusinessRepository implements BusinessRepository {
       dishes: dishes,
       ratingAverage: (row['rating_average'] as num?)?.toDouble(),
       ratingCount: (row['rating_count'] as num?)?.toInt() ?? 0,
+      myRating: (row['my_rating'] as num?)?.toInt(),
+      isOwner: (row['is_owner'] as bool?) ?? (ownerId != null),
     );
   }
 
@@ -318,6 +321,27 @@ class SupabaseBusinessRepository implements BusinessRepository {
       municipalityCode: municipalityCode,
       ownerId: ownerId,
       photoBytesByPath: photoBytesByPath,
+    );
+  }
+
+  @override
+  Future<BusinessRatingSummary> rateBusiness({
+    required String businessId,
+    required int stars,
+  }) async {
+    final dynamic raw = await client.rpc(
+      'rate_business',
+      params: <String, dynamic>{
+        'p_business_id': businessId,
+        'p_stars': stars,
+      },
+    );
+    final map = Map<String, dynamic>.from(raw as Map);
+    return BusinessRatingSummary(
+      businessId: (map['business_id'] ?? businessId).toString(),
+      myRating: (map['my_rating'] as num?)?.toInt() ?? stars,
+      ratingAverage: (map['rating_average'] as num?)?.toDouble(),
+      ratingCount: (map['rating_count'] as num?)?.toInt() ?? 0,
     );
   }
 }
