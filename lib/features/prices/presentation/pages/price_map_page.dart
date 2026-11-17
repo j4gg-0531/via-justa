@@ -155,10 +155,13 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
         ),
       );
       if (!context.mounted) return;
+      final errorKey = ref.read(userMapLocationProvider).errorKey;
       _showInfoDialog(
         context,
         title: cityName,
-        body: 'price_map.demo_location_body'.tr(namedArgs: {'city': cityName}),
+        body: errorKey != null
+            ? 'price_map.gps_errors.$errorKey'.tr()
+            : 'price_map.demo_location_body'.tr(namedArgs: {'city': cityName}),
       );
     }
   }
@@ -266,6 +269,7 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
     final sectionTitleKey = ref.watch(priceMapSectionTitleKeyProvider);
     final cityName = ref.watch(activeCityNameProvider);
     final useNativeGoogleMap = ref.watch(useNativeGoogleMapProvider);
+    final isDemoMode = ref.watch(isDemoMapModeProvider);
     final userLocation = ref.watch(userMapLocationProvider);
     final textTheme = Theme.of(context).textTheme;
 
@@ -531,9 +535,10 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
                           border: Border.all(color: AppColors.border),
                         ),
                         child: Text(
-                          'price_map.demo_label'.tr(
-                            namedArgs: {'city': cityName},
-                          ),
+                          (isDemoMode
+                                  ? 'price_map.demo_label'
+                                  : 'price_map.live_label')
+                              .tr(namedArgs: {'city': cityName}),
                           style: textTheme.bodySmall?.copyWith(
                             color: AppColors.textPrimary,
                             fontWeight: FontWeight.w700,

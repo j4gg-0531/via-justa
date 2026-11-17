@@ -244,6 +244,27 @@ class _MapPointPickerSheetContentState
                   label: Text('price_verdict.use_gps_cta'.tr()),
                 ),
               ),
+              if (gpsState.errorKey != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_off_outlined,
+                      size: 16,
+                      color: AppColors.semaphoreAmber,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        'price_map.gps_errors.${gpsState.errorKey}'.tr(),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ] else
               const SizedBox(height: AppSpacing.md),
             Container(

@@ -1,6 +1,12 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:via_justa/features/prices/data/supabase_price_map_repository.dart';
+import 'package:via_justa/features/prices/data/supabase_price_verdict_repository.dart';
+import 'package:via_justa/features/prices/domain/device_location.dart';
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
 import 'package:via_justa/features/prices/domain/price_map_repository.dart';
 import 'package:via_justa/features/prices/presentation/state/price_map_providers.dart';
@@ -187,4 +193,127 @@ void main() {
     expect(parsedEs[1].hasCallableContact, isTrue);
     expect(parsedEs[1].sourceType, 'business');
   });
+
+  test(
+    'UserMapLocationNotifier expone errorKey claro cuando GPS está desactivado, denegado o activo',
+    () async {
+      final gateway = _FakeLocationGateway(
+        const DeviceLocationResult(status: DeviceLocationStatus.serviceDisabled),
+      );
+      final container = ProviderContainer(
+        overrides: [deviceLocationGatewayProvider.overrideWithValue(gateway)],
+      );
+      addTearDown(container.dispose);
+
+      var coords = await container
+          .read(userMapLocationProvider.notifier)
+          .requestAndFetchLocation();
+      expect(coords, isNull);
+      expect(
+        container.read(userMapLocationProvider).errorKey,
+        'gps_disabled',
+      );
+      expect(container.read(userMapLocationProvider).permissionGranted, isFalse);
+
+      gateway.next = const DeviceLocationResult(
+        status: DeviceLocationStatus.permissionDenied,
+      );
+      coords = await container
+          .read(userMapLocationProvider.notifier)
+          .requestAndFetchLocation();
+      expect(coords, isNull);
+      expect(
+        container.read(userMapLocationProvider).errorKey,
+        'gps_permission_denied',
+      );
+
+      gateway.next = const DeviceLocationResult(
+        status: DeviceLocationStatus.granted,
+        latitude: 10.489,
+        longitude: -73.253,
+      );
+      coords = await container
+          .read(userMapLocationProvider.notifier)
+          .requestAndFetchLocation();
+      expect(coords, (10.489, -73.253));
+      expect(container.read(userMapLocationProvider).errorKey, isNull);
+      expect(container.read(userMapLocationProvider).permissionGranted, isTrue);
+    },
+  );
+
+  test(
+    'SupabasePriceVerdictRepository.detectCurrentZoneByGps resuelve la zona más cercana según GPS real y falla si GPS falla',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode([
+            {
+              'id': 'vup_centro',
+              'municipality_code': '20001',
+              'name_es': 'Zona Centro',
+              'name_en': 'Downtown Zone',
+              'sector_hint_es': '',
+              'sector_hint_en': '',
+              'normalized_x': 0.5,
+              'normalized_y': 0.5,
+              'center_lat': 10.4742,
+              'center_lng': -73.2436,
+              'sort_order': 1,
+            },
+            {
+              'id': 'vup_norte',
+              'municipality_code': '20001',
+              'name_es': 'Zona Norte',
+              'name_en': 'North Zone',
+              'sector_hint_es': '',
+              'sector_hint_en': '',
+              'normalized_x': 0.45,
+              'normalized_y': 0.2,
+              'center_lat': 10.4950,
+              'center_lng': -73.2535,
+              'sort_order': 2,
+            },
+          ]),
+        );
+        await request.response.close();
+      });
+      final client = SupabaseClient(
+        'http://127.0.0.1:${server.port}',
+        'local-test-key',
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+      addTearDown(client.dispose);
+
+      final gateway = _FakeLocationGateway(
+        const DeviceLocationResult(
+          status: DeviceLocationStatus.granted,
+          latitude: 10.494,
+          longitude: -73.253,
+        ),
+      );
+      final repo = SupabasePriceVerdictRepository(
+        client,
+        locationGateway: gateway,
+      );
+
+      final zone = await repo.detectCurrentZoneByGps();
+      expect(zone.id, 'vup_norte');
+
+      gateway.next = const DeviceLocationResult(
+        status: DeviceLocationStatus.permissionDenied,
+      );
+      await expectLater(repo.detectCurrentZoneByGps(), throwsStateError);
+    },
+  );
+}
+
+class _FakeLocationGateway implements DeviceLocationGateway {
+  _FakeLocationGateway(this.next);
+  DeviceLocationResult next;
+
+  @override
+  Future<DeviceLocationResult> fetchCurrentPosition() async => next;
 }

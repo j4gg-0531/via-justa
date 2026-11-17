@@ -19,6 +19,12 @@ final priceContributionRepositoryProvider =
       return DemoPriceContributionRepository();
     });
 
+/// Indica si el flujo de aportes opera con datos de demostración o en vivo con Supabase.
+final isDemoContributionModeProvider = Provider<bool>((ref) {
+  return ref.watch(priceContributionRepositoryProvider)
+      is! SupabasePriceContributionRepository;
+});
+
 /// Estado inmutable del asistente de 4 pasos para aportar un precio (M10).
 class PriceContributionWizardState {
   const PriceContributionWizardState({
@@ -175,20 +181,26 @@ class PriceContributionNotifier extends Notifier<PriceContributionWizardState> {
   Future<void> grantLocationPermissionAndDetect({
     String municipalityCode = '20001',
   }) async {
-    final verdictRepo = ref.read(priceVerdictRepositoryProvider);
-    final detectedZone = await verdictRepo.detectCurrentZoneByGps(
-      municipalityCode: municipalityCode,
-    );
-    state = state.copyWith(
-      locationPermission: LocationPermissionStatus.granted,
-      isManualMapOpen: false,
-      selectedZoneId: detectedZone.id,
-      originLatitude: detectedZone.centerLat,
-      originLongitude: detectedZone.centerLng,
-      pinNormalizedX: detectedZone.normalizedX,
-      pinNormalizedY: detectedZone.normalizedY,
-      submitError: false,
-    );
+    try {
+      final verdictRepo = ref.read(priceVerdictRepositoryProvider);
+      final detectedZone = await verdictRepo.detectCurrentZoneByGps(
+        municipalityCode: municipalityCode,
+      );
+      if (!ref.mounted) return;
+      state = state.copyWith(
+        locationPermission: LocationPermissionStatus.granted,
+        isManualMapOpen: false,
+        selectedZoneId: detectedZone.id,
+        originLatitude: detectedZone.centerLat,
+        originLongitude: detectedZone.centerLng,
+        pinNormalizedX: detectedZone.normalizedX,
+        pinNormalizedY: detectedZone.normalizedY,
+        submitError: false,
+      );
+    } catch (_) {
+      if (!ref.mounted) return;
+      denyLocationPermissionAndOpenMap();
+    }
   }
 
   /// Paso 3: Deniega el permiso de ubicación del teléfono y abre el mapa interactivo de zonas.

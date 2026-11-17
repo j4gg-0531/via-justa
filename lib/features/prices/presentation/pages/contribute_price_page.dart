@@ -129,6 +129,7 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
     final activeZone = ref.watch(activeContributionZoneProvider);
     final activeDestZone = ref.watch(activeContributionDestinationZoneProvider);
     final cityName = ref.watch(activeCityNameProvider);
+    final isDemoMode = ref.watch(isDemoContributionModeProvider);
     final municipality = ref.watch(selectedMunicipalityProvider);
     final municipalityCode = municipality?.code ?? '20001';
     final textTheme = Theme.of(context).textTheme;
@@ -195,6 +196,7 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
                   destinationZone: activeDestZone,
                   cityName: cityName,
                   languageCode: languageCode,
+                  isDemoMode: isDemoMode,
                   onAnotherContribution: _startNewContribution,
                   onFinish: () => _handleBack(context),
                 )
@@ -263,6 +265,7 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
                     destinationZone: activeDestZone,
                     cityName: cityName,
                     languageCode: languageCode,
+                    isDemoMode: isDemoMode,
                     onEditStep: notifier.goToStep,
                   ),
 
@@ -713,6 +716,7 @@ class _Step4ReviewAndConfirm extends StatelessWidget {
     required this.destinationZone,
     required this.cityName,
     required this.languageCode,
+    required this.isDemoMode,
     required this.onEditStep,
   });
 
@@ -722,6 +726,7 @@ class _Step4ReviewAndConfirm extends StatelessWidget {
   final MunicipalityZone? destinationZone;
   final String cityName;
   final String languageCode;
+  final bool isDemoMode;
   final ValueChanged<int> onEditStep;
 
   @override
@@ -750,7 +755,10 @@ class _Step4ReviewAndConfirm extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'price_contribute.step4_subtitle'.tr(),
+                (isDemoMode
+                        ? 'price_contribute.step4_subtitle'
+                        : 'price_contribute.live_step4_subtitle')
+                    .tr(),
                 style: textTheme.bodyMedium,
               ),
               const SizedBox(height: AppSpacing.md),
@@ -804,7 +812,10 @@ class _Step4ReviewAndConfirm extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
-                  'price_contribute.demo_sync_disclaimer'.tr(),
+                  (isDemoMode
+                          ? 'price_contribute.demo_sync_disclaimer'
+                          : 'price_contribute.live_sync_disclaimer')
+                      .tr(),
                   style: textTheme.bodySmall?.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
@@ -828,6 +839,7 @@ class _CompletedContributionView extends StatelessWidget {
     required this.destinationZone,
     required this.cityName,
     required this.languageCode,
+    required this.isDemoMode,
     required this.onAnotherContribution,
     required this.onFinish,
   });
@@ -838,6 +850,7 @@ class _CompletedContributionView extends StatelessWidget {
   final MunicipalityZone? destinationZone;
   final String cityName;
   final String languageCode;
+  final bool isDemoMode;
   final VoidCallback onAnotherContribution;
   final VoidCallback onFinish;
 
@@ -871,7 +884,10 @@ class _CompletedContributionView extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'price_contribute.success_title'.tr(),
+                (isDemoMode
+                        ? 'price_contribute.success_title'
+                        : 'price_contribute.live_success_title')
+                    .tr(),
                 style: textTheme.headlineMedium?.copyWith(
                   fontSize: 20,
                   color: AppColors.textPrimary,
@@ -880,7 +896,10 @@ class _CompletedContributionView extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'price_contribute.demo_sync_disclaimer'.tr(),
+                (isDemoMode
+                        ? 'price_contribute.demo_sync_disclaimer'
+                        : 'price_contribute.live_saved_disclaimer')
+                    .tr(),
                 style: textTheme.bodyMedium?.copyWith(
                   color: AppColors.textPrimary,
                 ),

@@ -109,6 +109,12 @@
     "status_alert": "Alerta de sobrecobro",
     "status_service": "Servicio de ejemplo",
     "demo_label": "DEMO · Mapa de ejemplo ({city})",
+    "live_label": "{city} · Datos en vivo",
+    "gps_errors": {
+      "gps_disabled": "Activa el GPS o la ubicación del teléfono para ubicarte en el mapa.",
+      "gps_permission_denied": "Sin permiso de ubicación; puedes marcar el punto manualmente en el mapa.",
+      "gps_unavailable": "No pudimos obtener tu ubicación GPS en este momento; marca el punto en el mapa."
+    },
     "semantics": "Mapa local de ejemplo de {city} con precios y servicios.",
     "layers_tooltip": "Restablecer capas del mapa",
     "center_tooltip": "Centrar en el municipio activo",
@@ -296,11 +302,15 @@
     "note_privacy_helper": "Opcional (máx. 120 caracteres). Por privacidad, no incluyas nombres propios ni datos personales.",
     "step4_title": "4. Revisión y confirmación",
     "step4_subtitle": "Verifica los datos de tu reporte antes de guardarlo en la sesión de demostración.",
+    "live_step4_subtitle": "Verifica los datos de tu reporte antes de publicarlo en la referencia de la zona.",
     "demo_sync_disclaimer": "Guardado localmente (DEMO); se sincronizará cuando la conexión esté activa en VJ-10.",
+    "live_sync_disclaimer": "Tu aporte se enviará a Supabase para alimentar las medianas de referencia de tu zona.",
+    "live_saved_disclaimer": "Tu aporte ya quedó guardado en Supabase y actualiza la referencia de la zona.",
     "prev_step_cta": "Anterior",
     "next_step_cta": "Siguiente paso",
     "confirm_submit_cta": "Confirmar aporte",
     "success_title": "¡Aporte registrado en modo DEMO!",
+    "live_success_title": "¡Aporte publicado!",
     "another_contribution_cta": "Aportar otro precio",
     "error_destination_required": "Selecciona el punto de destino en el mapa para calcular el trayecto del taxi.",
     "route_summary_label": "Trayecto de taxi"

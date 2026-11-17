@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:via_justa/features/prices/domain/device_location.dart';
+import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
 import 'package:via_justa/features/prices/domain/price_map_repository.dart';
 import 'package:via_justa/features/prices/presentation/pages/price_map_page.dart';
 import 'package:via_justa/features/prices/presentation/state/price_map_providers.dart';
+import 'package:via_justa/features/prices/presentation/widgets/map_point_picker_sheet.dart';
 
 class _ConfigurableMapRepository implements PriceMapRepository {
   _ConfigurableMapRepository({this.fail = false, this.items = const []});
@@ -119,4 +122,68 @@ void main() {
       expect(find.text('Cocina del Patio'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'PriceMapPage muestra live_label cuando isDemoMapModeProvider es false y MapPointPickerSheet avisa si GPS está apagado',
+    (tester) async {
+      final repo = _ConfigurableMapRepository();
+      final gpsGateway = _DisabledLocationGateway();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            priceMapRepositoryProvider.overrideWithValue(repo),
+            isDemoMapModeProvider.overrideWithValue(false),
+            deviceLocationGatewayProvider.overrideWithValue(gpsGateway),
+          ],
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) => Column(
+                children: [
+                  const Expanded(child: PriceMapPage()),
+                  TextButton(
+                    onPressed: () => showMapPointPickerSheet(
+                      context: context,
+                      title: 'picker',
+                      subtitle: 'sub',
+                      zones: const [
+                        MunicipalityZone(
+                          id: 'vup_centro',
+                          municipalityCode: '20001',
+                          nameEs: 'Zona Centro',
+                          nameEn: 'Downtown',
+                          sectorHintEs: '',
+                          sectorHintEn: '',
+                        ),
+                      ],
+                      initialZoneId: 'vup_centro',
+                      languageCode: 'es',
+                    ),
+                    child: const Text('open-picker'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('price_map.live_label'), findsOneWidget);
+      expect(find.text('price_map.demo_label'), findsNothing);
+
+      await tester.tap(find.text('open-picker'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('price_verdict.use_gps_cta'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('price_map.gps_errors.gps_disabled'), findsOneWidget);
+    },
+  );
+}
+
+class _DisabledLocationGateway implements DeviceLocationGateway {
+  @override
+  Future<DeviceLocationResult> fetchCurrentPosition() async =>
+      const DeviceLocationResult(status: DeviceLocationStatus.serviceDisabled);
 }

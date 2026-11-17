@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:via_justa/core/supabase/supabase_providers.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/data/local_price_map_repository.dart';
 import 'package:via_justa/features/prices/data/supabase_price_map_repository.dart';
@@ -11,6 +11,10 @@ import 'package:via_justa/features/prices/domain/price_map_filter.dart';
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
 import 'package:via_justa/features/prices/domain/price_map_repository.dart';
 import 'package:via_justa/features/prices/presentation/state/price_contribution_provider.dart';
+import 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart';
+
+export 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart'
+    show deviceLocationGatewayProvider;
 
 /// Indica si se debe renderizar el widget nativo `GoogleMap` (activo en dispositivos
 /// Android/iOS reales; desactivado automáticamente en `flutter test` headless).
@@ -26,6 +30,15 @@ final useNativeGoogleMapProvider = Provider<bool>((ref) {
     return false;
   }
   return true;
+});
+
+/// Indica si el mapa está operando con datos de demostración o conectado a Supabase real.
+final isDemoMapModeProvider = Provider<bool>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  final usesDemo = ref.watch(
+    authControllerProvider.select((state) => state.usesDemoData),
+  );
+  return client == null || usesDemo;
 });
 
 /// Provider del repositorio del mapa de precios, servicios y negocios (M08 / VJ-12).
@@ -68,12 +81,14 @@ class UserMapLocationState {
     this.longitude,
     this.permissionGranted = false,
     this.isRequesting = false,
+    this.errorKey,
   });
 
   final double? latitude;
   final double? longitude;
   final bool permissionGranted;
   final bool isRequesting;
+  final String? errorKey;
 
   bool get hasLocation => latitude != null && longitude != null;
 
@@ -82,12 +97,15 @@ class UserMapLocationState {
     double? longitude,
     bool? permissionGranted,
     bool? isRequesting,
+    String? errorKey,
+    bool clearError = false,
   }) {
     return UserMapLocationState(
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       permissionGranted: permissionGranted ?? this.permissionGranted,
       isRequesting: isRequesting ?? this.isRequesting,
+      errorKey: clearError ? null : (errorKey ?? this.errorKey),
     );
   }
 }
@@ -100,40 +118,36 @@ class UserMapLocationNotifier extends Notifier<UserMapLocationState> {
   /// Solicita permiso de ubicación al sistema Android y obtiene las coordenadas GPS actuales.
   Future<(double, double)?> requestAndFetchLocation() async {
     if (state.isRequesting) return null;
-    state = state.copyWith(isRequesting: true);
+    state = state.copyWith(isRequesting: true, clearError: true);
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        state = state.copyWith(isRequesting: false, permissionGranted: false);
+      final result = await ref
+          .read(deviceLocationGatewayProvider)
+          .fetchCurrentPosition();
+      if (!ref.mounted) return null;
+
+      if (!result.isGranted) {
+        state = state.copyWith(
+          isRequesting: false,
+          permissionGranted: false,
+          errorKey: result.errorKey ?? 'gps_unavailable',
+        );
         return null;
       }
 
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        state = state.copyWith(isRequesting: false, permissionGranted: false);
-        return null;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 8),
-        ),
-      );
       state = state.copyWith(
-        latitude: position.latitude,
-        longitude: position.longitude,
+        latitude: result.latitude,
+        longitude: result.longitude,
         permissionGranted: true,
         isRequesting: false,
+        clearError: true,
       );
-      return (position.latitude, position.longitude);
+      return (result.latitude!, result.longitude!);
     } catch (_) {
-      state = state.copyWith(isRequesting: false);
+      if (!ref.mounted) return null;
+      state = state.copyWith(
+        isRequesting: false,
+        errorKey: 'gps_unavailable',
+      );
       return null;
     }
   }

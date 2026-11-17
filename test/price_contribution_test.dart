@@ -433,5 +433,55 @@ void main() {
       expect(find.text('price_contribute.demo_sync_disclaimer'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets(
+      'muestra textos en vivo (sin DEMO/VJ-10) cuando isDemoContributionModeProvider es false',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              isDemoContributionModeProvider.overrideWithValue(false),
+            ],
+            child: const MaterialApp(home: ContributePricePage()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final nextBtn = find.text('price_contribute.next_step_cta');
+        await tester.ensureVisible(nextBtn);
+        await tester.tap(nextBtn);
+        await tester.pumpAndSettle();
+
+        final presetChip = find.text(r'$12.000 COP');
+        await tester.ensureVisible(presetChip);
+        await tester.tap(presetChip);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(nextBtn);
+        await tester.tap(nextBtn);
+        await tester.pumpAndSettle();
+
+        await tester.ensureVisible(nextBtn);
+        await tester.tap(nextBtn);
+        await tester.pumpAndSettle();
+
+        expect(find.text('price_contribute.live_step4_subtitle'), findsOneWidget);
+        expect(find.text('price_contribute.live_sync_disclaimer'), findsOneWidget);
+        expect(find.text('price_contribute.demo_sync_disclaimer'), findsNothing);
+
+        final confirmBtn = find.text('price_contribute.confirm_submit_cta');
+        await tester.ensureVisible(confirmBtn);
+        await tester.tap(confirmBtn);
+        await tester.pumpAndSettle();
+
+        expect(find.text('price_contribute.live_success_title'), findsOneWidget);
+        expect(find.text('price_contribute.live_saved_disclaimer'), findsOneWidget);
+        expect(find.text('price_contribute.demo_sync_disclaimer'), findsNothing);
+      },
+    );
   });
 }
