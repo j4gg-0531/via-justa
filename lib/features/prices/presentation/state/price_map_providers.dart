@@ -215,6 +215,44 @@ final allPriceMapItemsProvider = FutureProvider<List<PriceMapItem>>((ref) async 
   return repository.getMapItems(municipalityCode: code);
 });
 
+/// Identificador del pin actualmente seleccionado en el mapa para destacarlo en la hoja inferior.
+class SelectedMapItemIdNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void select(String? id) {
+    state = id;
+  }
+
+  void clear() {
+    state = null;
+  }
+}
+
+final selectedMapItemIdProvider =
+    NotifierProvider<SelectedMapItemIdNotifier, String?>(
+  SelectedMapItemIdNotifier.new,
+);
+
+/// Controla si el listado inferior de lugares está expandido (Opción A).
+class PriceMapListOpenNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void open() {
+    if (!state) state = true;
+  }
+
+  void close() {
+    if (state) state = false;
+  }
+}
+
+final priceMapListOpenProvider =
+    NotifierProvider.autoDispose<PriceMapListOpenNotifier, bool>(
+  PriceMapListOpenNotifier.new,
+);
+
 /// Provider que devuelve los puntos filtrados por categoría y texto mediante la función pura de dominio.
 final filteredPriceMapItemsProvider =
     Provider<AsyncValue<List<PriceMapItem>>>((ref) {
@@ -229,6 +267,32 @@ final filteredPriceMapItemsProvider =
       query: query,
     );
   });
+});
+
+/// Provider que filtra únicamente lugares reales (negocios, servicios y consulados) para la hoja inferior.
+final sheetPlaceItemsProvider =
+    Provider<AsyncValue<List<PriceMapItem>>>((ref) {
+  final itemsAsync = ref.watch(allPriceMapItemsProvider);
+  final category = ref.watch(priceMapCategoryProvider);
+  final query = ref.watch(priceMapSearchQueryProvider);
+  final prioritizedId = ref.watch(selectedMapItemIdProvider);
+
+  return itemsAsync.whenData((items) {
+    return filterSheetPlaceItems(
+      items,
+      category: category,
+      query: query,
+      prioritizedId: prioritizedId,
+    );
+  });
+});
+
+/// Devuelve el elemento actualmente seleccionado mediante el identificador del pin tocado.
+final selectedMapPlaceItemProvider = Provider<PriceMapItem?>((ref) {
+  final items = ref.watch(filteredPriceMapItemsProvider).asData?.value;
+  final selectedId = ref.watch(selectedMapItemIdProvider);
+  if (items == null || selectedId == null) return null;
+  return findMapItemById(items, selectedId);
 });
 
 /// Provider de la clave de traducción para el título de la hoja inferior del mapa.

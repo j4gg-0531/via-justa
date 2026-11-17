@@ -98,6 +98,24 @@ void main() {
         container.read(filteredPriceMapItemsProvider).value!;
     expect(filteredByQuery.length, 1);
     expect(filteredByQuery.first.id, 'fake_1');
+
+    // Sheet places excludes price reports (fake_2) and prioritizes selected place
+    final sheetPlaces = container.read(sheetPlaceItemsProvider).value!;
+    expect(sheetPlaces.map((e) => e.id).toList(), ['fake_1']);
+
+    // Selecting a pin resolves selectedMapPlaceItemProvider and clearing resets it
+    expect(container.read(selectedMapPlaceItemProvider), isNull);
+    container.read(selectedMapItemIdProvider.notifier).select('fake_1');
+    expect(container.read(selectedMapPlaceItemProvider)?.name, 'Clínica del Cesar');
+    container.read(selectedMapItemIdProvider.notifier).clear();
+    expect(container.read(selectedMapPlaceItemProvider), isNull);
+
+    // PriceMapListOpenNotifier toggles list expansion without setState in views
+    expect(container.read(priceMapListOpenProvider), isFalse);
+    container.read(priceMapListOpenProvider.notifier).open();
+    expect(container.read(priceMapListOpenProvider), isTrue);
+    container.read(priceMapListOpenProvider.notifier).close();
+    expect(container.read(priceMapListOpenProvider), isFalse);
   });
 
   test('SupabasePriceMapRepository.parseRows maps price_report and business RPC rows with WGS84 coordinates', () {

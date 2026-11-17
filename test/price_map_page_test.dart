@@ -55,9 +55,9 @@ void main() {
       expect(find.text('price_map.filter_consulates'), findsOneWidget);
       expect(find.text('price_map.contribute_cta'), findsOneWidget);
 
-      // Los comercios demo ya no aparecen en el mapa
+      // Los comercios demo y los reportes sueltos de precio no aparecen en la hoja inferior
       expect(find.text('[DEMO] Hospital Rosario Pumarejo'), findsNothing);
-      expect(find.text('[DEMO] Almuerzo corriente · Centro'), findsOneWidget);
+      expect(find.text('[DEMO] Almuerzo corriente · Centro'), findsNothing);
 
       // Al filtrar por Servicios en una zona sin negocios reales muestra «Aún no hay negocios en esta zona»
       await tester.ensureVisible(find.text('price_map.filter_services'));
@@ -110,21 +110,19 @@ void main() {
 
       repo.fail = false;
       final callsBeforeRetry = repo.calls;
-      await tester.scrollUntilVisible(
-        find.text('common.retry'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
       await tester.tap(find.text('common.retry'));
       await tester.pumpAndSettle();
 
       expect(repo.calls, greaterThan(callsBeforeRetry));
+      expect(find.text('price_map.view_list'), findsOneWidget);
+      await tester.tap(find.text('price_map.view_list'));
+      await tester.pumpAndSettle();
       expect(find.text('Cocina del Patio'), findsOneWidget);
     },
   );
 
   testWidgets(
-    'PriceMapPage muestra live_label cuando isDemoMapModeProvider es false y MapPointPickerSheet avisa si GPS está apagado',
+    'PriceMapPage oculta la etiqueta de datos en vivo cuando isDemoMapModeProvider es false y MapPointPickerSheet avisa si GPS está apagado',
     (tester) async {
       final repo = _ConfigurableMapRepository();
       final gpsGateway = _DisabledLocationGateway();
@@ -169,7 +167,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('price_map.live_label'), findsOneWidget);
+      expect(find.text('price_map.live_label'), findsNothing);
       expect(find.text('price_map.demo_label'), findsNothing);
 
       await tester.tap(find.text('open-picker'));
@@ -178,6 +176,92 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('price_map.gps_errors.gps_disabled'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Opción A inicia con píldora compacta, abre tarjeta flotante sin reportes de taxi ni botón Llamar y flota la tarjeta del pin seleccionado',
+    (tester) async {
+      final repo = _ConfigurableMapRepository(
+        items: const [
+          PriceMapItem(
+            id: 'biz-with-phone',
+            name: 'Asadero Central',
+            description: 'Carnes al carbón.',
+            category: PriceMapCategory.services,
+            pinKind: PriceMapPinKind.food,
+            status: PricePinStatus.info,
+            pinLabel: '',
+            badgeText: 'Calle 10',
+            normalizedX: 0.25,
+            normalizedY: 0.45,
+            latitude: 10.4742,
+            longitude: -73.2436,
+            phone: '3001234567',
+            sourceType: 'business',
+            municipalityCode: '20001',
+            isDemo: false,
+          ),
+          PriceMapItem(
+            id: 'rep-taxi-1',
+            name: 'Taxi · Plaza → Terminal',
+            description: 'Carrera urbana',
+            category: PriceMapCategory.prices,
+            pinKind: PriceMapPinKind.transport,
+            status: PricePinStatus.fair,
+            pinLabel: r'$10k',
+            badgeText: r'$10.000',
+            normalizedX: 0.75,
+            normalizedY: 0.65,
+            latitude: 10.4750,
+            longitude: -73.2450,
+            sourceType: 'price_report',
+            municipalityCode: '20001',
+            isDemo: false,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [priceMapRepositoryProvider.overrideWithValue(repo)],
+          child: const MaterialApp(home: PriceMapPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Inicialmente el mapa está despejado con la píldora compacta y sin lista desplegada
+      expect(find.text('price_map.view_list'), findsOneWidget);
+      expect(find.text('Asadero Central'), findsNothing);
+      expect(find.text('Taxi · Plaza → Terminal'), findsNothing);
+
+      // Al tocar "Ver lista" abre la tarjeta flotante con lugares reales sin reportes de taxi ni botón Llamar
+      await tester.tap(find.text('price_map.view_list'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Asadero Central'), findsOneWidget);
+      expect(find.text('Taxi · Plaza → Terminal'), findsNothing);
+      expect(find.text('price_map.action_details'), findsOneWidget);
+      expect(find.text('price_map.action_route'), findsOneWidget);
+      expect(find.text('businesses.action_call'), findsNothing);
+
+      // Al tocar el botón de cierre vuelve a colapsar a la píldora compacta
+      await tester.tap(find.byTooltip('price_map.show_map'));
+      await tester.pumpAndSettle();
+      expect(find.text('price_map.view_list'), findsOneWidget);
+      expect(find.text('Asadero Central'), findsNothing);
+
+      // Al tocar un pin sobre el mapa flota la tarjeta completa y cerrarla regresa a la píldora
+      await tester.tap(find.byIcon(Icons.restaurant).first);
+      await tester.pumpAndSettle();
+      expect(find.text('Asadero Central'), findsOneWidget);
+      expect(find.text('businesses.action_call'), findsNothing);
+      expect(find.byIcon(Icons.close), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('price_map.view_list'), findsOneWidget);
+      expect(find.text('Asadero Central'), findsNothing);
     },
   );
 }
