@@ -16,8 +16,8 @@ import 'package:via_justa/features/map_colombia/presentation/state/map_providers
 import 'package:via_justa/features/municipality/domain/city_visual_identity.dart';
 import 'package:via_justa/features/municipality/presentation/widgets/city_cultural_illustration.dart';
 
-/// Pantalla 3 (M03 · VJ-09) · Mapa real de los 33 territorios de Colombia
-/// (32 departamentos + Bogotá, D.C.) con identidad cultural ilustrada, buscador y selección táctil.
+/// Pantalla 3 (M03 · VJ-09) · Croquis ilustrado de los 33 territorios de Colombia
+/// (32 departamentos + Bogotá, D.C.) con resaltado dinámico por zona seleccionada.
 class MapPage extends ConsumerWidget {
   const MapPage({super.key});
 
@@ -55,7 +55,7 @@ class MapPage extends ConsumerWidget {
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // 1. Lienzo cartográfico vectorial de Colombia con zoom, desplazamiento y adornos sutiles de cañaguate
+          // 1. Lienzo estilo Croquis de Colombia con zona seleccionada destacada
           Positioned.fill(
             child: Semantics(
               label: 'map.semantics'.tr(),
@@ -111,8 +111,7 @@ class MapPage extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    // Recuadro accesible para San Andrés y Providencia (código 88),
-                    // cuyas islas son muy pequeñas a escala nacional.
+                    // Recuadro accesible para San Andrés y Providencia (código 88)
                     _SanAndresInsetChip(
                       isSelected:
                           selectedDepartment.code == Departments.sanAndres.code,
@@ -334,6 +333,8 @@ class MapPage extends ConsumerWidget {
 
     final bounds = geometry.bounds;
     final cesarAnchor = geometry.canvasAnchorForCode(Departments.cesar.code);
+    final selectedAnchor =
+        geometry.canvasAnchorForCode(selectedDepartment.code) ?? cesarAnchor;
 
     return InteractiveViewer(
       minScale: 1,
@@ -374,18 +375,19 @@ class MapPage extends ConsumerWidget {
                         bounds: bounds,
                         selectedCode: selectedDepartment.code,
                         cesarAnchor: cesarAnchor,
+                        selectedAnchor: selectedAnchor,
                       ),
                     ),
-                    if (cesarAnchor != null)
+                    if (selectedAnchor != null)
                       Positioned(
-                        left: cesarAnchor.x - 52,
-                        top: cesarAnchor.y - 26,
+                        left: selectedAnchor.x - 52,
+                        top: selectedAnchor.y - 28,
                         child: _DepartmentBubble(
-                          department: Departments.cesar,
+                          department: selectedDepartment,
                           onTap: () => _handleDepartmentSelection(
                             context,
                             ref,
-                            Departments.cesar,
+                            selectedDepartment,
                           ),
                         ),
                       ),
@@ -400,66 +402,112 @@ class MapPage extends ConsumerWidget {
   }
 }
 
+/// Pintor estilo Croquis Ilustrado de Colombia:
+/// 1. Silueta celeste desplazada (`Offset(9, 8)`) exactamente como en el croquis de referencia.
+/// 2. Contorno exterior continuo en tinta oscura (`#181F26`) que bordea el croquis de Colombia.
+/// 3. Relleno interior celeste claro unificado con divisiones departamentales sutiles.
+/// 4. Resaltado vivo de la zona/departamento seleccionado (`selectedCode`, p. ej. Cesar `20`)
+///    con su borde en tinta y adornos culturales.
 class _ColombiaMapPainter extends CustomPainter {
   const _ColombiaMapPainter({
     required this.features,
     required this.bounds,
     required this.selectedCode,
     this.cesarAnchor,
+    this.selectedAnchor,
   });
 
   final List<DepartmentMapFeature> features;
   final MapBounds bounds;
   final String selectedCode;
   final MapPoint? cesarAnchor;
+  final MapPoint? selectedAnchor;
+
+  static const Color _croquisOffsetFillColor = Color(0xFFB3DCFA);
+  static const Color _croquisBaseFillColor = Color(0xFFC9E6FC);
+  static const Color _croquisPilotFillColor = Color(0xFFA9D6FA);
+  static const Color _croquisOuterInkColor = Color(0xFF181F26);
+  static const Color _croquisInternalLineColor = Color(0xFF8ABBE6);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final fillPaint = Paint()..style = PaintingStyle.fill;
-    final borderPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..color = AppColors.surface
-      ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 2.0;
-
-    final selectedBorderPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..color = AppColors.primary
-      ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 3.0;
-
-    // 1. Pintar primero los departamentos no seleccionados ni piloto
+    final pathsByCode = <String, Path>{};
     for (final feature in features) {
-      final dept = feature.department;
-      final isSelected = dept.code == selectedCode;
-      if (isSelected || dept.isAvailable) continue;
-
-      final path = _buildShapePath(feature.shape);
-      fillPaint.color = AppColors.border;
-      canvas.drawPath(path, fillPaint);
-      canvas.drawPath(path, borderPaint);
+      pathsByCode[feature.department.code] = _buildShapePath(feature.shape);
     }
 
-    // 2. Pintar encima el departamento piloto (Cesar) y el seleccionado
-    // para que su borde azul no quede tapado por vecinos adyacentes.
+    // 1. Capa de sombra/relleno celeste desplazada (efecto croquis offset)
+    final offsetFillPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = _croquisOffsetFillColor;
+    canvas.save();
+    canvas.translate(9.0, 8.0);
+    for (final path in pathsByCode.values) {
+      canvas.drawPath(path, offsetFillPaint);
+    }
+    canvas.restore();
+
+    // 2. Contorno exterior en tinta oscura del croquis de Colombia:
+    // Al trazar primero el borde grueso negro en todos los polígonos y luego
+    // rellenar el interior encima, las fronteras internas quedan cubiertas y
+    // solo sobresale el trazo negro continuo de la silueta exterior de Colombia.
+    final outerInkPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..color = _croquisOuterInkColor
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 7.5;
+    for (final path in pathsByCode.values) {
+      canvas.drawPath(path, outerInkPaint);
+    }
+
+    // 3. Relleno interior celeste del croquis y líneas divisorias internas sutiles
+    final baseFillPaint = Paint()..style = PaintingStyle.fill;
+    final internalStrokePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..color = _croquisInternalLineColor.withValues(alpha: 0.65)
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = 1.1;
+
     for (final feature in features) {
       final dept = feature.department;
-      final isSelected = dept.code == selectedCode;
-      if (!isSelected && !dept.isAvailable) continue;
+      final path = pathsByCode[dept.code]!;
+      baseFillPaint.color = dept.isAvailable
+          ? _croquisPilotFillColor
+          : _croquisBaseFillColor;
+      canvas.drawPath(path, baseFillPaint);
+      canvas.drawPath(path, internalStrokePaint);
+    }
 
-      final path = _buildShapePath(feature.shape);
-      if (dept.isAvailable) {
-        fillPaint.color = isSelected
-            ? AppColors.primary.withValues(alpha: 0.34)
-            : AppColors.primarySoft;
-      } else {
-        fillPaint.color = AppColors.primary.withValues(alpha: 0.22);
-      }
-      canvas.drawPath(path, fillPaint);
+    // 4. Destacar encima la zona/departamento actualmente seleccionado (ej. Cesar)
+    for (final feature in features) {
+      final dept = feature.department;
+      if (dept.code != selectedCode) continue;
+
+      final path = pathsByCode[dept.code]!;
+      final identity = CityVisualIdentityCatalog.forDepartment(dept.code);
+      final accentColor = Color(identity.accentHex);
+
+      // Relleno destacado de la zona seleccionada
+      final selectedFillPaint = Paint()
+        ..style = PaintingStyle.fill
+        ..color = dept.isAvailable
+            ? const Color(0xFF3B82F6).withValues(alpha: 0.82)
+            : accentColor.withValues(alpha: 0.72);
+
+      // Contorno tipo croquis para separar con nitidez la zona seleccionada
+      final selectedBorderPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..color = _croquisOuterInkColor
+        ..strokeJoin = StrokeJoin.round
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 3.2;
+
+      canvas.drawPath(path, selectedFillPaint);
       canvas.drawPath(path, selectedBorderPaint);
     }
 
-    // 3. Adorno ilustrado sutil de flores amarillas de Cañaguate alrededor del piloto (Cesar)
+    // 5. Adorno ilustrado sutil de flores amarillas de Cañaguate alrededor del Cesar
     if (cesarAnchor != null) {
       _paintSubtleCanaguateGarnish(
         canvas,
@@ -467,7 +515,7 @@ class _ColombiaMapPainter extends CustomPainter {
       );
     }
 
-    // 4. Recuadro guía alrededor del archipiélago de San Andrés y Providencia (esquina sup. izq.)
+    // 6. Recuadro guía alrededor del archipiélago de San Andrés y Providencia (esquina sup. izq.)
     final insetRect = RRect.fromRectAndRadius(
       const Rect.fromLTWH(-8, -8, 42, 62),
       const Radius.circular(AppRadius.sm),
@@ -476,16 +524,31 @@ class _ColombiaMapPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..color = selectedCode == Departments.sanAndres.code
           ? AppColors.primary
-          : AppColors.textSecondary.withValues(alpha: 0.5)
-      ..strokeWidth = 1.6;
+          : _croquisOuterInkColor.withValues(alpha: 0.45)
+      ..strokeWidth = 1.8;
     canvas.drawRRect(insetRect, insetPaint);
   }
 
   void _paintSubtleCanaguateGarnish(Canvas canvas, Offset anchor) {
     const goldColor = Color(0xFFFFCA28);
-    _drawMiniBlossom(canvas, Offset(anchor.dx + 22, anchor.dy - 28), 6.0, goldColor);
-    _drawMiniBlossom(canvas, Offset(anchor.dx - 24, anchor.dy + 20), 5.2, goldColor);
-    _drawMiniBlossom(canvas, Offset(anchor.dx + 18, anchor.dy + 24), 4.6, goldColor);
+    _drawMiniBlossom(
+      canvas,
+      Offset(anchor.dx + 22, anchor.dy - 28),
+      6.2,
+      goldColor,
+    );
+    _drawMiniBlossom(
+      canvas,
+      Offset(anchor.dx - 24, anchor.dy + 20),
+      5.4,
+      goldColor,
+    );
+    _drawMiniBlossom(
+      canvas,
+      Offset(anchor.dx + 18, anchor.dy + 24),
+      4.8,
+      goldColor,
+    );
   }
 
   void _drawMiniBlossom(
@@ -627,10 +690,10 @@ class _DepartmentBubble extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(color: AppColors.primary, width: 1.4),
+                border: Border.all(color: const Color(0xFF181F26), width: 1.5),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.14),
+                    color: Colors.black.withValues(alpha: 0.16),
                     blurRadius: 5,
                     offset: const Offset(0, 2),
                   ),
@@ -643,21 +706,25 @@ class _DepartmentBubble extends StatelessWidget {
                     width: 20,
                     height: 20,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFCA28).withValues(alpha: 0.28),
+                      color: const Color(0xFFFFCA28).withValues(alpha: 0.32),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.music_note_rounded,
+                    child: Icon(
+                      department.isAvailable
+                          ? Icons.music_note_rounded
+                          : Icons.place_rounded,
                       size: 13,
-                      color: Color(0xFFD84315),
+                      color: department.isAvailable
+                          ? const Color(0xFFD84315)
+                          : AppColors.primary,
                     ),
                   ),
                   const SizedBox(width: 6),
                   Text(
                     department.name,
                     style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF181F26),
+                      fontWeight: FontWeight.w800,
                       fontSize: 13,
                     ),
                   ),
