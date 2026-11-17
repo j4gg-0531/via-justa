@@ -378,16 +378,16 @@ class MapPage extends ConsumerWidget {
                         selectedAnchor: selectedAnchor,
                       ),
                     ),
-                    if (selectedAnchor != null)
+                    if (cesarAnchor != null)
                       Positioned(
-                        left: selectedAnchor.x - 52,
-                        top: selectedAnchor.y - 28,
+                        left: cesarAnchor.x - 52,
+                        top: cesarAnchor.y - 28,
                         child: _DepartmentBubble(
-                          department: selectedDepartment,
+                          department: Departments.cesar,
                           onTap: () => _handleDepartmentSelection(
                             context,
                             ref,
-                            selectedDepartment,
+                            Departments.cesar,
                           ),
                         ),
                       ),
