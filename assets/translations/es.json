@@ -482,6 +482,8 @@
     "priceNoticeSamples": "Reportes utilizados: {}",
     "priceNoticeInsufficient": "Muestra insuficiente en esta zona ({} reportes). Aún no hay datos suficientes para calcular la mediana.",
     "priceNoticePrivateHint": "Este aviso es privado y orientativo. Puedes mantener tu precio y publicar.",
+    "priceNoticeChecking": "Consultando precios de referencia de la zona...",
+    "priceNoticeErrorTitle": "No pudimos comparar",
     "priceNoticeError": "No se pudo consultar la referencia de precios de la zona.",
     "priceNoticeLevels": {
       "green": "Dentro del rango de referencia de la zona",

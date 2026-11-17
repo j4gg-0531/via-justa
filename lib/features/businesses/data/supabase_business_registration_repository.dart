@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -5,17 +7,66 @@ import 'package:via_justa/features/businesses/domain/business_draft.dart';
 import 'package:via_justa/features/businesses/domain/business_registration_repository.dart';
 import 'package:via_justa/features/businesses/domain/business_validator.dart';
 
+class _PendingEditAttempt {
+  _PendingEditAttempt({
+    required this.editRequestId,
+    required this.draftSignature,
+  });
+
+  final String editRequestId;
+  final String draftSignature;
+  final List<String> uploadedNewPaths = <String>[];
+}
+
+class _ReconciledEditAttempt {
+  const _ReconciledEditAttempt({
+    required this.editStatus,
+    required this.removedPhotoPaths,
+    required this.deletablePhotoPaths,
+  });
+
+  final String editStatus;
+  final List<String> removedPhotoPaths;
+  final List<String> deletablePhotoPaths;
+}
+
 /// El mismo borrador y requestId se conservan hasta publicar o descartar.
 class SupabaseBusinessRegistrationRepository
     implements BusinessRegistrationRepository {
-  const SupabaseBusinessRegistrationRepository(this._client);
+  SupabaseBusinessRegistrationRepository(this._client);
   final SupabaseClient _client;
+  final Map<String, _PendingEditAttempt> _pendingEditAttempts =
+      <String, _PendingEditAttempt>{};
 
   void _checkOwner(String ownerId) {
     if (_client.auth.currentUser?.id != ownerId) {
       throw const BusinessRegistrationFailure('session');
     }
   }
+
+  String _newUuidV4() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+    final hex = bytes.map((v) => v.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
+
+  String _draftSignature(BusinessDraft draft) => jsonEncode({
+    'type': draft.type.name,
+    'fields': {for (final f in BusinessField.values) f.name: draft.text(f).trim()},
+    'lat': draft.latitude,
+    'lng': draft.longitude,
+    'wa': draft.whatsappConsent,
+    'pub': draft.publicationConsent,
+    'hours': _hoursPayload(draft),
+    'dishes': _dishesPayload(draft),
+    'photos': [
+      for (final p in draft.photos) p.storagePath ?? 'bytes:${p.bytes.length}:${p.extension}',
+    ],
+  });
 
   Map<String, dynamic> _hoursPayload(BusinessDraft draft) => {
     for (final day in BusinessDraft.days)
@@ -34,6 +85,8 @@ class SupabaseBusinessRegistrationRepository
       {'name': dish.name.trim(), 'price_cop': int.parse(dish.price)},
   ];
 
+  static int _editAttemptCounter = 0;
+
   String _newEditPhotoPath({
     required String ownerId,
     required String businessId,
@@ -42,8 +95,16 @@ class SupabaseBusinessRegistrationRepository
     required String extension,
   }) {
     final cleanToken = requestId.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
-    final suffix = cleanToken.isEmpty ? 'batch' : cleanToken.substring(0, cleanToken.length > 16 ? 16 : cleanToken.length);
-    return '$ownerId/$businessId/edit_${suffix}_$index.$extension';
+    final suffix = cleanToken.isEmpty
+        ? 'batch'
+        : cleanToken.substring(
+            0,
+            cleanToken.length > 12 ? 12 : cleanToken.length,
+          );
+    final attempt =
+        '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}_'
+        '${(++_editAttemptCounter).toRadixString(36)}';
+    return '$ownerId/$businessId/edit_${suffix}_${attempt}_$index.$extension';
   }
 
   Future<void> _bestEffortRemoveStoragePaths(List<String> paths) async {
@@ -54,6 +115,39 @@ class SupabaseBusinessRegistrationRepository
       // Limpieza en segundo plano: la ficha en BD ya es consistente.
     }
   }
+
+  Future<_ReconciledEditAttempt?> _reconcileEditAttempt({
+    required String businessId,
+    required _PendingEditAttempt attempt,
+  }) async {
+    try {
+      final dynamic raw = await _client.rpc(
+        'reconcile_business_edit_attempt',
+        params: {
+          'p_business_id': businessId,
+          'p_edit_request_id': attempt.editRequestId,
+          'p_candidate_photo_paths': attempt.uploadedNewPaths,
+        },
+      );
+      if (raw is! Map) return null;
+      final data = Map<String, dynamic>.from(raw);
+      final status = (data['edit_status'] as String?)?.trim() ?? '';
+      if (status != 'committed' && status != 'aborted') return null;
+      return _ReconciledEditAttempt(
+        editStatus: status,
+        removedPhotoPaths: _stringList(data['removed_photo_paths']),
+        deletablePhotoPaths: _stringList(data['deletable_photo_paths']),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<String> _stringList(dynamic raw) => <String>[
+    if (raw is List)
+      for (final item in raw)
+        if (item != null && item.toString().isNotEmpty) item.toString(),
+  ];
 
   @override
   Future<String> publish({
@@ -73,7 +167,33 @@ class SupabaseBusinessRegistrationRepository
       final orderUrl = draft.text(BusinessField.orderUrl).trim();
 
       if (businessId != null) {
-        final uploadedNewPaths = <String>[];
+        final currentSignature = _draftSignature(draft);
+        final pending = _pendingEditAttempts[businessId];
+        if (pending != null) {
+          final reconciled = await _reconcileEditAttempt(
+            businessId: businessId,
+            attempt: pending,
+          );
+          if (reconciled == null) {
+            // El estado del intento previo sigue siendo incierto; conservar archivos y no duplicar.
+            throw const BusinessRegistrationFailure('network');
+          }
+          _pendingEditAttempts.remove(businessId);
+          if (reconciled.editStatus == 'committed') {
+            await _bestEffortRemoveStoragePaths(reconciled.removedPhotoPaths);
+            if (pending.draftSignature == currentSignature) {
+              return businessId;
+            }
+          } else {
+            await _bestEffortRemoveStoragePaths(reconciled.deletablePhotoPaths);
+          }
+        }
+
+        final attempt = _PendingEditAttempt(
+          editRequestId: _newUuidV4(),
+          draftSignature: currentSignature,
+        );
+        _pendingEditAttempts[businessId] = attempt;
         final photoSpecs = <Map<String, dynamic>>[];
 
         try {
@@ -102,7 +222,7 @@ class SupabaseBusinessRegistrationRepository
                       upsert: false,
                     ),
                   );
-              uploadedNewPaths.add(targetPath);
+              attempt.uploadedNewPaths.add(targetPath);
             }
             photoSpecs.add({
               'storage_path': targetPath,
@@ -129,22 +249,33 @@ class SupabaseBusinessRegistrationRepository
               'p_hours': _hoursPayload(draft),
               'p_dishes': _dishesPayload(draft),
               'p_photos': photoSpecs,
+              'p_edit_request_id': attempt.editRequestId,
             },
           );
 
+          _pendingEditAttempts.remove(businessId);
           final result = rawResult is Map
               ? Map<String, dynamic>.from(rawResult)
               : const <String, dynamic>{};
-          final removedRaw = result['removed_photo_paths'];
-          final removedPaths = <String>[
-            if (removedRaw is List)
-              for (final item in removedRaw)
-                if (item != null && item.toString().isNotEmpty) item.toString(),
-          ];
-          await _bestEffortRemoveStoragePaths(removedPaths);
+          await _bestEffortRemoveStoragePaths(
+            _stringList(result['removed_photo_paths']),
+          );
           return businessId;
         } catch (_) {
-          await _bestEffortRemoveStoragePaths(uploadedNewPaths);
+          // Confirmar en servidor bajo bloqueo si este editRequestId quedó committed o aborted
+          // antes de eliminar ninguna imagen subida.
+          final reconciled = await _reconcileEditAttempt(
+            businessId: businessId,
+            attempt: attempt,
+          );
+          if (reconciled != null) {
+            _pendingEditAttempts.remove(businessId);
+            if (reconciled.editStatus == 'committed') {
+              await _bestEffortRemoveStoragePaths(reconciled.removedPhotoPaths);
+              return businessId;
+            }
+            await _bestEffortRemoveStoragePaths(reconciled.deletablePhotoPaths);
+          }
           rethrow;
         }
       }
@@ -250,6 +381,7 @@ class SupabaseBusinessRegistrationRepository
         if (rawDishes is List)
           for (final item in rawDishes.whereType<Map>())
             BusinessDishDraft(
+              id: (item['id'] as String?) ?? '',
               name: (item['name'] as String?) ?? '',
               price: (item['price_cop'] ?? '').toString(),
             ),

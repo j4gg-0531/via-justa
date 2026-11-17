@@ -12,6 +12,9 @@ import 'package:via_justa/features/businesses/presentation/state/register_busine
 import 'package:via_justa/features/municipality/domain/municipality.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
+import 'package:via_justa/features/prices/domain/price_category.dart';
+import 'package:via_justa/features/prices/domain/price_verdict.dart';
+import 'package:via_justa/features/prices/domain/price_verdict_repository.dart';
 import 'package:via_justa/features/prices/presentation/state/price_map_providers.dart';
 import 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart';
 
@@ -274,10 +277,8 @@ void main() {
       );
       await notifier.compareDishPrice(0);
 
-      final notice = container
-          .read(registerBusinessProvider)
-          .dishPriceNotices[0]
-          ?.value;
+      final state = container.read(registerBusinessProvider);
+      final notice = state.dishPriceNoticeFor(state.draft.dishes.first)?.value;
       expect(notice, isNotNull);
       expect(notice!.categoryId, 'food_corrientazo');
       expect(notice.enteredCop, 20000);
@@ -329,4 +330,454 @@ void main() {
     controller.removePhoto(0);
     expect(photoContainer.read(registerBusinessProvider).canAddPhoto, isTrue);
   });
+
+  test(
+    'identidad estable de plato y secuencia descartan avisos obsoletos al cambiar precio, zona o eliminar platos',
+    () async {
+      final firstCompleter = Completer<PriceVerdict>();
+      final secondCompleter = Completer<PriceVerdict>();
+      final dishBCompleter = Completer<PriceVerdict>();
+      final calls = <({int submittedCop, String zoneId})>[];
+      var callIndex = 0;
+      final fakeVerdicts = _ControllablePriceVerdictRepository(
+        onEvaluate: (submittedCop, zoneId) {
+          calls.add((submittedCop: submittedCop, zoneId: zoneId));
+          final current = callIndex++;
+          if (current == 0) return firstCompleter.future;
+          if (current == 1) return secondCompleter.future;
+          return dishBCompleter.future;
+        },
+      );
+      final raceContainer = ProviderContainer(
+        overrides: [
+          authControllerProvider.overrideWith(TestBusinessAuth.new),
+          businessRegistrationRepositoryProvider.overrideWithValue(repository),
+          priceVerdictRepositoryProvider.overrideWithValue(fakeVerdicts),
+          municipalityZonesProvider.overrideWith(
+            (ref) async => const [
+              registrationZone,
+              MunicipalityZone(
+                id: 'north',
+                municipalityCode: '20001',
+                nameEs: 'Norte',
+                nameEn: 'North',
+                sectorHintEs: '',
+                sectorHintEn: '',
+                centerLat: 10.50,
+                centerLng: -73.24,
+              ),
+            ],
+          ),
+          priceCategoriesProvider.overrideWith(
+            (ref) async => const [
+              PriceCategory(
+                id: 'food_corrientazo',
+                groupKey: 'food',
+                nameEs: 'Almuerzo corriente',
+                nameEn: 'Daily lunch',
+                unitDescriptionEs: 'Por plato',
+                unitDescriptionEn: 'Per meal',
+              ),
+            ],
+          ),
+        ],
+      );
+      addTearDown(raceContainer.dispose);
+      raceContainer
+          .read(selectedMunicipalityProvider.notifier)
+          .select(
+            const Municipality(
+              code: '20001',
+              name: 'Valledupar',
+              departmentCode: '20',
+              isPilot: true,
+            ),
+          );
+      raceContainer.listen(registerBusinessProvider, (_, _) {});
+      final n = raceContainer.read(registerBusinessProvider.notifier);
+      await raceContainer.read(municipalityZonesProvider.future);
+      await raceContainer.read(priceCategoriesProvider.future);
+      fillRegistration(n);
+
+      n.addDish();
+      n.addDish();
+      n.setDish(
+        0,
+        name: 'Plato A',
+        price: '20000',
+        priceCategoryId: 'food_corrientazo',
+      );
+      n.setDish(
+        1,
+        name: 'Plato B',
+        price: '28000',
+        priceCategoryId: 'food_corrientazo',
+      );
+
+      // Inicia comparación a $20.000 y antes de responder cambia el precio a $10.000.
+      final firstFuture = n.compareDishPrice(0);
+      await Future<void>.delayed(Duration.zero);
+      n.setDish(0, price: '10000');
+
+      final secondFuture = n.compareDishPrice(0);
+      await Future<void>.delayed(Duration.zero);
+
+      secondCompleter.complete(
+        const PriceVerdict(
+          categoryId: 'food_corrientazo',
+          municipalityCode: '20001',
+          zoneId: 'center',
+          level: PriceVerdictLevel.green,
+          submittedCop: 10000,
+          n: 10,
+          referenceCop: 12000,
+          deviationPct: -16.7,
+        ),
+      );
+      await secondFuture;
+
+      firstCompleter.complete(
+        const PriceVerdict(
+          categoryId: 'food_corrientazo',
+          municipalityCode: '20001',
+          zoneId: 'center',
+          level: PriceVerdictLevel.red,
+          submittedCop: 20000,
+          n: 10,
+          referenceCop: 12000,
+          deviationPct: 66.7,
+        ),
+      );
+      await firstFuture;
+
+      var s = raceContainer.read(registerBusinessProvider);
+      expect(s.dishPriceNoticeFor(s.draft.dishes[0])?.value?.enteredCop, 10000);
+
+      // Si cambia de zona mientras Plato B sigue pendiente, Plato B también se descarta.
+      final thirdFuture = n.compareDishPrice(1);
+      await Future<void>.delayed(Duration.zero);
+      n.selectPoint(
+        const PickedMapPoint(
+          zoneId: 'north',
+          latitude: 10.50,
+          longitude: -73.24,
+          normalizedX: .5,
+          normalizedY: .2,
+        ),
+        'es',
+      );
+      dishBCompleter.complete(
+        const PriceVerdict(
+          categoryId: 'food_corrientazo',
+          municipalityCode: '20001',
+          zoneId: 'center',
+          level: PriceVerdictLevel.red,
+          submittedCop: 28000,
+          n: 10,
+          referenceCop: 12000,
+          deviationPct: 133.3,
+        ),
+      );
+      await thirdFuture;
+      s = raceContainer.read(registerBusinessProvider);
+      expect(s.dishPriceNoticeFor(s.draft.dishes[1]), isNull);
+    },
+  );
+
+  test(
+    'eliminar otro plato no mezcla ni descarta el aviso del plato conservado',
+    () async {
+      final completer = Completer<PriceVerdict>();
+      final fakeVerdicts = _ControllablePriceVerdictRepository(
+        onEvaluate: (_, _) => completer.future,
+      );
+      final deleteContainer = ProviderContainer(
+        overrides: [
+          authControllerProvider.overrideWith(TestBusinessAuth.new),
+          businessRegistrationRepositoryProvider.overrideWithValue(repository),
+          priceVerdictRepositoryProvider.overrideWithValue(fakeVerdicts),
+          municipalityZonesProvider.overrideWith(
+            (ref) async => const [registrationZone],
+          ),
+          priceCategoriesProvider.overrideWith(
+            (ref) async => const [
+              PriceCategory(
+                id: 'food_corrientazo',
+                groupKey: 'food',
+                nameEs: 'Almuerzo corriente',
+                nameEn: 'Daily lunch',
+                unitDescriptionEs: 'Por plato',
+                unitDescriptionEn: 'Per meal',
+              ),
+            ],
+          ),
+        ],
+      );
+      addTearDown(deleteContainer.dispose);
+      deleteContainer
+          .read(selectedMunicipalityProvider.notifier)
+          .select(
+            const Municipality(
+              code: '20001',
+              name: 'Valledupar',
+              departmentCode: '20',
+              isPilot: true,
+            ),
+          );
+      deleteContainer.listen(registerBusinessProvider, (_, _) {});
+      final n = deleteContainer.read(registerBusinessProvider.notifier);
+      await deleteContainer.read(municipalityZonesProvider.future);
+      await deleteContainer.read(priceCategoriesProvider.future);
+      fillRegistration(n);
+
+      n.addDish();
+      n.addDish();
+      n.setDish(0, name: 'Descartable', price: '12000');
+      n.setDish(1, name: 'Conservado', price: '24000');
+
+      final bId = deleteContainer.read(registerBusinessProvider).draft.dishes[1].id;
+      final pending = n.compareDishPriceById(bId);
+      await Future<void>.delayed(Duration.zero);
+
+      // Elimina el plato 0 mientras el plato 1 espera respuesta; su id sigue siendo estable.
+      n.removeDish(0);
+      completer.complete(
+        const PriceVerdict(
+          categoryId: 'food_corrientazo',
+          municipalityCode: '20001',
+          zoneId: 'center',
+          level: PriceVerdictLevel.red,
+          submittedCop: 24000,
+          n: 12,
+          referenceCop: 14000,
+          deviationPct: 71.4,
+        ),
+      );
+      await pending;
+
+      final s = deleteContainer.read(registerBusinessProvider);
+      expect(s.draft.dishes.length, 1);
+      expect(s.draft.dishes.first.name, 'Conservado');
+      expect(s.dishPriceNoticeFor(s.draft.dishes.first)?.value?.enteredCop, 24000);
+    },
+  );
+
+  test(
+    'loadEdit no asigna vup_centro provisional mientras cargan las zonas y resuelve la zona cercana real al completar',
+    () async {
+      final zonesCompleter = Completer<List<MunicipalityZone>>();
+      final editRepo = FakeRegistrationRepository()
+        ..loadedDraft = const BusinessDraft(
+          fields: {
+            BusinessField.name: 'Asadero Norte',
+            BusinessField.descriptionEs: 'Comida tradicional en el norte.',
+            BusinessField.address: 'Carrera 9 #1-10',
+            BusinessField.whatsapp: '573001234567',
+          },
+          latitude: 10.51,
+          longitude: -73.24,
+          whatsappConsent: true,
+          publicationConsent: true,
+        );
+      final editContainer = ProviderContainer(
+        overrides: [
+          authControllerProvider.overrideWith(TestBusinessAuth.new),
+          businessRegistrationRepositoryProvider.overrideWithValue(editRepo),
+          municipalityZonesProvider.overrideWith(
+            (ref) => zonesCompleter.future,
+          ),
+        ],
+      );
+      addTearDown(editContainer.dispose);
+      editContainer
+          .read(selectedMunicipalityProvider.notifier)
+          .select(
+            const Municipality(
+              code: '20001',
+              name: 'Valledupar',
+              departmentCode: '20',
+              isPilot: true,
+            ),
+          );
+      editContainer.listen(registerBusinessProvider, (_, _) {});
+      final n = editContainer.read(registerBusinessProvider.notifier);
+
+      await n.loadEdit('own-north-1', 'es');
+      expect(
+        editContainer.read(registerBusinessProvider).draft.zoneId,
+        isNull,
+      );
+
+      zonesCompleter.complete(const [
+        MunicipalityZone(
+          id: 'vup_centro',
+          municipalityCode: '20001',
+          nameEs: 'Centro',
+          nameEn: 'Downtown',
+          sectorHintEs: '',
+          sectorHintEn: '',
+          centerLat: 10.46,
+          centerLng: -73.24,
+        ),
+        MunicipalityZone(
+          id: 'vup_norte',
+          municipalityCode: '20001',
+          nameEs: 'Norte',
+          nameEn: 'North',
+          sectorHintEs: '',
+          sectorHintEn: '',
+          centerLat: 10.505,
+          centerLng: -73.24,
+        ),
+      ]);
+      await editContainer.read(municipalityZonesProvider.future);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        editContainer.read(registerBusinessProvider).draft.zoneId,
+        'vup_norte',
+      );
+      expect(editContainer.read(registerBusinessProvider).zoneName, 'Norte');
+    },
+  );
+
+  test(
+    'avanzar a Revisión compara automáticamente, muestra error si falla sin asumir precio justo, reintenta y deja publicar',
+    () async {
+      var shouldFail = true;
+      final evaluatedPrices = <int>[];
+      final verdictRepo = _ControllablePriceVerdictRepository(
+        onEvaluate: (submittedCop, _) async {
+          evaluatedPrices.add(submittedCop);
+          if (shouldFail) throw Exception('network timeout');
+          return PriceVerdict(
+            categoryId: 'food_corrientazo',
+            municipalityCode: '20001',
+            zoneId: 'center',
+            level: PriceVerdictLevel.red,
+            submittedCop: submittedCop,
+            n: 9,
+            referenceCop: 14000,
+            deviationPct: 78.6,
+          );
+        },
+      );
+      final reviewContainer = ProviderContainer(
+        overrides: [
+          authControllerProvider.overrideWith(TestBusinessAuth.new),
+          businessRegistrationRepositoryProvider.overrideWithValue(repository),
+          priceVerdictRepositoryProvider.overrideWithValue(verdictRepo),
+          municipalityZonesProvider.overrideWith(
+            (ref) async => const [registrationZone],
+          ),
+          priceCategoriesProvider.overrideWith(
+            (ref) async => const [
+              PriceCategory(
+                id: 'food_corrientazo',
+                groupKey: 'food',
+                nameEs: 'Almuerzo corriente',
+                nameEn: 'Daily lunch',
+                unitDescriptionEs: 'Por plato',
+                unitDescriptionEn: 'Per meal',
+              ),
+            ],
+          ),
+        ],
+      );
+      addTearDown(reviewContainer.dispose);
+      reviewContainer
+          .read(selectedMunicipalityProvider.notifier)
+          .select(
+            const Municipality(
+              code: '20001',
+              name: 'Valledupar',
+              departmentCode: '20',
+              isPilot: true,
+            ),
+          );
+      reviewContainer.listen(registerBusinessProvider, (_, _) {});
+      final n = reviewContainer.read(registerBusinessProvider.notifier);
+      await reviewContainer.read(municipalityZonesProvider.future);
+      await reviewContainer.read(priceCategoriesProvider.future);
+      fillRegistration(n);
+
+      n.next(); // paso 0 -> 1
+      n.next(); // paso 1 -> 2
+      n.addDish();
+      n.setDish(
+        0,
+        name: 'Almuerzo especial',
+        price: '25000',
+        priceCategoryId: 'food_corrientazo',
+      );
+
+      // Sin pulsar "Comparar" manualmente, avanza al paso 3 (Revisión).
+      n.next();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      var s = reviewContainer.read(registerBusinessProvider);
+      expect(s.step, 3);
+      expect(evaluatedPrices, [25000]);
+      final dish = s.draft.dishes.first;
+      expect(s.dishPriceNoticeFor(dish)?.hasError, isTrue);
+
+      // Reintenta con éxito y muestra advertencia de precio alto sin bloquear publicación.
+      shouldFail = false;
+      await n.retryDishComparison(dish.id);
+      s = reviewContainer.read(registerBusinessProvider);
+      expect(
+        s.dishPriceNoticeFor(dish)?.value?.level,
+        PriceVerdictLevel.red,
+      );
+
+      n.setPublicationConsent(true);
+      await n.submit();
+      expect(
+        reviewContainer.read(registerBusinessProvider).publishedId,
+        'business-id',
+      );
+    },
+  );
+}
+
+class _ControllablePriceVerdictRepository implements PriceVerdictRepository {
+  _ControllablePriceVerdictRepository({required this.onEvaluate});
+
+  final Future<PriceVerdict> Function(int submittedCop, String zoneId)
+  onEvaluate;
+
+  @override
+  Future<PriceVerdict> evaluatePrice({
+    required String categoryId,
+    required String municipalityCode,
+    String zoneId = 'vup_centro',
+    String? destinationZoneId,
+    double? originLatitude,
+    double? originLongitude,
+    double? destinationLatitude,
+    double? destinationLongitude,
+    required int submittedCop,
+    bool includeEventContext = false,
+  }) => onEvaluate(submittedCop, zoneId);
+
+  @override
+  Future<List<PriceCategory>> getCategories() => throw UnimplementedError();
+
+  @override
+  Future<MunicipalityZone> detectCurrentZoneByGps({
+    String municipalityCode = '20001',
+  }) => throw UnimplementedError();
+
+  @override
+  Future<PriceVerdict> getScenarioFixture(
+    DemoPriceScenario scenario, {
+    String municipalityCode = '20001',
+    String? zoneId,
+    bool includeEventContext = false,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<List<MunicipalityZone>> getZones({String municipalityCode = '20001'}) =>
+      throw UnimplementedError();
 }

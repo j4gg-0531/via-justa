@@ -29,13 +29,32 @@ class BusinessPhoto {
 
 class BusinessDishDraft {
   const BusinessDishDraft({
+    this.id = '',
     this.name = '',
     this.price = '',
     this.priceCategoryId,
   });
+
+  /// Identificador estable en memoria para vincular avisos de precio sin depender del índice.
+  final String id;
   final String name;
   final String price;
   final String? priceCategoryId;
+
+  BusinessDishDraft copyWith({
+    String? id,
+    String? name,
+    String? price,
+    String? priceCategoryId,
+    bool clearCategory = false,
+  }) => BusinessDishDraft(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    price: price ?? this.price,
+    priceCategoryId: clearCategory
+        ? null
+        : (priceCategoryId ?? this.priceCategoryId),
+  );
 }
 
 class BusinessDayHours {

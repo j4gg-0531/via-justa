@@ -482,6 +482,8 @@
     "priceNoticeSamples": "Reports used: {}",
     "priceNoticeInsufficient": "Insufficient sample in this zone ({} reports). Not enough data yet to calculate the median.",
     "priceNoticePrivateHint": "This notice is private and orientative. You can keep your price and publish.",
+    "priceNoticeChecking": "Checking zone reference prices...",
+    "priceNoticeErrorTitle": "We couldn't compare",
     "priceNoticeError": "Could not load the zone price reference.",
     "priceNoticeLevels": {
       "green": "Within the zone reference range",

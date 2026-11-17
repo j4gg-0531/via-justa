@@ -309,6 +309,8 @@ class _StepContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(registerBusinessProvider.notifier);
+    final languageCode =
+        EasyLocalization.of(context)?.locale.languageCode ?? 'es';
     final draft = state.draft;
     switch (state.step) {
       case 0:
@@ -451,7 +453,7 @@ class _StepContent extends ConsumerWidget {
             for (var index = 0; index < draft.dishes.length; index++)
               _DishEditor(
                 key: ValueKey(
-                  'dish-$index-${draft.dishes.length}-${state.editingId}-${state.busy}',
+                  'dish-${draft.dishes[index].id}-${state.editingId}-${state.busy}',
                 ),
                 index: index,
                 dish: draft.dishes[index],
@@ -507,12 +509,23 @@ class _StepContent extends ConsumerWidget {
                 args: [draft.photos.length.toString()],
               ),
             ),
-            for (final dish in draft.dishes)
+            for (final dish in draft.dishes) ...[
               Text(
                 'businessRegistration.dishSummary'.tr(
                   args: [dish.name, dish.price],
                 ),
               ),
+              if (state.dishPriceNoticeFor(dish) case final noticeAsync?) ...[
+                const SizedBox(height: AppSpacing.sm),
+                _DishComparisonFeedback(
+                  noticeAsync: noticeAsync,
+                  languageCode: languageCode,
+                  showCheckingLabel: true,
+                  onRetry: () => notifier.retryDishComparison(dish.id),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+            ],
             const SizedBox(height: AppSpacing.lg),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
@@ -616,7 +629,7 @@ class _DishEditor extends ConsumerWidget {
         EasyLocalization.of(context)?.locale.languageCode ?? 'es';
     final categories = state.comparableCategories;
     final selectedCategoryId = state.dishCategoryId(index);
-    final noticeAsync = state.dishPriceNotices[index];
+    final noticeAsync = state.dishPriceNoticeFor(dish);
 
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.lg),
@@ -642,7 +655,7 @@ class _DishEditor extends ConsumerWidget {
           if (categories.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             DropdownButtonFormField<String?>(
-              key: ValueKey('dish-cat-$index-$selectedCategoryId'),
+              key: ValueKey('dish-cat-${dish.id}-$selectedCategoryId'),
               initialValue: selectedCategoryId,
               isExpanded: true,
               decoration: InputDecoration(
@@ -676,21 +689,17 @@ class _DishEditor extends ConsumerWidget {
               label: 'businessRegistration.compareZonePrice'.tr(),
               variant: VjButtonVariant.outlined,
               onPressed: state.canCompareDish(index)
-                  ? () => notifier.compareDishPrice(index)
+                  ? () => notifier.compareDishPriceById(dish.id)
                   : null,
             ),
           ],
           if (noticeAsync != null) ...[
             const SizedBox(height: AppSpacing.md),
-            noticeAsync.when(
-              loading: () => const LinearProgressIndicator(),
-              error: (_, _) => Text(
-                'businessRegistration.priceNoticeError'.tr(),
-              ),
-              data: (notice) => _DishPriceNoticeCard(
-                notice: notice,
-                languageCode: languageCode,
-              ),
+            _DishComparisonFeedback(
+              noticeAsync: noticeAsync,
+              languageCode: languageCode,
+              showCheckingLabel: false,
+              onRetry: () => notifier.retryDishComparison(dish.id),
             ),
           ],
           TextButton.icon(
@@ -812,6 +821,95 @@ class _DishPriceNoticeCard extends StatelessWidget {
             style: textTheme.bodySmall?.copyWith(
               color: AppColors.textSecondary,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DishComparisonFeedback extends StatelessWidget {
+  const _DishComparisonFeedback({
+    required this.noticeAsync,
+    required this.languageCode,
+    required this.showCheckingLabel,
+    required this.onRetry,
+  });
+
+  final AsyncValue<BusinessPriceNotice> noticeAsync;
+  final String languageCode;
+  final bool showCheckingLabel;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return noticeAsync.when(
+      loading: () => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const LinearProgressIndicator(),
+          if (showCheckingLabel) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'businessRegistration.priceNoticeChecking'.tr(),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ],
+      ),
+      error: (_, _) => _DishPriceErrorCard(onRetry: onRetry),
+      data: (notice) => _DishPriceNoticeCard(
+        notice: notice,
+        languageCode: languageCode,
+      ),
+    );
+  }
+}
+
+class _DishPriceErrorCard extends StatelessWidget {
+  const _DishPriceErrorCard({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.textSecondary),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.cloud_off_outlined,
+                color: AppColors.textSecondary,
+                size: 20,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  'businessRegistration.priceNoticeErrorTitle'.tr(),
+                  style: textTheme.labelLarge,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'businessRegistration.priceNoticeError'.tr(),
+            style: textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          VjButton(
+            label: 'common.retry'.tr(),
+            variant: VjButtonVariant.outlined,
+            onPressed: onRetry,
           ),
         ],
       ),

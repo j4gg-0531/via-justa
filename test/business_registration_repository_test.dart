@@ -15,6 +15,11 @@ void main() {
   var published = false;
   String? error;
   bool failUpdateRpc = false;
+  bool dropUpdateResponse = false;
+  bool commitUpdateBeforeDrop = true;
+  bool failReconcile = false;
+  Map<String, String> editAttemptStatuses = <String, String>{};
+  List<String> referencedPhotosInDb = const ['owner/existing-id/old_photo.png'];
   List<String> removedPathsOnEdit = const ['owner/existing-id/old_photo.png'];
 
   setUp(() async {
@@ -22,6 +27,11 @@ void main() {
     published = false;
     error = null;
     failUpdateRpc = false;
+    dropUpdateResponse = false;
+    commitUpdateBeforeDrop = true;
+    failReconcile = false;
+    editAttemptStatuses = <String, String>{};
+    referencedPhotosInDb = const ['owner/existing-id/old_photo.png'];
     removedPathsOnEdit = const ['owner/existing-id/old_photo.png'];
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) async {
@@ -43,7 +53,19 @@ void main() {
           }),
         );
       } else if (request.uri.path.endsWith('update_own_business')) {
-        if (failUpdateRpc) {
+        final payload = jsonDecode(body) as Map<String, dynamic>;
+        final editId = (payload['p_edit_request_id'] as String?) ?? '';
+        if (editId.isNotEmpty && editAttemptStatuses[editId] == 'aborted') {
+          request.response.statusCode = 400;
+          request.response.write(
+            jsonEncode({
+              'message': '[BUSINESS_EDIT_ABORTED]',
+              'code': '40001',
+              'details': null,
+              'hint': null,
+            }),
+          );
+        } else if (failUpdateRpc) {
           request.response.statusCode = 400;
           request.response.write(
             jsonEncode({
@@ -54,11 +76,70 @@ void main() {
             }),
           );
         } else {
+          final photos = (payload['p_photos'] as List?) ?? const [];
+          if (!dropUpdateResponse || commitUpdateBeforeDrop) {
+            if (editId.isNotEmpty) {
+              editAttemptStatuses[editId] = 'committed';
+            }
+            referencedPhotosInDb = [
+              for (final item in photos.whereType<Map>())
+                if (item['storage_path'] != null)
+                  item['storage_path'].toString(),
+            ];
+          }
+          if (dropUpdateResponse) {
+            final socket = await request.response.detachSocket(
+              writeHeaders: false,
+            );
+            socket.destroy();
+            return;
+          }
           request.response.write(
             jsonEncode({
               'id': 'existing-id',
               'status': 'approved',
+              'edit_status': 'committed',
               'removed_photo_paths': removedPathsOnEdit,
+            }),
+          );
+        }
+      } else if (request.uri.path.endsWith('reconcile_business_edit_attempt')) {
+        if (failReconcile) {
+          final socket = await request.response.detachSocket(
+            writeHeaders: false,
+          );
+          socket.destroy();
+          return;
+        }
+        final payload = jsonDecode(body) as Map<String, dynamic>;
+        final editId = (payload['p_edit_request_id'] as String?) ?? '';
+        final candidates = [
+          for (final item in (payload['p_candidate_photo_paths'] as List?) ?? const [])
+            if (item != null) item.toString(),
+        ];
+        if (editAttemptStatuses[editId] == 'committed') {
+          request.response.write(
+            jsonEncode({
+              'business_id': 'existing-id',
+              'edit_request_id': editId,
+              'edit_status': 'committed',
+              'removed_photo_paths': removedPathsOnEdit,
+              'deletable_photo_paths': const <String>[],
+            }),
+          );
+        } else {
+          editAttemptStatuses[editId] = 'aborted';
+          final deletable = [
+            for (final c in candidates)
+              if (!referencedPhotosInDb.contains(c)) c,
+          ];
+          request.response.write(
+            jsonEncode({
+              'business_id': 'existing-id',
+              'edit_request_id': editId,
+              'edit_status': 'aborted',
+              'removed_photo_paths': const <String>[],
+              'deletable_photo_paths': deletable,
             }),
           );
         }
@@ -198,32 +279,36 @@ void main() {
         businessId: 'existing-id',
       );
       expect(result, 'existing-id');
-      expect(requests.map((r) => '${r.method} ${r.path}'), [
-        'POST /storage/v1/object/business-media/owner/existing-id/edit_samerequest_1.png',
+      expect(requests.map((r) => '${r.method} ${r.path}').toList(), [
+        predicate<String>(
+          (s) => s.startsWith(
+            'POST /storage/v1/object/business-media/owner/existing-id/edit_samerequest_',
+          ),
+        ),
         'POST /rest/v1/rpc/update_own_business',
         'DELETE /storage/v1/object/business-media',
       ]);
 
       final rpcPayload = jsonDecode(requests[1].body) as Map<String, dynamic>;
-      expect(rpcPayload['p_photos'], [
-        {
-          'storage_path': 'owner/existing-id/kept_0.png',
-          'position': 0,
-          'is_cover': true,
-        },
-        {
-          'storage_path': 'owner/existing-id/edit_samerequest_1.png',
-          'position': 1,
-          'is_cover': false,
-        },
-      ]);
+      final rpcPhotos = (rpcPayload['p_photos'] as List).cast<Map>();
+      expect(rpcPhotos[0], {
+        'storage_path': 'owner/existing-id/kept_0.png',
+        'position': 0,
+        'is_cover': true,
+      });
+      expect(
+        rpcPhotos[1]['storage_path'],
+        startsWith('owner/existing-id/edit_samerequest_'),
+      );
+      expect(rpcPhotos[1]['position'], 1);
+      expect(rpcPhotos[1]['is_cover'], false);
       final cleanupPayload =
           jsonDecode(requests[2].body) as Map<String, dynamic>;
       expect(cleanupPayload['prefixes'], ['owner/existing-id/old_photo.png']);
     },
   );
   test(
-    'si la RPC transaccional de edición falla, limpia únicamente las fotos nuevas recién subidas',
+    'si la RPC transaccional de edición falla, reconcilia en servidor y limpia únicamente las fotos nuevas autorizadas tras abortar',
     () async {
       failUpdateRpc = true;
       await expectLater(
@@ -242,16 +327,137 @@ void main() {
         throwsA(isA<BusinessRegistrationFailure>()),
       );
 
-      expect(requests.map((r) => '${r.method} ${r.path}'), [
-        'POST /storage/v1/object/business-media/owner/existing-id/edit_samerequest_0.png',
+      expect(requests.map((r) => '${r.method} ${r.path}').toList(), [
+        predicate<String>(
+          (s) => s.startsWith(
+            'POST /storage/v1/object/business-media/owner/existing-id/edit_samerequest_',
+          ),
+        ),
+        'POST /rest/v1/rpc/update_own_business',
+        'POST /rest/v1/rpc/reconcile_business_edit_attempt',
+        'DELETE /storage/v1/object/business-media',
+      ]);
+      final uploadedPath = requests.first.path.replaceFirst(
+        '/storage/v1/object/business-media/',
+        '',
+      );
+      final rollbackCleanup =
+          jsonDecode(requests[3].body) as Map<String, dynamic>;
+      expect(rollbackCleanup['prefixes'], [uploadedPath]);
+    },
+  );
+  test(
+    'guardado exitoso con respuesta perdida reconcilia committed en servidor, conserva fotos nuevas y limpia desplazadas',
+    () async {
+      dropUpdateResponse = true;
+      commitUpdateBeforeDrop = true;
+      final result = await publish(
+        draft.copyWith(
+          photos: [
+            BusinessPhoto(
+              bytes: Uint8List.fromList('new-img'.codeUnits),
+              extension: 'png',
+              mimeType: 'image/png',
+            ),
+          ],
+        ),
+        businessId: 'existing-id',
+      );
+
+      expect(result, 'existing-id');
+      expect(requests.map((r) => '${r.method} ${r.path}').toList(), [
+        predicate<String>(
+          (s) => s.startsWith(
+            'POST /storage/v1/object/business-media/owner/existing-id/edit_samerequest_',
+          ),
+        ),
+        'POST /rest/v1/rpc/update_own_business',
+        'POST /rest/v1/rpc/reconcile_business_edit_attempt',
+        'DELETE /storage/v1/object/business-media',
+      ]);
+      final cleanupPayload =
+          jsonDecode(requests[3].body) as Map<String, dynamic>;
+      expect(cleanupPayload['prefixes'], ['owner/existing-id/old_photo.png']);
+    },
+  );
+  test(
+    'si la reconciliación tras corte es incierta, conserva fotos y al reintentar reconcilia committed sin duplicar',
+    () async {
+      dropUpdateResponse = true;
+      commitUpdateBeforeDrop = true;
+      failReconcile = true;
+      final editedDraft = draft.copyWith(
+        photos: [
+          BusinessPhoto(
+            bytes: Uint8List.fromList('new-img'.codeUnits),
+            extension: 'png',
+            mimeType: 'image/png',
+          ),
+        ],
+      );
+      await expectLater(
+        publish(editedDraft, businessId: 'existing-id'),
+        throwsA(anything),
+      );
+      expect(requests.where((r) => r.method == 'DELETE'), isEmpty);
+
+      requests.clear();
+      failReconcile = false;
+      final retryResult = await publish(editedDraft, businessId: 'existing-id');
+      expect(retryResult, 'existing-id');
+      expect(requests.map((r) => '${r.method} ${r.path}').toList(), [
+        'POST /rest/v1/rpc/reconcile_business_edit_attempt',
+        'DELETE /storage/v1/object/business-media',
+      ]);
+      final cleanupPayload =
+          jsonDecode(requests[1].body) as Map<String, dynamic>;
+      expect(cleanupPayload['prefixes'], ['owner/existing-id/old_photo.png']);
+    },
+  );
+  test(
+    'si la reconciliación tras corte es incierta y el intento previo no confirmó, el reintento aborta y limpia el huérfano antes de subir de nuevo',
+    () async {
+      dropUpdateResponse = true;
+      commitUpdateBeforeDrop = false;
+      failReconcile = true;
+      final editedDraft = draft.copyWith(
+        photos: [
+          BusinessPhoto(
+            bytes: Uint8List.fromList('new-img'.codeUnits),
+            extension: 'png',
+            mimeType: 'image/png',
+          ),
+        ],
+      );
+      await expectLater(
+        publish(editedDraft, businessId: 'existing-id'),
+        throwsA(anything),
+      );
+      final orphanPath = requests.first.path.replaceFirst(
+        '/storage/v1/object/business-media/',
+        '',
+      );
+      expect(requests.where((r) => r.method == 'DELETE'), isEmpty);
+
+      requests.clear();
+      dropUpdateResponse = false;
+      failReconcile = false;
+      final retryResult = await publish(editedDraft, businessId: 'existing-id');
+      expect(retryResult, 'existing-id');
+      expect(requests.map((r) => '${r.method} ${r.path}').toList(), [
+        'POST /rest/v1/rpc/reconcile_business_edit_attempt',
+        'DELETE /storage/v1/object/business-media',
+        predicate<String>(
+          (s) => s.startsWith(
+            'POST /storage/v1/object/business-media/owner/existing-id/edit_samerequest_',
+          ),
+        ),
         'POST /rest/v1/rpc/update_own_business',
         'DELETE /storage/v1/object/business-media',
       ]);
-      final rollbackCleanup =
-          jsonDecode(requests[2].body) as Map<String, dynamic>;
-      expect(rollbackCleanup['prefixes'], [
-        'owner/existing-id/edit_samerequest_0.png',
-      ]);
+      final orphanCleanup =
+          jsonDecode(requests[1].body) as Map<String, dynamic>;
+      expect(orphanCleanup['prefixes'], [orphanPath]);
     },
   );
   test('retirar negocio limpia archivos de Storage y elimina fila', () async {
