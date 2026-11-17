@@ -193,6 +193,90 @@ select is(
   'La edición transaccional enlaza la nueva foto en business_photos'
 );
 
+-- 4. Reconciliación tras corte de red: un edit_request_id confirmado devuelve committed y sin fotos borrables
+select is(
+  (
+    select (
+      public.update_own_business(
+        p_business_id := (select business_id from tx_edit_state),
+        p_name := 'Cocina Idempotente',
+        p_description_es := 'Cocina tradicional con seguimiento idempotente por solicitud.',
+        p_description_en := 'Traditional kitchen with idempotent edit tracking.',
+        p_latitude := 10.4750,
+        p_longitude := -73.2440,
+        p_address := 'Calle 16 #9-10',
+        p_phone := '6055799999',
+        p_dishes := '[{"name":"Chivo asado","price_cop":28000}]'::jsonb,
+        p_photos := jsonb_build_array(
+          jsonb_build_object(
+            'storage_path', format('aaaa1111-1111-4111-8111-111111111111/%s/edit_new_0.png', (select business_id from tx_edit_state)),
+            'position', 0,
+            'is_cover', true
+          )
+        ),
+        p_edit_request_id := '40000000-0000-4000-8000-000000000001'::uuid
+      )->>'edit_status'
+    )
+  ),
+  'committed',
+  'update_own_business registra edit_request_id como committed'
+);
+
+select is(
+  (
+    select public.reconcile_business_edit_attempt(
+      (select business_id from tx_edit_state),
+      '40000000-0000-4000-8000-000000000001'::uuid,
+      array[format('aaaa1111-1111-4111-8111-111111111111/%s/edit_new_0.png', (select business_id from tx_edit_state))]
+    )->>'edit_status'
+  ),
+  'committed',
+  'reconcile_business_edit_attempt confirma que una edición ya guardada quedó committed'
+);
+
+select is(
+  (
+    select jsonb_array_length(
+      public.reconcile_business_edit_attempt(
+        (select business_id from tx_edit_state),
+        '40000000-0000-4000-8000-000000000001'::uuid,
+        array[format('aaaa1111-1111-4111-8111-111111111111/%s/edit_new_0.png', (select business_id from tx_edit_state))]
+      )->'deletable_photo_paths'
+    )
+  ),
+  0,
+  'Cuando la edición quedó committed no autoriza borrar las fotos nuevas'
+);
+
+-- 5. Si reconcile marca un intento no confirmado como aborted, una RPC tardía con ese mismo ID es rechazada
+select is(
+  (
+    select public.reconcile_business_edit_attempt(
+      (select business_id from tx_edit_state),
+      '40000000-0000-4000-8000-000000000002'::uuid,
+      array[format('aaaa1111-1111-4111-8111-111111111111/%s/orphan_retry.png', (select business_id from tx_edit_state))]
+    )->>'edit_status'
+  ),
+  'aborted',
+  'reconcile_business_edit_attempt marca aborted un intento que nunca confirmó'
+);
+
+select throws_ok(
+  $$select public.update_own_business(
+      p_business_id := (select business_id from tx_edit_state),
+      p_name := 'Escritura tardía bloqueada',
+      p_description_es := 'Intento tardío que no debe mutar datos ni referenciar fotos borradas.',
+      p_description_en := 'Late request that must be rejected after abort.',
+      p_latitude := 10.4750,
+      p_longitude := -73.2440,
+      p_address := 'Calle 16 #9-10',
+      p_edit_request_id := '40000000-0000-4000-8000-000000000002'::uuid
+    )$$,
+  '40001',
+  null,
+  'Una RPC tardía para un edit_request_id ya abortado no puede ejecutarse después de limpiar fotos'
+);
+
 reset role;
 select * from finish();
 rollback;
