@@ -11,6 +11,7 @@ import 'package:via_justa/core/security/external_uri_guard.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
+import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_search_field.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
@@ -611,11 +612,20 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
               error: (err, stack) => SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.xl),
-                  child: Center(
-                    child: Text(
-                      'municipality.load_error'.tr(),
-                      style: textTheme.bodyLarge,
-                    ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'municipality.load_error'.tr(),
+                        style: textTheme.bodyLarge,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      VjButton(
+                        label: 'common.retry'.tr(),
+                        onPressed: () =>
+                            ref.invalidate(allPriceMapItemsProvider),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -626,7 +636,10 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
                       padding: const EdgeInsets.all(AppSpacing.xl),
                       child: Center(
                         child: Text(
-                          'price_map.no_results'.tr(),
+                          (selectedCategory == PriceMapCategory.prices
+                                  ? 'price_map.no_results'
+                                  : 'businesses.no_results')
+                              .tr(),
                           style: textTheme.bodyLarge,
                           textAlign: TextAlign.center,
                         ),

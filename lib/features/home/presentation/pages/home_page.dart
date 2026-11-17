@@ -434,11 +434,7 @@ class _ResidentHomeView extends StatelessWidget {
           VjButton(
             label: 'businesses.register_action'.tr(),
             trailingIcon: Icons.storefront,
-            onPressed: () => onShowDialog(
-              context,
-              title: 'businesses.register_dialog_title'.tr(),
-              body: 'businesses.register_dialog_body'.tr(),
-            ),
+            onPressed: () => context.push(AppRoutes.businessRegister),
           ),
         ],
       ),

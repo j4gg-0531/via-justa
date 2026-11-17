@@ -290,6 +290,50 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY; -- Sin políticas para
 ---
 
 ### 2.10 `businesses` y Flujo de Registro, Moderación y Catálogo (`VJ-16` / `VJ-17`)
+
+#### Cambio acordado el 15 de noviembre de 2026 — publicación directa
+
+La migración `20261115120000_business_direct_publication.sql` elimina la aprobación
+previa del flujo ciudadano. Las descripciones de moderación de esta sección
+documentan el contrato anterior y las operaciones administrativas existentes.
+
+- El envío del formulario prepara el negocio mediante `submit_business` y conserva
+  su `client_request_id` en cada reintento. Su estado interno `pending` representa
+  una preparación privada mientras se suben y vinculan las fotos seleccionadas.
+- El mismo envío termina llamando a `publish_business(p_business_id uuid,
+  p_expected_photo_count integer)`. Solo el dueño autenticado puede ejecutarla
+  sobre su registro real. La cantidad esperada debe estar entre cero y cinco y
+  coincidir con las fotos vinculadas que existen en Storage.
+- La publicación asigna `approved` por compatibilidad con las consultas actuales
+  del catálogo, la ficha, el mapa y Storage. Este valor significa **publicado** en
+  la app. La publicación directa conserva `reviewed_at` y `reviewed_by` en `null`.
+- La RPC bloquea la fila durante la publicación y devuelve la misma fila si el
+  envío ya se completó. Un fallo de fotos mantiene el registro privado para que
+  el formulario pueda reintentar. Cero fotos es una opción válida del formulario.
+- Editar un negocio publicado, sus fotos o sus platos conserva su publicación.
+  Se mantienen las validaciones, los consentimientos y los permisos del dueño.
+- Los registros históricos mantienen su estado. Un registro retirado (`rejected`)
+  requiere corregir sus datos antes de volver a publicarlo. Las funciones
+  administrativas existentes siguen disponibles para compatibilidad.
+- La app confirmará la publicación únicamente tras completar esta RPC e
+  invalidará las consultas del directorio y del mapa. La integración Flutter
+  corresponde a los siguientes cambios de VJ-16.
+
+Validación local de este cambio con Supabase CLI 2.101.0 y PostgreSQL 17.6:
+`business_direct_publication.sql`, `business_registration.sql`,
+`business_catalog_rpc.sql` y `map_items_rpc.sql` pasan 78 aserciones, incluidas
+23 de publicación directa. La suite completa mantiene fallos previos en
+`rls.sql` (conteos dependientes de semillas y eliminación de cuenta) y
+`security_cross_audit.sql` (permiso de `immutable_unaccent` y municipio ausente).
+Se reprodujeron los mismos fallos restaurando las funciones anteriores de negocios.
+
+El contenedor local sufrió un cierre de PostgreSQL al comprobar permisos
+denegados, consistente con el fallo de `supautils` documentado en
+https://github.com/supabase/postgres/issues/2112. Para ejecutar las pruebas se
+configuró temporalmente `session_preload_libraries = 'plpgsql'` en la base local,
+conservando RLS y los permisos SQL. Este ajuste del entorno queda fuera de la
+migración y se restaura al terminar la validación.
+
 - **Finalidad:** Directorio, registro ciudadano en 4 pasos, moderación administrativa y catálogo/detalle paginado de negocios y comercios locales.
 - **Estructura (actualizada con `20261031100000` y `20261031110000`):**
   | Columna | Tipo | Restricciones | Descripción |
