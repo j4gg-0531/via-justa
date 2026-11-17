@@ -8,6 +8,7 @@ import 'package:via_justa/features/auth/presentation/pages/register_page.dart';
 import 'package:via_justa/features/auth/presentation/pages/welcome_page.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_state.dart';
+import 'package:via_justa/features/businesses/presentation/pages/business_detail_page.dart';
 import 'package:via_justa/features/businesses/presentation/pages/businesses_page.dart';
 import 'package:via_justa/features/businesses/presentation/pages/register_business_page.dart';
 import 'package:via_justa/features/home/presentation/pages/home_page.dart';
@@ -53,9 +54,11 @@ class AppRoutes {
   static const scan = '/scan';
   static const businesses = '/businesses';
   static const businessRegister = '/businesses/register';
+  static const businessDetail = '/businesses/detail/:id';
   static const profile = '/profile';
 
   static String businessEditPath(String id) => '$businessRegister?id=$id';
+  static String businessDetailPath(String id) => '/businesses/detail/$id';
 
   static String departmentPath(String code) => '/department/$code';
   static String municipalityPath(String code) => '/municipality/$code';
@@ -156,6 +159,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.businessRegister,
         builder: (context, state) => RegisterBusinessPage(
           businessId: state.uri.queryParameters['id'],
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.businessDetail,
+        builder: (context, state) => BusinessDetailPage(
+          businessId: state.pathParameters['id']!,
         ),
       ),
 

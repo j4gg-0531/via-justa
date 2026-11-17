@@ -317,6 +317,7 @@
     "demo_banner": "Directorio de muestra local para el piloto de Valledupar.",
     "demo_badge": "Dato DEMO",
     "verified_badge": "Verificado",
+    "published_badge": "Publicado",
     "action_call": "Llamar",
     "action_details": "Ver detalle",
     "register_title": "¿Tienes un negocio en Valledupar?",
@@ -329,7 +330,23 @@
     "action_edit": "Editar",
     "action_withdraw": "Retirar",
     "withdraw_error": "No se pudo retirar el negocio. Comprueba tu conexión e inténtalo de nuevo.",
+    "load_more": "Cargar más negocios",
     "no_results": "Aún no hay negocios en esta zona"
+  },
+  "business_detail": {
+    "photo_placeholder": "Foto del negocio",
+    "no_ratings": "Sin valoraciones",
+    "rating_summary": "{} · {} valoraciones",
+    "action_order": "Ver menú y pedir",
+    "action_whatsapp": "WhatsApp",
+    "action_directions": "Cómo llegar",
+    "section_info": "Información",
+    "section_dishes": "Platos o servicios destacados",
+    "section_hours": "Horario",
+    "hours_not_specified": "Horario no especificado",
+    "section_location": "Ubicación",
+    "section_ratings": "Valoraciones",
+    "action_launch_error": "No se pudo abrir el enlace externo."
   },
   "profile": {
     "edit_name_title": "Editar nombre",

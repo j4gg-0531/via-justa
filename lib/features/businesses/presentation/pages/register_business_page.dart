@@ -31,7 +31,7 @@ class _RegisterBusinessPageState extends ConsumerState<RegisterBusinessPage> {
     if (id != null && id.isNotEmpty && !_didRequestEditLoad) {
       _didRequestEditLoad = true;
       final languageCode =
-          Localizations.maybeLocaleOf(context)?.languageCode ?? 'es';
+          EasyLocalization.of(context)?.locale.languageCode ?? 'es';
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           ref

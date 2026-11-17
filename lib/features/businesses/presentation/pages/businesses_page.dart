@@ -10,30 +10,39 @@ import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/core/widgets/vj_search_field.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
+import 'package:via_justa/features/businesses/presentation/pages/business_detail_page.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 
 /// Pantalla 21 (M21) · Directorio de comercios publicados en Valledupar con buscador y categorías.
 class BusinessesPage extends ConsumerWidget {
   const BusinessesPage({super.key});
 
-  void _showInfoDialog(
-    BuildContext context, {
-    required String title,
-    required String body,
-  }) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text('common.close'.tr()),
-          ),
-        ],
-      ),
-    );
+  void _openBusinessDetail(BuildContext context, String businessId) {
+    if (GoRouter.maybeOf(context) != null) {
+      context.push(AppRoutes.businessDetailPath(businessId));
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => BusinessDetailPage(businessId: businessId),
+        ),
+      );
+    }
+  }
+
+  Future<void> _contactBusiness(
+    BuildContext context,
+    WidgetRef ref,
+    Business business,
+    String localeCode,
+  ) async {
+    final ok = await ref
+        .read(businessExternalActionProvider.notifier)
+        .openCardContact(business, localeCode: localeCode);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('business_detail.action_launch_error'.tr())),
+      );
+    }
   }
 
   Future<void> _confirmWithdraw(
@@ -75,9 +84,11 @@ class BusinessesPage extends ConsumerWidget {
     final selectedCategory = ref.watch(businessCategoryProvider);
     final currentOwnerId = ref.watch(currentBusinessOwnerIdProvider);
     final ownerBusy = ref.watch(businessOwnerActionProvider);
+    final canLoadMore = ref.watch(canLoadMoreBusinessesProvider);
+    final isLoadingMore = ref.watch(isLoadingMoreBusinessesProvider);
     final textTheme = Theme.of(context).textTheme;
     final localeCode =
-        Localizations.maybeLocaleOf(context)?.languageCode ?? 'es';
+        EasyLocalization.of(context)?.locale.languageCode ?? 'es';
 
     return Scaffold(
       body: SafeArea(
@@ -195,7 +206,8 @@ class BusinessesPage extends ConsumerWidget {
                       const SizedBox(height: AppSpacing.md),
                       VjButton(
                         label: 'common.retry'.tr(),
-                        onPressed: () => ref.invalidate(allBusinessesProvider),
+                        onPressed: () =>
+                            ref.invalidate(businessCatalogProvider),
                       ),
                     ],
                   ),
@@ -238,16 +250,13 @@ class BusinessesPage extends ConsumerWidget {
                             description: description,
                             isOwner: isOwner,
                             ownerBusy: ownerBusy,
-                            onTap: () => _showInfoDialog(
+                            onTap: () =>
+                                _openBusinessDetail(context, business.id),
+                            onContactTap: () => _contactBusiness(
                               context,
-                              title: business.name,
-                              body:
-                                  '$description\n\n${business.address}\nTel: ${business.phone}',
-                            ),
-                            onContactTap: () => _showInfoDialog(
-                              context,
-                              title: 'businesses.contact_dialog_title'.tr(),
-                              body: 'businesses.contact_dialog_body'.tr(),
+                              ref,
+                              business,
+                              localeCode,
                             ),
                             onEditTap: isOwner
                                 ? () => context.push(
@@ -266,6 +275,25 @@ class BusinessesPage extends ConsumerWidget {
                 );
               },
             ),
+
+            // Botón de paginación ("Cargar más negocios")
+            if (canLoadMore)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xl,
+                  ),
+                  child: VjButton(
+                    label: 'businesses.load_more'.tr(),
+                    variant: VjButtonVariant.outlined,
+                    onPressed: isLoadingMore
+                        ? null
+                        : () => ref
+                              .read(businessCatalogProvider.notifier)
+                              .loadMore(),
+                  ),
+                ),
+              ),
 
             // Registro de negocio (para dueños locales)
             SliverToBoxAdapter(
@@ -399,7 +427,7 @@ class _BusinessCard extends StatelessWidget {
                 ),
               ),
               VjBadge(
-                label: 'businesses.verified_badge'.tr(),
+                label: 'businesses.published_badge'.tr(),
               ),
             ],
           ),

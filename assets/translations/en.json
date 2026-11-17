@@ -317,6 +317,7 @@
     "demo_banner": "Sample local directory for the Valledupar pilot.",
     "demo_badge": "DEMO Data",
     "verified_badge": "Verified",
+    "published_badge": "Published",
     "action_call": "Call",
     "action_details": "View details",
     "register_title": "Do you own a business in Valledupar?",
@@ -329,7 +330,23 @@
     "action_edit": "Edit",
     "action_withdraw": "Withdraw",
     "withdraw_error": "Could not withdraw the business. Check your connection and try again.",
+    "load_more": "Load more businesses",
     "no_results": "There are no businesses in this zone yet"
+  },
+  "business_detail": {
+    "photo_placeholder": "Business photo",
+    "no_ratings": "No ratings yet",
+    "rating_summary": "{} · {} ratings",
+    "action_order": "View menu and order",
+    "action_whatsapp": "WhatsApp",
+    "action_directions": "Get directions",
+    "section_info": "Information",
+    "section_dishes": "Featured dishes or services",
+    "section_hours": "Hours",
+    "hours_not_specified": "Hours not specified",
+    "section_location": "Location",
+    "section_ratings": "Ratings",
+    "action_launch_error": "Could not open the external link."
   },
   "profile": {
     "edit_name_title": "Edit name",

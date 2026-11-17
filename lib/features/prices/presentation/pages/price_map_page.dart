@@ -13,6 +13,7 @@ import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_search_field.dart';
+import 'package:via_justa/features/businesses/presentation/pages/business_detail_page.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
 import 'package:via_justa/features/prices/presentation/state/price_map_providers.dart';
@@ -32,6 +33,18 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
   void dispose() {
     _mapController?.dispose();
     super.dispose();
+  }
+
+  void _openBusinessDetail(BuildContext context, String businessId) {
+    if (GoRouter.maybeOf(context) != null) {
+      context.push(AppRoutes.businessDetailPath(businessId));
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => BusinessDetailPage(businessId: businessId),
+        ),
+      );
+    }
   }
 
   void _showInfoDialog(
@@ -87,7 +100,9 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
           infoWindow: InfoWindow(
             title: title,
             snippet: item.description,
-            onTap: () => _openDirectionsToItem(context, item),
+            onTap: () => item.sourceType == 'business'
+                ? _openBusinessDetail(context, item.id)
+                : _openDirectionsToItem(context, item),
           ),
         ),
       );
@@ -325,12 +340,14 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
                           ),
                           child: _MapPinWidget(
                             item: item,
-                            onTap: () => _showInfoDialog(
-                              context,
-                              title: item.name,
-                              body:
-                                  '${item.description}\n\n${'price_map.demo_pin_dialog'.tr()}',
-                            ),
+                            onTap: () => item.sourceType == 'business'
+                                ? _openBusinessDetail(context, item.id)
+                                : _showInfoDialog(
+                                    context,
+                                    title: item.name,
+                                    body:
+                                        '${item.description}\n\n${'price_map.demo_pin_dialog'.tr()}',
+                                  ),
                           ),
                         ),
 
@@ -663,7 +680,9 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
                           padding: const EdgeInsets.only(bottom: AppSpacing.md),
                           child: _PriceMapItemCard(
                             item: item,
-                            onCardTap: () => _focusItemOnMap(item),
+                            onCardTap: () => item.sourceType == 'business'
+                                ? _openBusinessDetail(context, item.id)
+                                : _focusItemOnMap(item),
                             onRouteTap: () =>
                                 _openDirectionsToItem(context, item),
                             onCallTap: () => _callItem(context, item),
@@ -1182,7 +1201,7 @@ class _SemaphoreStatusBadge extends StatelessWidget {
         return VjBadge(
           label: isDemo
               ? 'businesses.demo_badge'.tr()
-              : 'businesses.verified_badge'.tr(),
+              : 'businesses.published_badge'.tr(),
         );
     }
   }
