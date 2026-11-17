@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:via_justa/features/prices/data/supabase_price_map_repository.dart';
 import 'package:via_justa/features/prices/data/supabase_price_verdict_repository.dart';
@@ -10,6 +11,7 @@ import 'package:via_justa/features/prices/domain/device_location.dart';
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
 import 'package:via_justa/features/prices/domain/price_map_repository.dart';
 import 'package:via_justa/features/prices/presentation/state/price_map_providers.dart';
+import 'package:via_justa/features/prices/presentation/widgets/map_pin_visuals.dart';
 
 class _FakePriceMapRepository implements PriceMapRepository {
   const _FakePriceMapRepository();
@@ -116,6 +118,55 @@ void main() {
     expect(container.read(priceMapListOpenProvider), isTrue);
     container.read(priceMapListOpenProvider.notifier).close();
     expect(container.read(priceMapListOpenProvider), isFalse);
+  });
+
+  test('mapMarkerDescriptorsProvider omite render cuando useNativeGoogleMapProvider es false y genera caché en modo nativo', () async {
+    final disabledContainer = ProviderContainer(
+      overrides: [
+        priceMapRepositoryProvider.overrideWithValue(
+          const _FakePriceMapRepository(),
+        ),
+        useNativeGoogleMapProvider.overrideWithValue(false),
+      ],
+    );
+    addTearDown(disabledContainer.dispose);
+    await disabledContainer.read(allPriceMapItemsProvider.future);
+    final emptyResult =
+        await disabledContainer.read(mapMarkerDescriptorsProvider.future);
+    expect(emptyResult, isEmpty);
+
+    var builds = 0;
+    final nativeContainer = ProviderContainer(
+      overrides: [
+        priceMapRepositoryProvider.overrideWithValue(
+          const _FakePriceMapRepository(),
+        ),
+        useNativeGoogleMapProvider.overrideWithValue(true),
+        mapMarkerIconCacheProvider.overrideWithValue(
+          MapMarkerIconCache(
+            descriptorBuilder: (key) async {
+              builds++;
+              return BitmapDescriptor.defaultMarkerWithHue(
+                key.selected ? BitmapDescriptor.hueRed : BitmapDescriptor.hueBlue,
+              );
+            },
+          ),
+        ),
+      ],
+    );
+    addTearDown(nativeContainer.dispose);
+    await nativeContainer.read(allPriceMapItemsProvider.future);
+
+    final initialIcons =
+        await nativeContainer.read(mapMarkerDescriptorsProvider.future);
+    expect(initialIcons.length, 2);
+    expect(builds, 2);
+
+    nativeContainer.read(selectedMapItemIdProvider.notifier).select('fake_1');
+    final selectedIcons =
+        await nativeContainer.read(mapMarkerDescriptorsProvider.future);
+    expect(selectedIcons.length, 2);
+    expect(builds, 3);
   });
 
   test('SupabasePriceMapRepository.parseRows maps price_report and business RPC rows with WGS84 coordinates', () {

@@ -17,6 +17,7 @@ import 'package:via_justa/features/businesses/presentation/pages/business_detail
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
 import 'package:via_justa/features/prices/presentation/state/price_map_providers.dart';
+import 'package:via_justa/features/prices/presentation/widgets/map_pin_visuals.dart';
 
 /// Pantalla 13 (M08 / VJ-12) · Mapa interactivo de Google Maps con precios, comercios y servicios del municipio seleccionado.
 class PriceMapPage extends ConsumerStatefulWidget {
@@ -89,18 +90,31 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
 
   Set<Marker> _buildGoogleMarkers(
     BuildContext context,
-    List<PriceMapItem> items,
-  ) {
+    List<PriceMapItem> items, {
+    required Map<MapPinStyleKey, BitmapDescriptor> customIcons,
+    required String? selectedItemId,
+  }) {
     final markers = <Marker>{};
     for (final item in items) {
       final title = item.pinLabel.isNotEmpty
           ? '${item.pinLabel} · ${item.name}'
           : item.name;
+      final styleKey = MapPinStyleKey.fromItem(
+        item,
+        selected: item.id == selectedItemId,
+      );
+      final customIcon = customIcons[styleKey];
       markers.add(
         Marker(
           markerId: MarkerId(item.id),
           position: LatLng(item.latitude, item.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(_markerHueForItem(item)),
+          icon:
+              customIcon ??
+              BitmapDescriptor.defaultMarkerWithHue(_markerHueForItem(item)),
+          anchor: customIcon != null
+              ? const Offset(0.5, 0.92)
+              : const Offset(0.5, 1.0),
+          zIndexInt: item.id == selectedItemId ? 2 : 1,
           onTap: () {
             ref.read(selectedMapItemIdProvider.notifier).select(item.id);
             _closeList();
@@ -252,6 +266,9 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
     final sectionTitleKey = ref.watch(priceMapSectionTitleKeyProvider);
     final cityName = ref.watch(activeCityNameProvider);
     final useNativeGoogleMap = ref.watch(useNativeGoogleMapProvider);
+    final customIcons =
+        ref.watch(mapMarkerDescriptorsProvider).asData?.value ??
+        const <MapPinStyleKey, BitmapDescriptor>{};
     final isDemoMode = ref.watch(isDemoMapModeProvider);
     final userLocation = ref.watch(userMapLocationProvider);
 
@@ -299,7 +316,12 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
                         buildingsEnabled: true,
                         indoorViewEnabled: true,
                         markers: itemsAsync.hasValue
-                            ? _buildGoogleMarkers(context, itemsAsync.value!)
+                            ? _buildGoogleMarkers(
+                                context,
+                                itemsAsync.value!,
+                                customIcons: customIcons,
+                                selectedItemId: selectedItemId,
+                              )
                             : const <Marker>{},
                         gestureRecognizers:
                             <Factory<OneSequenceGestureRecognizer>>{
@@ -842,36 +864,6 @@ class _MapPinWidget extends StatelessWidget {
   final PriceMapItem item;
   final VoidCallback onTap;
 
-  IconData _iconForKind(PriceMapPinKind kind) {
-    switch (kind) {
-      case PriceMapPinKind.food:
-        return Icons.restaurant;
-      case PriceMapPinKind.transport:
-        return Icons.directions_car;
-      case PriceMapPinKind.lodging:
-        return Icons.hotel;
-      case PriceMapPinKind.hospital:
-        return Icons.local_hospital;
-      case PriceMapPinKind.assistance:
-        return Icons.medical_services_outlined;
-      case PriceMapPinKind.consulate:
-        return Icons.account_balance;
-    }
-  }
-
-  Color _backgroundColorForStatus(PricePinStatus status) {
-    switch (status) {
-      case PricePinStatus.fair:
-        return AppColors.semaphoreGreen;
-      case PricePinStatus.moderate:
-        return AppColors.semaphoreAmber;
-      case PricePinStatus.alert:
-        return AppColors.semaphoreRed;
-      case PricePinStatus.info:
-        return AppColors.surface;
-    }
-  }
-
   String _semanticStatusLabel(PricePinStatus status) {
     switch (status) {
       case PricePinStatus.fair:
@@ -887,9 +879,7 @@ class _MapPinWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isServicePin = item.status == PricePinStatus.info;
-    final bgColor = _backgroundColorForStatus(item.status);
-    final fgColor = isServicePin ? AppColors.primary : Colors.white;
+    final style = resolveMapPinStyle(MapPinStyleKey.fromItem(item));
 
     return Semantics(
       button: true,
@@ -906,13 +896,15 @@ class _MapPinWidget extends StatelessWidget {
               heightFactor: 1.0,
               child: Container(
                 padding: EdgeInsets.symmetric(
-                  horizontal: isServicePin ? AppSpacing.sm : AppSpacing.md,
+                  horizontal: item.pinLabel.isEmpty
+                      ? AppSpacing.sm
+                      : AppSpacing.md,
                   vertical: AppSpacing.xs,
                 ),
                 decoration: BoxDecoration(
-                  color: bgColor,
+                  color: style.fillColor,
                   borderRadius: BorderRadius.circular(AppRadius.lg),
-                  border: Border.all(color: Colors.white, width: 2),
+                  border: Border.all(color: style.borderColor, width: 2),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.18),
@@ -925,16 +917,16 @@ class _MapPinWidget extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      _iconForKind(item.pinKind),
+                      style.icon,
                       size: 16,
-                      color: fgColor,
+                      color: style.foregroundColor,
                     ),
                     if (item.pinLabel.isNotEmpty) ...[
                       const SizedBox(width: 4),
                       Text(
                         item.pinLabel,
                         style: TextStyle(
-                          color: fgColor,
+                          color: style.foregroundColor,
                           fontWeight: FontWeight.w800,
                           fontSize: 12,
                         ),
@@ -967,23 +959,6 @@ class _PriceMapItemCard extends StatelessWidget {
   final VoidCallback onRouteTap;
   final VoidCallback? onClose;
 
-  IconData _iconForKind(PriceMapPinKind kind) {
-    switch (kind) {
-      case PriceMapPinKind.food:
-        return Icons.restaurant;
-      case PriceMapPinKind.transport:
-        return Icons.local_taxi;
-      case PriceMapPinKind.lodging:
-        return Icons.hotel;
-      case PriceMapPinKind.hospital:
-        return Icons.local_hospital_outlined;
-      case PriceMapPinKind.assistance:
-        return Icons.volunteer_activism_outlined;
-      case PriceMapPinKind.consulate:
-        return Icons.account_balance_outlined;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -1015,7 +990,7 @@ class _PriceMapItemCard extends StatelessWidget {
                   border: Border.all(color: AppColors.border),
                 ),
                 child: Icon(
-                  _iconForKind(item.pinKind),
+                  mapPinIconForKind(item.pinKind),
                   color: AppColors.primary,
                   size: 24,
                 ),

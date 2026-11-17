@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:via_justa/core/supabase/supabase_providers.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
@@ -12,6 +13,7 @@ import 'package:via_justa/features/prices/domain/price_map_item.dart';
 import 'package:via_justa/features/prices/domain/price_map_repository.dart';
 import 'package:via_justa/features/prices/presentation/state/price_contribution_provider.dart';
 import 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart';
+import 'package:via_justa/features/prices/presentation/widgets/map_pin_visuals.dart';
 
 export 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart'
     show deviceLocationGatewayProvider;
@@ -299,6 +301,27 @@ final selectedMapPlaceItemProvider = Provider<PriceMapItem?>((ref) {
 final priceMapSectionTitleKeyProvider = Provider<String>((ref) {
   final category = ref.watch(priceMapCategoryProvider);
   return sectionTitleKeyForMapCategory(category);
+});
+
+/// Caché compartida en memoria para descriptores de marcadores personalizados de Google Maps.
+final mapMarkerIconCacheProvider = Provider<MapMarkerIconCache>((ref) {
+  return MapMarkerIconCache();
+});
+
+/// Descriptores PNG renderizados por ícono y semáforo para los marcadores visibles del mapa.
+final mapMarkerDescriptorsProvider =
+    FutureProvider<Map<MapPinStyleKey, BitmapDescriptor>>((ref) async {
+  final useNative = ref.watch(useNativeGoogleMapProvider);
+  if (!useNative) {
+    return const <MapPinStyleKey, BitmapDescriptor>{};
+  }
+  final items = ref.watch(filteredPriceMapItemsProvider).asData?.value;
+  if (items == null || items.isEmpty) {
+    return const <MapPinStyleKey, BitmapDescriptor>{};
+  }
+  final selectedId = ref.watch(selectedMapItemIdProvider);
+  final cache = ref.watch(mapMarkerIconCacheProvider);
+  return cache.resolveForItems(items, selectedItemId: selectedId);
 });
 
 
