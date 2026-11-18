@@ -111,6 +111,21 @@ MapPinStyleSpec resolveMapPinStyle(MapPinStyleKey key) {
   );
 }
 
+/// Especificación visual del pin temporal de destino seleccionado en el mapa.
+const MapPinStyleSpec kDestinationMapPinSpec = MapPinStyleSpec(
+  icon: Icons.flag,
+  fillColor: AppColors.textPrimary,
+  foregroundColor: AppColors.surface,
+  borderColor: AppColors.surface,
+  selected: true,
+);
+
+/// Dibuja el pin temporal de destino en alta resolución para [BitmapDescriptor.bytes].
+Future<Uint8List> renderDestinationMarkerPngBytes({
+  double pixelRatio = 3.0,
+}) =>
+    renderMapMarkerPngBytes(kDestinationMapPinSpec, pixelRatio: pixelRatio);
+
 /// Dibuja un pin tipo gota en alta resolución y devuelve los bytes PNG para [BitmapDescriptor.bytes].
 Future<Uint8List> renderMapMarkerPngBytes(
   MapPinStyleSpec spec, {

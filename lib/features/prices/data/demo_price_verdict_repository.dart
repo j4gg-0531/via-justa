@@ -3,6 +3,7 @@ import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_category.dart';
 import 'package:via_justa/features/prices/domain/price_verdict.dart';
 import 'package:via_justa/features/prices/domain/price_verdict_repository.dart';
+import 'package:via_justa/features/prices/domain/taxi_route_estimate.dart';
 
 /// Espejo educativo, no decide veredicto real.
 /// En producción la única fuente de verdad es la función SQL `calculate_price_verdict` en Supabase (`docs/contrato-datos-v1.md`).
@@ -348,8 +349,50 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
     required int submittedCop,
     bool includeEventContext = false,
   }) async {
+    var effectiveZoneId = zoneId.trim();
+    if (effectiveZoneId.isEmpty &&
+        originLatitude != null &&
+        originLongitude != null) {
+      effectiveZoneId =
+          resolveNearestZoneByCoordinates(
+            zones: demoZonesValledupar,
+            latitude: originLatitude,
+            longitude: originLongitude,
+          )?.id ??
+          'vup_centro';
+    }
+    if (effectiveZoneId.isEmpty) {
+      effectiveZoneId = 'vup_centro';
+    }
+
+    var effectiveDestZoneId = destinationZoneId;
+    double? distanceKm;
+    String? distanceRange;
+    if (categoryId == kTaxiCategoryId &&
+        destinationLatitude != null &&
+        destinationLongitude != null) {
+      effectiveDestZoneId ??= resolveNearestZoneByCoordinates(
+        zones: demoZonesValledupar,
+        latitude: destinationLatitude,
+        longitude: destinationLongitude,
+      )?.id;
+
+      final origLat =
+          originLatitude ?? demoZonesValledupar[1].centerLat;
+      final origLng =
+          originLongitude ?? demoZonesValledupar[1].centerLng;
+      final rawDistance = calculateAirDistanceKm(
+        originLatitude: origLat,
+        originLongitude: origLng,
+        destinationLatitude: destinationLatitude,
+        destinationLongitude: destinationLongitude,
+      );
+      distanceKm = double.parse(rawDistance.toStringAsFixed(2));
+      distanceRange = classifyTaxiDistanceRange(distanceKm);
+    }
+
     final zoneMap =
-        _zoneCategoryBenchmarks[zoneId] ??
+        _zoneCategoryBenchmarks[effectiveZoneId] ??
         _zoneCategoryBenchmarks['vup_centro']!;
     final benchmark =
         zoneMap[categoryId] ??
@@ -365,8 +408,10 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
     return demoVerdictMirror(
       categoryId: categoryId,
       municipalityCode: municipalityCode,
-      zoneId: zoneId,
-      destinationZoneId: destinationZoneId,
+      zoneId: effectiveZoneId,
+      destinationZoneId: effectiveDestZoneId,
+      distanceKm: distanceKm,
+      distanceRange: distanceRange,
       submittedCop: submittedCop,
       sampleCount: benchmark.n,
       referenceCop: benchmark.referenceCop,

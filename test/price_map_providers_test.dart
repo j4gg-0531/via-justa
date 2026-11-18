@@ -8,9 +8,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:via_justa/features/prices/data/supabase_price_map_repository.dart';
 import 'package:via_justa/features/prices/data/supabase_price_verdict_repository.dart';
 import 'package:via_justa/features/prices/domain/device_location.dart';
+import 'package:via_justa/features/prices/domain/municipality_zone.dart';
+import 'package:via_justa/features/prices/domain/price_category.dart';
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
 import 'package:via_justa/features/prices/domain/price_map_repository.dart';
+import 'package:via_justa/features/prices/domain/price_verdict.dart';
+import 'package:via_justa/features/prices/domain/price_verdict_repository.dart';
+import 'package:via_justa/features/prices/domain/taxi_route_estimate.dart';
 import 'package:via_justa/features/prices/presentation/state/price_map_providers.dart';
+import 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart'
+    show priceVerdictRepositoryProvider;
 import 'package:via_justa/features/prices/presentation/widgets/map_pin_visuals.dart';
 
 class _FakePriceMapRepository implements PriceMapRepository {
@@ -377,6 +384,160 @@ void main() {
       await expectLater(repo.detectCurrentZoneByGps(), throwsStateError);
     },
   );
+
+  test(
+    'MapDestinationEstimatorNotifier usa GPS como origen cuando está activo, cae a centro cuando falta GPS y soporta reintento y limpieza',
+    () async {
+      final fakeVerdictRepo = _FakeTaxiVerdictRepository();
+      final gpsGateway = _FakeLocationGateway(
+        const DeviceLocationResult(
+          status: DeviceLocationStatus.granted,
+          latitude: 10.489,
+          longitude: -73.254,
+        ),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          priceVerdictRepositoryProvider.overrideWithValue(fakeVerdictRepo),
+          deviceLocationGatewayProvider.overrideWithValue(gpsGateway),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      expect(container.read(mapDestinationEstimatorProvider), isNull);
+
+      await container
+          .read(mapDestinationEstimatorProvider.notifier)
+          .selectDestination(
+            const MapDestinationTarget(
+              latitude: 10.4742,
+              longitude: -73.2436,
+              name: 'Plaza Alfonso López',
+            ),
+          );
+
+      final gpsState = container.read(mapDestinationEstimatorProvider)!;
+      expect(gpsState.usedGpsOrigin, isTrue);
+      expect(gpsState.originLatitude, 10.489);
+      expect(gpsState.originLongitude, -73.254);
+      expect(gpsState.destination.name, 'Plaza Alfonso López');
+      expect(fakeVerdictRepo.lastCategoryId, kTaxiCategoryId);
+      expect(fakeVerdictRepo.lastSubmittedCop, kTaxiReferenceProbeCop);
+      expect(gpsState.verdictAsync.value?.referenceCop, 11000);
+
+      // Falla de red -> AsyncError y retry recupera la estimación
+      fakeVerdictRepo.shouldFail = true;
+      await container.read(mapDestinationEstimatorProvider.notifier).retry();
+      expect(
+        container.read(mapDestinationEstimatorProvider)!.verdictAsync.hasError,
+        isTrue,
+      );
+
+      fakeVerdictRepo.shouldFail = false;
+      await container.read(mapDestinationEstimatorProvider.notifier).retry();
+      expect(
+        container.read(mapDestinationEstimatorProvider)!.verdictAsync.hasValue,
+        isTrue,
+      );
+
+      container.read(mapDestinationEstimatorProvider.notifier).clear();
+      expect(container.read(mapDestinationEstimatorProvider), isNull);
+
+      // Sin GPS previo -> usa el centro del municipio sin bloquear la estimación
+      final noGpsContainer = ProviderContainer(
+        overrides: [
+          priceVerdictRepositoryProvider.overrideWithValue(fakeVerdictRepo),
+          deviceLocationGatewayProvider.overrideWithValue(
+            _FakeLocationGateway(
+              const DeviceLocationResult(
+                status: DeviceLocationStatus.serviceDisabled,
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(noGpsContainer.dispose);
+
+      await noGpsContainer
+          .read(mapDestinationEstimatorProvider.notifier)
+          .selectDestination(
+            const MapDestinationTarget(latitude: 10.465, longitude: -73.240),
+          );
+
+      final fallbackState = noGpsContainer.read(
+        mapDestinationEstimatorProvider,
+      )!;
+      expect(fallbackState.usedGpsOrigin, isFalse);
+      expect(fallbackState.originLatitude, kValleduparCenterLat);
+      expect(fallbackState.originLongitude, kValleduparCenterLng);
+      expect(fallbackState.verdictAsync.value?.referenceCop, 11000);
+    },
+  );
+}
+
+class _FakeTaxiVerdictRepository implements PriceVerdictRepository {
+  bool shouldFail = false;
+  String? lastCategoryId;
+  int? lastSubmittedCop;
+
+  @override
+  Future<MunicipalityZone> detectCurrentZoneByGps({
+    String municipalityCode = '20001',
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<PriceVerdict> evaluatePrice({
+    required String categoryId,
+    required String municipalityCode,
+    String zoneId = 'vup_centro',
+    String? destinationZoneId,
+    double? originLatitude,
+    double? originLongitude,
+    double? destinationLatitude,
+    double? destinationLongitude,
+    required int submittedCop,
+    bool includeEventContext = false,
+  }) async {
+    lastCategoryId = categoryId;
+    lastSubmittedCop = submittedCop;
+    if (shouldFail) throw Exception('rpc timeout');
+    return const PriceVerdict(
+      categoryId: kTaxiCategoryId,
+      municipalityCode: '20001',
+      zoneId: 'vup_norte',
+      destinationZoneId: 'vup_centro',
+      distanceKm: 2.3,
+      distanceRange: '2_5_km',
+      level: PriceVerdictLevel.green,
+      submittedCop: 10000,
+      referenceCop: 11000,
+      deviationPct: -9.1,
+      recommendedCapCop: 12650,
+      n: 12,
+      isDemo: false,
+    );
+  }
+
+  @override
+  Future<List<PriceCategory>> getCategories() async => const [];
+
+  @override
+  Future<PriceVerdict> getScenarioFixture(
+    DemoPriceScenario scenario, {
+    String municipalityCode = '20001',
+    String? zoneId,
+    bool includeEventContext = false,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<MunicipalityZone>> getZones({
+    String municipalityCode = '20001',
+  }) async => const [];
 }
 
 class _FakeLocationGateway implements DeviceLocationGateway {

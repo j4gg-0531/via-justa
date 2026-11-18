@@ -11,6 +11,8 @@ import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_map_filter.dart';
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
 import 'package:via_justa/features/prices/domain/price_map_repository.dart';
+import 'package:via_justa/features/prices/domain/price_verdict.dart';
+import 'package:via_justa/features/prices/domain/taxi_route_estimate.dart';
 import 'package:via_justa/features/prices/presentation/state/price_contribution_provider.dart';
 import 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart';
 import 'package:via_justa/features/prices/presentation/widgets/map_pin_visuals.dart';
@@ -323,6 +325,139 @@ final mapMarkerDescriptorsProvider =
   final cache = ref.watch(mapMarkerIconCacheProvider);
   return cache.resolveForItems(items, selectedItemId: selectedId);
 });
+
+/// Descriptor del pin temporal de destino para el estimador de taxi en el mapa.
+final destinationMarkerDescriptorProvider = FutureProvider<BitmapDescriptor?>((
+  ref,
+) async {
+  final useNative = ref.watch(useNativeGoogleMapProvider);
+  if (!useNative) return null;
+  final bytes = await renderDestinationMarkerPngBytes();
+  if (bytes.isEmpty) return BitmapDescriptor.defaultMarker;
+  return BitmapDescriptor.bytes(bytes, imagePixelRatio: 3.0);
+});
+
+/// Estado de la estimación de carrera urbana en taxi hasta un punto seleccionado en el mapa.
+class MapDestinationEstimatorState {
+  const MapDestinationEstimatorState({
+    required this.destination,
+    required this.originLatitude,
+    required this.originLongitude,
+    required this.usedGpsOrigin,
+    required this.verdictAsync,
+  });
+
+  final MapDestinationTarget destination;
+  final double originLatitude;
+  final double originLongitude;
+  final bool usedGpsOrigin;
+  final AsyncValue<PriceVerdict> verdictAsync;
+
+  MapDestinationEstimatorState copyWith({
+    double? originLatitude,
+    double? originLongitude,
+    bool? usedGpsOrigin,
+    AsyncValue<PriceVerdict>? verdictAsync,
+  }) {
+    return MapDestinationEstimatorState(
+      destination: destination,
+      originLatitude: originLatitude ?? this.originLatitude,
+      originLongitude: originLongitude ?? this.originLongitude,
+      usedGpsOrigin: usedGpsOrigin ?? this.usedGpsOrigin,
+      verdictAsync: verdictAsync ?? this.verdictAsync,
+    );
+  }
+}
+
+/// Controlador del destino temporal en el mapa y su estimación de tarifa media de taxi.
+class MapDestinationEstimatorNotifier
+    extends Notifier<MapDestinationEstimatorState?> {
+  int _requestSeq = 0;
+
+  @override
+  MapDestinationEstimatorState? build() => null;
+
+  /// Marca un punto destino (libre o lugar), intenta usar GPS como origen y consulta la mediana de taxi.
+  Future<void> selectDestination(MapDestinationTarget target) async {
+    final requestToken = ++_requestSeq;
+
+    ref.read(priceMapListOpenProvider.notifier).close();
+    ref.read(selectedMapItemIdProvider.notifier).clear();
+
+    var userLocation = ref.read(userMapLocationProvider);
+    var usedGps = userLocation.hasLocation;
+    var originLat = userLocation.latitude ?? kValleduparCenterLat;
+    var originLng = userLocation.longitude ?? kValleduparCenterLng;
+
+    state = MapDestinationEstimatorState(
+      destination: target,
+      originLatitude: originLat,
+      originLongitude: originLng,
+      usedGpsOrigin: usedGps,
+      verdictAsync: const AsyncLoading(),
+    );
+
+    if (!usedGps) {
+      final fetched = await ref
+          .read(userMapLocationProvider.notifier)
+          .requestAndFetchLocation();
+      if (!ref.mounted || requestToken != _requestSeq) return;
+      if (fetched != null) {
+        originLat = fetched.$1;
+        originLng = fetched.$2;
+        usedGps = true;
+        state = state?.copyWith(
+          originLatitude: originLat,
+          originLongitude: originLng,
+          usedGpsOrigin: true,
+        );
+      }
+    }
+
+    final municipality = ref.read(selectedMunicipalityProvider);
+    final code = municipality?.code ?? '20001';
+
+    try {
+      final verdict = await ref
+          .read(priceVerdictRepositoryProvider)
+          .evaluatePrice(
+            categoryId: kTaxiCategoryId,
+            municipalityCode: code,
+            zoneId: '',
+            originLatitude: originLat,
+            originLongitude: originLng,
+            destinationLatitude: target.latitude,
+            destinationLongitude: target.longitude,
+            submittedCop: kTaxiReferenceProbeCop,
+          );
+      if (!ref.mounted || requestToken != _requestSeq) return;
+      state = state?.copyWith(verdictAsync: AsyncData(verdict));
+    } catch (error, stackTrace) {
+      if (!ref.mounted || requestToken != _requestSeq) return;
+      state = state?.copyWith(verdictAsync: AsyncError(error, stackTrace));
+    }
+  }
+
+  /// Reintenta la consulta de estimación de taxi para el destino actual.
+  Future<void> retry() async {
+    final current = state;
+    if (current == null) return;
+    await selectDestination(current.destination);
+  }
+
+  /// Limpia el marcador temporal de destino y la tarjeta de estimación.
+  void clear() {
+    _requestSeq++;
+    state = null;
+  }
+}
+
+/// Provider de estado para la estimación de taxi sobre el destino elegido en el mapa.
+final mapDestinationEstimatorProvider =
+    NotifierProvider.autoDispose<
+      MapDestinationEstimatorNotifier,
+      MapDestinationEstimatorState?
+    >(MapDestinationEstimatorNotifier.new);
 
 
 /// Resultado y estado activo de selección de un punto preciso en el mapa municipal.

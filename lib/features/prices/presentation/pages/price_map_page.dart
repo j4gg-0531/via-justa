@@ -16,6 +16,8 @@ import 'package:via_justa/core/widgets/vj_search_field.dart';
 import 'package:via_justa/features/businesses/presentation/pages/business_detail_page.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
+import 'package:via_justa/features/prices/domain/price_verdict.dart';
+import 'package:via_justa/features/prices/domain/taxi_route_estimate.dart';
 import 'package:via_justa/features/prices/presentation/state/price_map_providers.dart';
 import 'package:via_justa/features/prices/presentation/widgets/map_pin_visuals.dart';
 
@@ -93,6 +95,8 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
     List<PriceMapItem> items, {
     required Map<MapPinStyleKey, BitmapDescriptor> customIcons,
     required String? selectedItemId,
+    MapDestinationTarget? destinationTarget,
+    BitmapDescriptor? destinationIcon,
   }) {
     final markers = <Marker>{};
     for (final item in items) {
@@ -116,6 +120,7 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
               : const Offset(0.5, 1.0),
           zIndexInt: item.id == selectedItemId ? 2 : 1,
           onTap: () {
+            ref.read(mapDestinationEstimatorProvider.notifier).clear();
             ref.read(selectedMapItemIdProvider.notifier).select(item.id);
             _closeList();
             _focusItemOnMap(item);
@@ -126,6 +131,29 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
             onTap: () => item.sourceType == 'business'
                 ? _openBusinessDetail(context, item.id)
                 : _openDirectionsToItem(context, item),
+          ),
+        ),
+      );
+    }
+
+    if (destinationTarget != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('__selected_destination__'),
+          position: LatLng(
+            destinationTarget.latitude,
+            destinationTarget.longitude,
+          ),
+          icon:
+              destinationIcon ??
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose),
+          anchor: destinationIcon != null
+              ? const Offset(0.5, 0.92)
+              : const Offset(0.5, 1.0),
+          zIndexInt: 3,
+          infoWindow: InfoWindow(
+            title:
+                destinationTarget.name ?? 'price_map.selected_point_title'.tr(),
           ),
         ),
       );
@@ -189,31 +217,71 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
     }
   }
 
+  Future<void> _focusCoordinatesOnMap(double latitude, double longitude) async {
+    final controller = _mapController;
+    if (controller == null) return;
+    await controller.animateCamera(
+      CameraUpdate.newLatLngZoom(LatLng(latitude, longitude), 15.6),
+    );
+  }
+
+  Future<void> _estimateTaxiToPoint(MapDestinationTarget target) async {
+    await Future.wait([
+      ref.read(mapDestinationEstimatorProvider.notifier).selectDestination(
+        target,
+      ),
+      _focusCoordinatesOnMap(target.latitude, target.longitude),
+    ]);
+  }
+
+  Future<void> _estimateTaxiToItem(PriceMapItem item) => _estimateTaxiToPoint(
+    MapDestinationTarget(
+      latitude: item.latitude,
+      longitude: item.longitude,
+      name: item.name,
+    ),
+  );
+
   Future<void> _openDirectionsToItem(
     BuildContext context,
     PriceMapItem item,
   ) async {
+    await _focusItemOnMap(item);
+    if (!context.mounted) return;
+    await _openDirectionsToCoordinates(
+      context,
+      latitude: item.latitude,
+      longitude: item.longitude,
+      label: item.name,
+    );
+  }
+
+  Future<void> _openDirectionsToCoordinates(
+    BuildContext context, {
+    required double latitude,
+    required double longitude,
+    required String label,
+  }) async {
     final useNativeMap = ref.read(useNativeGoogleMapProvider);
     if (!useNativeMap) {
       _showInfoDialog(
         context,
-        title: 'price_map.action_route'.tr(),
-        body: 'price_map.demo_route_body'.tr(namedArgs: {'name': item.name}),
+        title: 'price_map.action_directions'.tr(),
+        body: 'price_map.demo_route_body'.tr(namedArgs: {'name': label}),
       );
       return;
     }
 
-    await _focusItemOnMap(item);
     final uri = ExternalUriGuard.buildSafeGoogleMapsDirectionsUri(
-      latitude: item.latitude,
-      longitude: item.longitude,
+      latitude: latitude,
+      longitude: longitude,
     );
     if (uri == null || !ExternalUriGuard.isAllowedExternalUri(uri)) {
       if (context.mounted) {
         _showInfoDialog(
           context,
-          title: 'price_map.action_route'.tr(),
-          body: 'price_map.demo_route_body'.tr(namedArgs: {'name': item.name}),
+          title: 'price_map.action_directions'.tr(),
+          body: 'price_map.demo_route_body'.tr(namedArgs: {'name': label}),
         );
       }
       return;
@@ -226,16 +294,16 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
       if (!launched && context.mounted) {
         _showInfoDialog(
           context,
-          title: 'price_map.action_route'.tr(),
-          body: 'price_map.demo_route_body'.tr(namedArgs: {'name': item.name}),
+          title: 'price_map.action_directions'.tr(),
+          body: 'price_map.demo_route_body'.tr(namedArgs: {'name': label}),
         );
       }
     } catch (_) {
       if (context.mounted) {
         _showInfoDialog(
           context,
-          title: 'price_map.action_route'.tr(),
-          body: 'price_map.demo_route_body'.tr(namedArgs: {'name': item.name}),
+          title: 'price_map.action_directions'.tr(),
+          body: 'price_map.demo_route_body'.tr(namedArgs: {'name': label}),
         );
       }
     }
@@ -245,6 +313,7 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
     ref.read(priceMapCategoryProvider.notifier).selectCategory(null);
     ref.read(priceMapSearchQueryProvider.notifier).clear();
     ref.read(selectedMapItemIdProvider.notifier).clear();
+    ref.read(mapDestinationEstimatorProvider.notifier).clear();
     ref.read(priceMapViewportBoundsProvider.notifier).clear();
     ref.invalidate(allPriceMapItemsProvider);
     _mapController?.animateCamera(
@@ -269,6 +338,11 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
     final customIcons =
         ref.watch(mapMarkerDescriptorsProvider).asData?.value ??
         const <MapPinStyleKey, BitmapDescriptor>{};
+    final destinationIcon = ref
+        .watch(destinationMarkerDescriptorProvider)
+        .asData
+        ?.value;
+    final destinationEstimate = ref.watch(mapDestinationEstimatorProvider);
     final isDemoMode = ref.watch(isDemoMapModeProvider);
     final userLocation = ref.watch(userMapLocationProvider);
 
@@ -304,9 +378,28 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
                         onMapCreated: (controller) {
                           _mapController = controller;
                         },
-                        onTap: (_) {
-                          ref.read(selectedMapItemIdProvider.notifier).clear();
-                          _closeList();
+                        onTap: (position) {
+                          if (selectedItemId != null || isListOpen) {
+                            ref
+                                .read(selectedMapItemIdProvider.notifier)
+                                .clear();
+                            _closeList();
+                            return;
+                          }
+                          _estimateTaxiToPoint(
+                            MapDestinationTarget(
+                              latitude: position.latitude,
+                              longitude: position.longitude,
+                            ),
+                          );
+                        },
+                        onLongPress: (position) {
+                          _estimateTaxiToPoint(
+                            MapDestinationTarget(
+                              latitude: position.latitude,
+                              longitude: position.longitude,
+                            ),
+                          );
                         },
                         myLocationEnabled: userLocation.permissionGranted,
                         myLocationButtonEnabled: false,
@@ -315,14 +408,14 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
                         mapToolbarEnabled: true,
                         buildingsEnabled: true,
                         indoorViewEnabled: true,
-                        markers: itemsAsync.hasValue
-                            ? _buildGoogleMarkers(
-                                context,
-                                itemsAsync.value!,
-                                customIcons: customIcons,
-                                selectedItemId: selectedItemId,
-                              )
-                            : const <Marker>{},
+                        markers: _buildGoogleMarkers(
+                          context,
+                          itemsAsync.asData?.value ?? const <PriceMapItem>[],
+                          customIcons: customIcons,
+                          selectedItemId: selectedItemId,
+                          destinationTarget: destinationEstimate?.destination,
+                          destinationIcon: destinationIcon,
+                        ),
                         gestureRecognizers:
                             <Factory<OneSequenceGestureRecognizer>>{
                           Factory<OneSequenceGestureRecognizer>(
@@ -330,10 +423,43 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
                           ),
                         },
                       )
-                    : ClipRect(
-                        child: CustomPaint(
-                          painter: _UrbanMapCanvasPainter(),
-                          child: const SizedBox.expand(),
+                    : GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTapUp: (details) {
+                          if (selectedItemId != null || isListOpen) {
+                            ref
+                                .read(selectedMapItemIdProvider.notifier)
+                                .clear();
+                            _closeList();
+                            return;
+                          }
+                          final size = context.size;
+                          final normX = size == null || size.width <= 0
+                              ? 0.5
+                              : (details.localPosition.dx / size.width).clamp(
+                                  0.05,
+                                  0.95,
+                                );
+                          final normY = size == null || size.height <= 0
+                              ? 0.5
+                              : (details.localPosition.dy / size.height).clamp(
+                                  0.05,
+                                  0.95,
+                                );
+                          _estimateTaxiToPoint(
+                            MapDestinationTarget(
+                              latitude:
+                                  kValleduparCenterLat + ((0.5 - normY) * 0.03),
+                              longitude:
+                                  kValleduparCenterLng + ((normX - 0.5) * 0.03),
+                            ),
+                          );
+                        },
+                        child: ClipRect(
+                          child: CustomPaint(
+                            painter: _UrbanMapCanvasPainter(),
+                            child: const SizedBox.expand(),
+                          ),
                         ),
                       ),
               ),
@@ -348,12 +474,21 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
                     item: item,
                     onTap: () {
                       ref
+                          .read(mapDestinationEstimatorProvider.notifier)
+                          .clear();
+                      ref
                           .read(selectedMapItemIdProvider.notifier)
                           .select(item.id);
                       _closeList();
                     },
                   ),
                 ),
+
+            if (!useNativeGoogleMap && destinationEstimate != null)
+              const Align(
+                alignment: Alignment(0.1, 0.1),
+                child: _DestinationFallbackPin(),
+              ),
 
             // 3. Controles y tarjetas flotantes inferiores sobre el mapa (Opción A)
             Positioned(
@@ -420,6 +555,37 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
                         }
                       },
                       onRouteTap: (item) => _openDirectionsToItem(context, item),
+                      onEstimateTaxiTap: _estimateTaxiToItem,
+                    )
+                  else if (destinationEstimate != null)
+                    _DestinationEstimatorCard(
+                      estimateState: destinationEstimate,
+                      cityName: cityName,
+                      onClose: () => ref
+                          .read(mapDestinationEstimatorProvider.notifier)
+                          .clear(),
+                      onRetry: () => ref
+                          .read(mapDestinationEstimatorProvider.notifier)
+                          .retry(),
+                      onDirectionsTap: () => _openDirectionsToCoordinates(
+                        context,
+                        latitude: destinationEstimate.destination.latitude,
+                        longitude: destinationEstimate.destination.longitude,
+                        label:
+                            destinationEstimate.destination.name ??
+                            'price_map.selected_point_title'.tr(),
+                      ),
+                      onContributeTap: () {
+                        if (GoRouter.maybeOf(context) != null) {
+                          context.push(AppRoutes.priceContribute);
+                        } else {
+                          _showInfoDialog(
+                            context,
+                            title: 'home.contribute_dialog_title'.tr(),
+                            body: 'home.contribute_dialog_body'.tr(),
+                          );
+                        }
+                      },
                     )
                   else if (selectedPlace != null)
                     _FloatingSelectedPlaceCard(
@@ -435,6 +601,8 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
                       },
                       onRouteTap: () =>
                           _openDirectionsToItem(context, selectedPlace),
+                      onEstimateTaxiTap: () =>
+                          _estimateTaxiToItem(selectedPlace),
                     )
                   else
                     _MapExplorePill(
@@ -558,6 +726,7 @@ class _MapPlacesSheet extends StatelessWidget {
     required this.onRetry,
     required this.onItemTap,
     required this.onRouteTap,
+    required this.onEstimateTaxiTap,
   });
 
   final double maxHeight;
@@ -570,6 +739,7 @@ class _MapPlacesSheet extends StatelessWidget {
   final VoidCallback onRetry;
   final ValueChanged<PriceMapItem> onItemTap;
   final ValueChanged<PriceMapItem> onRouteTap;
+  final ValueChanged<PriceMapItem> onEstimateTaxiTap;
 
   @override
   Widget build(BuildContext context) {
@@ -729,6 +899,8 @@ class _MapPlacesSheet extends StatelessWidget {
                                 isSelected: item.id == selectedItemId,
                                 onCardTap: () => onItemTap(item),
                                 onRouteTap: () => onRouteTap(item),
+                                onEstimateTaxiTap: () =>
+                                    onEstimateTaxiTap(item),
                               ),
                             );
                           },
@@ -950,6 +1122,7 @@ class _PriceMapItemCard extends StatelessWidget {
     required this.isSelected,
     required this.onCardTap,
     required this.onRouteTap,
+    required this.onEstimateTaxiTap,
     this.onClose,
   });
 
@@ -957,6 +1130,7 @@ class _PriceMapItemCard extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onCardTap;
   final VoidCallback onRouteTap;
+  final VoidCallback onEstimateTaxiTap;
   final VoidCallback? onClose;
 
   @override
@@ -1086,6 +1260,23 @@ class _PriceMapItemCard extends StatelessWidget {
                             backgroundColor: AppColors.primarySoft,
                             foregroundColor: AppColors.primary,
                             side: BorderSide.none,
+                            minimumSize: const Size(48, 48),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                            ),
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: onEstimateTaxiTap,
+                          icon: const Icon(Icons.local_taxi_outlined, size: 16),
+                          label: Text('price_map.action_estimate_taxi'.tr()),
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: AppColors.surface,
+                            foregroundColor: AppColors.textPrimary,
+                            side: const BorderSide(color: AppColors.border),
                             minimumSize: const Size(48, 48),
                             padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.md,
@@ -1492,13 +1683,14 @@ class _MapExplorePill extends StatelessWidget {
                             color: AppColors.textPrimary,
                           ),
                         ),
-                        if (selectedCategory != null)
-                          Text(
-                            sectionTitleKey.tr(),
-                            style: textTheme.bodySmall?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                        Text(
+                          selectedCategory != null
+                              ? sectionTitleKey.tr()
+                              : 'price_map.tap_map_hint'.tr(),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
                           ),
+                        ),
                       ],
                     ),
                     if (itemsAsync.isLoading && items == null)
@@ -1546,12 +1738,14 @@ class _FloatingSelectedPlaceCard extends StatelessWidget {
     required this.onClose,
     required this.onCardTap,
     required this.onRouteTap,
+    required this.onEstimateTaxiTap,
   });
 
   final PriceMapItem item;
   final VoidCallback onClose;
   final VoidCallback onCardTap;
   final VoidCallback onRouteTap;
+  final VoidCallback onEstimateTaxiTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1564,7 +1758,365 @@ class _FloatingSelectedPlaceCard extends StatelessWidget {
         isSelected: true,
         onCardTap: onCardTap,
         onRouteTap: onRouteTap,
+        onEstimateTaxiTap: onEstimateTaxiTap,
         onClose: onClose,
+      ),
+    );
+  }
+}
+
+/// Marcador visual de respaldo sobre el lienzo de pruebas cuando hay destino seleccionado.
+class _DestinationFallbackPin extends StatelessWidget {
+  const _DestinationFallbackPin();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: AppColors.textPrimary,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.surface, width: 2.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: const Icon(Icons.flag, size: 18, color: AppColors.surface),
+    );
+  }
+}
+
+/// Tarjeta flotante para consultar la tarifa media de taxi y abrir cómo llegar al punto marcado.
+class _DestinationEstimatorCard extends StatelessWidget {
+  const _DestinationEstimatorCard({
+    required this.estimateState,
+    required this.cityName,
+    required this.onClose,
+    required this.onRetry,
+    required this.onDirectionsTap,
+    required this.onContributeTap,
+  });
+
+  final MapDestinationEstimatorState estimateState;
+  final String cityName;
+  final VoidCallback onClose;
+  final VoidCallback onRetry;
+  final VoidCallback onDirectionsTap;
+  final VoidCallback onContributeTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final destinationTitle =
+        estimateState.destination.name ?? 'price_map.selected_point_title'.tr();
+    final originLabel = estimateState.usedGpsOrigin
+        ? 'price_map.origin_gps'.tr()
+        : 'price_map.origin_city_center'.tr(namedArgs: {'city': cityName});
+
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      elevation: 8,
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: (MediaQuery.sizeOf(context).height * 0.48).clamp(
+            240.0,
+            440.0,
+          ),
+        ),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.primary, width: 1.5),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.textPrimary,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: const Icon(
+                    Icons.flag,
+                    color: AppColors.surface,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        destinationTitle,
+                        style: textTheme.titleMedium?.copyWith(fontSize: 15),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        originLabel,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'common.close'.tr(),
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close, size: 18),
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                    foregroundColor: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            estimateState.verdictAsync.when(
+              loading: () => Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'price_map.estimating_taxi'.tr(),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    const LinearProgressIndicator(),
+                  ],
+                ),
+              ),
+              error: (_, _) => Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'municipality.load_error'.tr(),
+                      style: textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: onRetry,
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                        ),
+                        child: Text('common.retry'.tr()),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              data: (verdict) {
+                if (verdict.isInsufficient || verdict.referenceCop == null) {
+                  return Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.info_outline,
+                          color: AppColors.textSecondary,
+                          size: 18,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            'price_map.taxi_insufficient'.tr(
+                              args: [verdict.n.toString()],
+                            ),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                final rangeKey = taxiDistanceRangeTranslationKey(
+                  verdict.distanceRange,
+                );
+                final distanceText =
+                    verdict.distanceKm != null && rangeKey != null
+                    ? 'price_map.taxi_distance_line'.tr(
+                        namedArgs: {
+                          'km': verdict.distanceKm!.toStringAsFixed(1),
+                          'range': rangeKey.tr(),
+                          'count': verdict.n.toString(),
+                        },
+                      )
+                    : 'price_map.taxi_sample_line'.tr(
+                        namedArgs: {'count': verdict.n.toString()},
+                      );
+
+                return Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: AppSpacing.xs,
+                        runSpacing: AppSpacing.xs,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.local_taxi,
+                            color: AppColors.primary,
+                            size: 16,
+                          ),
+                          Text(
+                            'price_map.taxi_estimate_title'.tr(),
+                            style: textTheme.labelMedium?.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (verdict.isDemo) const VjBadge(label: 'DEMO'),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Wrap(
+                        spacing: AppSpacing.lg,
+                        runSpacing: AppSpacing.xs,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'price_map.taxi_median_label'.tr(),
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              Text(
+                                formatCop(verdict.referenceCop!),
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (verdict.recommendedCapCop != null)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'price_map.taxi_cap_label'.tr(),
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                Text(
+                                  formatCop(verdict.recommendedCapCop!),
+                                  style: textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        distanceText,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.xs,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: onDirectionsTap,
+                  icon: const Icon(Icons.directions_outlined, size: 18),
+                  label: Text('price_map.action_directions'.tr()),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.surface,
+                    side: BorderSide.none,
+                    minimumSize: const Size(48, 48),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                  ),
+                ),
+                if (estimateState.verdictAsync.asData?.value.isInsufficient ??
+                    false)
+                  OutlinedButton.icon(
+                    onPressed: onContributeTap,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: Text('price_map.contribute_cta'.tr()),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: AppColors.primarySoft,
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide.none,
+                      minimumSize: const Size(48, 48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            ],
+          ),
+        ),
       ),
     );
   }
