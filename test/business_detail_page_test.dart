@@ -341,6 +341,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(find.text('price_map.view_list'));
+      await tester.pumpAndSettle();
+
       await tester.tap(find.text('Cocina del Patio').first);
       await tester.pumpAndSettle();
 

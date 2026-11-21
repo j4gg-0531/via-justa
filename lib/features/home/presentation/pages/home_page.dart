@@ -78,11 +78,13 @@ class HomePage extends ConsumerWidget {
                               color: AppColors.primary,
                             ),
                             const SizedBox(width: AppSpacing.xs),
-                            Text(
-                              cityName,
-                              style: textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
+                            Expanded(
+                              child: Text(
+                                cityName,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
                               ),
                             ),
                           ],
@@ -301,14 +303,14 @@ class _SettlerHomeView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Expanded(
-                    child: Text(
-                      'home.settler_card_title'.tr(),
-                      style: textTheme.titleMedium,
-                    ),
+                  Text(
+                    'home.settler_card_title'.tr(),
+                    style: textTheme.titleMedium,
                   ),
                   VjBadge(label: 'home.settler_card_badge'.tr()),
                 ],
@@ -413,14 +415,14 @@ class _ResidentHomeView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Text(
-                  'home.resident_card_title'.tr(),
-                  style: textTheme.titleMedium,
-                ),
+              Text(
+                'home.resident_card_title'.tr(),
+                style: textTheme.titleMedium,
               ),
               VjBadge(label: 'home.resident_card_badge'.tr()),
             ],

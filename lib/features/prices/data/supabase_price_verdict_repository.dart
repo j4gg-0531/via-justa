@@ -1,4 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:via_justa/features/prices/data/geolocator_device_location_gateway.dart';
+import 'package:via_justa/features/prices/domain/device_location.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_category.dart';
 import 'package:via_justa/features/prices/domain/price_verdict.dart';
@@ -11,9 +13,13 @@ import 'package:via_justa/features/prices/domain/price_verdict_repository.dart';
 /// datos de prueba: si la red o la RPC fallan, la excepción se propaga para que
 /// la interfaz muestre el estado de error con acción de reintento.
 class SupabasePriceVerdictRepository implements PriceVerdictRepository {
-  const SupabasePriceVerdictRepository(this._client);
+  const SupabasePriceVerdictRepository(
+    this._client, {
+    this.locationGateway = const GeolocatorDeviceLocationGateway(),
+  });
 
   final SupabaseClient _client;
+  final DeviceLocationGateway locationGateway;
 
   @override
   Future<List<MunicipalityZone>> getZones({
@@ -45,13 +51,17 @@ class SupabasePriceVerdictRepository implements PriceVerdictRepository {
   Future<MunicipalityZone> detectCurrentZoneByGps({
     String municipalityCode = '20001',
   }) async {
-    final zones = await getZones(municipalityCode: municipalityCode);
-    for (final zone in zones) {
-      if (zone.id == 'vup_centro') {
-        return zone;
-      }
+    final location = await locationGateway.fetchCurrentPosition();
+    if (!location.isGranted) {
+      throw StateError(location.errorKey ?? 'gps_unavailable');
     }
-    return zones.first;
+    final zones = await getZones(municipalityCode: municipalityCode);
+    final nearest = resolveNearestZoneByCoordinates(
+      zones: zones,
+      latitude: location.latitude!,
+      longitude: location.longitude!,
+    );
+    return nearest ?? zones.first;
   }
 
   @override

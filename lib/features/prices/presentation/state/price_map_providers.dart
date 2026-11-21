@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:via_justa/core/supabase/supabase_providers.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/data/local_price_map_repository.dart';
 import 'package:via_justa/features/prices/data/supabase_price_map_repository.dart';
@@ -10,7 +11,14 @@ import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_map_filter.dart';
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
 import 'package:via_justa/features/prices/domain/price_map_repository.dart';
+import 'package:via_justa/features/prices/domain/price_verdict.dart';
+import 'package:via_justa/features/prices/domain/taxi_route_estimate.dart';
 import 'package:via_justa/features/prices/presentation/state/price_contribution_provider.dart';
+import 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart';
+import 'package:via_justa/features/prices/presentation/widgets/map_pin_visuals.dart';
+
+export 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart'
+    show deviceLocationGatewayProvider;
 
 /// Indica si se debe renderizar el widget nativo `GoogleMap` (activo en dispositivos
 /// Android/iOS reales; desactivado automáticamente en `flutter test` headless).
@@ -26,6 +34,15 @@ final useNativeGoogleMapProvider = Provider<bool>((ref) {
     return false;
   }
   return true;
+});
+
+/// Indica si el mapa está operando con datos de demostración o conectado a Supabase real.
+final isDemoMapModeProvider = Provider<bool>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  final usesDemo = ref.watch(
+    authControllerProvider.select((state) => state.usesDemoData),
+  );
+  return client == null || usesDemo;
 });
 
 /// Provider del repositorio del mapa de precios, servicios y negocios (M08 / VJ-12).
@@ -68,12 +85,14 @@ class UserMapLocationState {
     this.longitude,
     this.permissionGranted = false,
     this.isRequesting = false,
+    this.errorKey,
   });
 
   final double? latitude;
   final double? longitude;
   final bool permissionGranted;
   final bool isRequesting;
+  final String? errorKey;
 
   bool get hasLocation => latitude != null && longitude != null;
 
@@ -82,12 +101,15 @@ class UserMapLocationState {
     double? longitude,
     bool? permissionGranted,
     bool? isRequesting,
+    String? errorKey,
+    bool clearError = false,
   }) {
     return UserMapLocationState(
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       permissionGranted: permissionGranted ?? this.permissionGranted,
       isRequesting: isRequesting ?? this.isRequesting,
+      errorKey: clearError ? null : (errorKey ?? this.errorKey),
     );
   }
 }
@@ -100,40 +122,36 @@ class UserMapLocationNotifier extends Notifier<UserMapLocationState> {
   /// Solicita permiso de ubicación al sistema Android y obtiene las coordenadas GPS actuales.
   Future<(double, double)?> requestAndFetchLocation() async {
     if (state.isRequesting) return null;
-    state = state.copyWith(isRequesting: true);
+    state = state.copyWith(isRequesting: true, clearError: true);
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        state = state.copyWith(isRequesting: false, permissionGranted: false);
+      final result = await ref
+          .read(deviceLocationGatewayProvider)
+          .fetchCurrentPosition();
+      if (!ref.mounted) return null;
+
+      if (!result.isGranted) {
+        state = state.copyWith(
+          isRequesting: false,
+          permissionGranted: false,
+          errorKey: result.errorKey ?? 'gps_unavailable',
+        );
         return null;
       }
 
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        state = state.copyWith(isRequesting: false, permissionGranted: false);
-        return null;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 8),
-        ),
-      );
       state = state.copyWith(
-        latitude: position.latitude,
-        longitude: position.longitude,
+        latitude: result.latitude,
+        longitude: result.longitude,
         permissionGranted: true,
         isRequesting: false,
+        clearError: true,
       );
-      return (position.latitude, position.longitude);
+      return (result.latitude!, result.longitude!);
     } catch (_) {
-      state = state.copyWith(isRequesting: false);
+      if (!ref.mounted) return null;
+      state = state.copyWith(
+        isRequesting: false,
+        errorKey: 'gps_unavailable',
+      );
       return null;
     }
   }
@@ -201,6 +219,44 @@ final allPriceMapItemsProvider = FutureProvider<List<PriceMapItem>>((ref) async 
   return repository.getMapItems(municipalityCode: code);
 });
 
+/// Identificador del pin actualmente seleccionado en el mapa para destacarlo en la hoja inferior.
+class SelectedMapItemIdNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void select(String? id) {
+    state = id;
+  }
+
+  void clear() {
+    state = null;
+  }
+}
+
+final selectedMapItemIdProvider =
+    NotifierProvider<SelectedMapItemIdNotifier, String?>(
+  SelectedMapItemIdNotifier.new,
+);
+
+/// Controla si el listado inferior de lugares está expandido (Opción A).
+class PriceMapListOpenNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void open() {
+    if (!state) state = true;
+  }
+
+  void close() {
+    if (state) state = false;
+  }
+}
+
+final priceMapListOpenProvider =
+    NotifierProvider.autoDispose<PriceMapListOpenNotifier, bool>(
+  PriceMapListOpenNotifier.new,
+);
+
 /// Provider que devuelve los puntos filtrados por categoría y texto mediante la función pura de dominio.
 final filteredPriceMapItemsProvider =
     Provider<AsyncValue<List<PriceMapItem>>>((ref) {
@@ -217,11 +273,191 @@ final filteredPriceMapItemsProvider =
   });
 });
 
+/// Provider que filtra únicamente lugares reales (negocios, servicios y consulados) para la hoja inferior.
+final sheetPlaceItemsProvider =
+    Provider<AsyncValue<List<PriceMapItem>>>((ref) {
+  final itemsAsync = ref.watch(allPriceMapItemsProvider);
+  final category = ref.watch(priceMapCategoryProvider);
+  final query = ref.watch(priceMapSearchQueryProvider);
+  final prioritizedId = ref.watch(selectedMapItemIdProvider);
+
+  return itemsAsync.whenData((items) {
+    return filterSheetPlaceItems(
+      items,
+      category: category,
+      query: query,
+      prioritizedId: prioritizedId,
+    );
+  });
+});
+
+/// Devuelve el elemento actualmente seleccionado mediante el identificador del pin tocado.
+final selectedMapPlaceItemProvider = Provider<PriceMapItem?>((ref) {
+  final items = ref.watch(filteredPriceMapItemsProvider).asData?.value;
+  final selectedId = ref.watch(selectedMapItemIdProvider);
+  if (items == null || selectedId == null) return null;
+  return findMapItemById(items, selectedId);
+});
+
 /// Provider de la clave de traducción para el título de la hoja inferior del mapa.
 final priceMapSectionTitleKeyProvider = Provider<String>((ref) {
   final category = ref.watch(priceMapCategoryProvider);
   return sectionTitleKeyForMapCategory(category);
 });
+
+/// Caché compartida en memoria para descriptores de marcadores personalizados de Google Maps.
+final mapMarkerIconCacheProvider = Provider<MapMarkerIconCache>((ref) {
+  return MapMarkerIconCache();
+});
+
+/// Descriptores PNG renderizados por ícono y semáforo para los marcadores visibles del mapa.
+final mapMarkerDescriptorsProvider =
+    FutureProvider<Map<MapPinStyleKey, BitmapDescriptor>>((ref) async {
+  final useNative = ref.watch(useNativeGoogleMapProvider);
+  if (!useNative) {
+    return const <MapPinStyleKey, BitmapDescriptor>{};
+  }
+  final items = ref.watch(filteredPriceMapItemsProvider).asData?.value;
+  if (items == null || items.isEmpty) {
+    return const <MapPinStyleKey, BitmapDescriptor>{};
+  }
+  final selectedId = ref.watch(selectedMapItemIdProvider);
+  final cache = ref.watch(mapMarkerIconCacheProvider);
+  return cache.resolveForItems(items, selectedItemId: selectedId);
+});
+
+/// Descriptor del pin temporal de destino para el estimador de taxi en el mapa.
+final destinationMarkerDescriptorProvider = FutureProvider<BitmapDescriptor?>((
+  ref,
+) async {
+  final useNative = ref.watch(useNativeGoogleMapProvider);
+  if (!useNative) return null;
+  final bytes = await renderDestinationMarkerPngBytes();
+  if (bytes.isEmpty) return BitmapDescriptor.defaultMarker;
+  return BitmapDescriptor.bytes(bytes, imagePixelRatio: 3.0);
+});
+
+/// Estado de la estimación de carrera urbana en taxi hasta un punto seleccionado en el mapa.
+class MapDestinationEstimatorState {
+  const MapDestinationEstimatorState({
+    required this.destination,
+    required this.originLatitude,
+    required this.originLongitude,
+    required this.usedGpsOrigin,
+    required this.verdictAsync,
+  });
+
+  final MapDestinationTarget destination;
+  final double originLatitude;
+  final double originLongitude;
+  final bool usedGpsOrigin;
+  final AsyncValue<PriceVerdict> verdictAsync;
+
+  MapDestinationEstimatorState copyWith({
+    double? originLatitude,
+    double? originLongitude,
+    bool? usedGpsOrigin,
+    AsyncValue<PriceVerdict>? verdictAsync,
+  }) {
+    return MapDestinationEstimatorState(
+      destination: destination,
+      originLatitude: originLatitude ?? this.originLatitude,
+      originLongitude: originLongitude ?? this.originLongitude,
+      usedGpsOrigin: usedGpsOrigin ?? this.usedGpsOrigin,
+      verdictAsync: verdictAsync ?? this.verdictAsync,
+    );
+  }
+}
+
+/// Controlador del destino temporal en el mapa y su estimación de tarifa media de taxi.
+class MapDestinationEstimatorNotifier
+    extends Notifier<MapDestinationEstimatorState?> {
+  int _requestSeq = 0;
+
+  @override
+  MapDestinationEstimatorState? build() => null;
+
+  /// Marca un punto destino (libre o lugar), intenta usar GPS como origen y consulta la mediana de taxi.
+  Future<void> selectDestination(MapDestinationTarget target) async {
+    final requestToken = ++_requestSeq;
+
+    ref.read(priceMapListOpenProvider.notifier).close();
+    ref.read(selectedMapItemIdProvider.notifier).clear();
+
+    var userLocation = ref.read(userMapLocationProvider);
+    var usedGps = userLocation.hasLocation;
+    var originLat = userLocation.latitude ?? kValleduparCenterLat;
+    var originLng = userLocation.longitude ?? kValleduparCenterLng;
+
+    state = MapDestinationEstimatorState(
+      destination: target,
+      originLatitude: originLat,
+      originLongitude: originLng,
+      usedGpsOrigin: usedGps,
+      verdictAsync: const AsyncLoading(),
+    );
+
+    if (!usedGps) {
+      final fetched = await ref
+          .read(userMapLocationProvider.notifier)
+          .requestAndFetchLocation();
+      if (!ref.mounted || requestToken != _requestSeq) return;
+      if (fetched != null) {
+        originLat = fetched.$1;
+        originLng = fetched.$2;
+        usedGps = true;
+        state = state?.copyWith(
+          originLatitude: originLat,
+          originLongitude: originLng,
+          usedGpsOrigin: true,
+        );
+      }
+    }
+
+    final municipality = ref.read(selectedMunicipalityProvider);
+    final code = municipality?.code ?? '20001';
+
+    try {
+      final verdict = await ref
+          .read(priceVerdictRepositoryProvider)
+          .evaluatePrice(
+            categoryId: kTaxiCategoryId,
+            municipalityCode: code,
+            zoneId: '',
+            originLatitude: originLat,
+            originLongitude: originLng,
+            destinationLatitude: target.latitude,
+            destinationLongitude: target.longitude,
+            submittedCop: kTaxiReferenceProbeCop,
+          );
+      if (!ref.mounted || requestToken != _requestSeq) return;
+      state = state?.copyWith(verdictAsync: AsyncData(verdict));
+    } catch (error, stackTrace) {
+      if (!ref.mounted || requestToken != _requestSeq) return;
+      state = state?.copyWith(verdictAsync: AsyncError(error, stackTrace));
+    }
+  }
+
+  /// Reintenta la consulta de estimación de taxi para el destino actual.
+  Future<void> retry() async {
+    final current = state;
+    if (current == null) return;
+    await selectDestination(current.destination);
+  }
+
+  /// Limpia el marcador temporal de destino y la tarjeta de estimación.
+  void clear() {
+    _requestSeq++;
+    state = null;
+  }
+}
+
+/// Provider de estado para la estimación de taxi sobre el destino elegido en el mapa.
+final mapDestinationEstimatorProvider =
+    NotifierProvider.autoDispose<
+      MapDestinationEstimatorNotifier,
+      MapDestinationEstimatorState?
+    >(MapDestinationEstimatorNotifier.new);
 
 
 /// Resultado y estado activo de selección de un punto preciso en el mapa municipal.

@@ -157,4 +157,34 @@ void main() {
       expect(_sampleItems[2].alignmentY, closeTo(0.0, 0.0001));
     });
   });
+
+  group('filterSheetPlaceItems', () {
+    test(
+      'excluye reportes históricos de precios y comercios demo, y prioriza elemento seleccionado',
+      () {
+        final result = filterSheetPlaceItems(
+          _sampleItems,
+          prioritizedId: '3',
+        );
+        expect(result.map((e) => e.id).toList(), ['3', '1']);
+      },
+    );
+
+    test('filtra lugares por categoría services y consulates', () {
+      expect(
+        filterSheetPlaceItems(
+          _sampleItems,
+          category: PriceMapCategory.services,
+        ).map((e) => e.id).toList(),
+        ['1'],
+      );
+      expect(
+        filterSheetPlaceItems(
+          _sampleItems,
+          category: PriceMapCategory.consulates,
+        ).map((e) => e.id).toList(),
+        ['3'],
+      );
+    });
+  });
 }

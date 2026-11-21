@@ -4,18 +4,28 @@ import 'package:via_justa/features/contracts/domain/contract_analysis.dart';
 import 'package:via_justa/features/contracts/presentation/state/contract_analysis_provider.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/data/demo_price_verdict_repository.dart';
+import 'package:via_justa/features/prices/data/geolocator_device_location_gateway.dart';
 import 'package:via_justa/features/prices/data/supabase_price_verdict_repository.dart';
+import 'package:via_justa/features/prices/domain/device_location.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_category.dart';
 import 'package:via_justa/features/prices/domain/price_contribution.dart';
 import 'package:via_justa/features/prices/domain/price_verdict.dart';
 import 'package:via_justa/features/prices/domain/price_verdict_repository.dart';
 
+/// Proveedor del servicio GPS del dispositivo (único punto que conoce `GeolocatorDeviceLocationGateway`).
+final deviceLocationGatewayProvider = Provider<DeviceLocationGateway>(
+  (ref) => const GeolocatorDeviceLocationGateway(),
+);
+
 /// Proveedor del repositorio de veredictos de precio (único lugar que conoce la implementación concreta).
 final priceVerdictRepositoryProvider = Provider<PriceVerdictRepository>((ref) {
   final client = ref.watch(supabaseClientProvider);
   if (client != null) {
-    return SupabasePriceVerdictRepository(client);
+    return SupabasePriceVerdictRepository(
+      client,
+      locationGateway: ref.watch(deviceLocationGatewayProvider),
+    );
   }
   return const DemoPriceVerdictRepository();
 });
@@ -159,23 +169,29 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
     String municipalityCode = '20001',
   }) async {
     _requestToken++;
-    final repository = ref.read(priceVerdictRepositoryProvider);
-    final detectedZone = await repository.detectCurrentZoneByGps(
-      municipalityCode: municipalityCode,
-    );
-    state = state.copyWith(
-      locationPermission: LocationPermissionStatus.granted,
-      isManualMapOpen: false,
-      selectedZoneId: detectedZone.id,
-      originLatitude: detectedZone.centerLat,
-      originLongitude: detectedZone.centerLng,
-      pinNormalizedX: detectedZone.normalizedX,
-      pinNormalizedY: detectedZone.normalizedY,
-      clearScenario: true,
-      amountError: false,
-      destinationError: false,
-      verdictAsync: const AsyncData<PriceVerdict?>(null),
-    );
+    try {
+      final repository = ref.read(priceVerdictRepositoryProvider);
+      final detectedZone = await repository.detectCurrentZoneByGps(
+        municipalityCode: municipalityCode,
+      );
+      if (!ref.mounted) return;
+      state = state.copyWith(
+        locationPermission: LocationPermissionStatus.granted,
+        isManualMapOpen: false,
+        selectedZoneId: detectedZone.id,
+        originLatitude: detectedZone.centerLat,
+        originLongitude: detectedZone.centerLng,
+        pinNormalizedX: detectedZone.normalizedX,
+        pinNormalizedY: detectedZone.normalizedY,
+        clearScenario: true,
+        amountError: false,
+        destinationError: false,
+        verdictAsync: const AsyncData<PriceVerdict?>(null),
+      );
+    } catch (_) {
+      if (!ref.mounted) return;
+      denyLocationPermissionAndOpenMap();
+    }
   }
 
   /// Deniega el permiso de ubicación del teléfono y habilita el mapa interactivo para selección manual.
