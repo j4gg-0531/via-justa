@@ -11,10 +11,12 @@ import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/core/widgets/vj_search_field.dart';
 import 'package:via_justa/features/map_colombia/domain/department.dart';
 import 'package:via_justa/features/map_colombia/presentation/state/map_providers.dart';
+import 'package:via_justa/features/municipality/domain/city_visual_identity.dart';
 import 'package:via_justa/features/municipality/domain/municipality.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
+import 'package:via_justa/features/municipality/presentation/widgets/city_cultural_illustration.dart';
 
-/// Pantalla 4 · Selector de municipios de un departamento.
+/// Pantalla 4 · Selector de municipios de un departamento con cabecera ilustrada.
 class MunicipalitySelectorPage extends ConsumerWidget {
   const MunicipalitySelectorPage({super.key, required this.departmentCode});
 
@@ -199,90 +201,112 @@ class _HeaderWithSearch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final departmentIdentity = CityVisualIdentityCatalog.forDepartment(
+      department.code,
+    );
+    final accentColor = Color(departmentIdentity.accentHex);
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 26),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: AppColors.textPrimary,
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(24),
-                bottomRight: Radius.circular(24),
-              ),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(24),
+              bottomRight: Radius.circular(24),
             ),
-            child: SafeArea(
-              bottom: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: AppSpacing.lg,
-                      top: AppSpacing.sm,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ExcludeSemantics(
+                    child: CustomPaint(
+                      painter: CulturalLandscapePainter(
+                        identity: departmentIdentity,
+                        showCenterpiece: false,
+                      ),
                     ),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white),
-                        tooltip: 'common.back'.tr(),
-                        onPressed: () => context.pop(),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.white.withValues(alpha: 0.1),
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(48, 48),
+                  ),
+                ),
+                SafeArea(
+                  bottom: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          left: AppSpacing.lg,
+                          top: AppSpacing.sm,
+                        ),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                            ),
+                            tooltip: 'common.back'.tr(),
+                            onPressed: () => context.pop(),
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.black.withValues(
+                                alpha: 0.22,
+                              ),
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(48, 48),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  Container(
-                    width: 56,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFD600), // Dorado
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: const Icon(
-                      Icons.wb_sunny,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.lg,
-                    ),
-                    child: Text(
-                      department.name,
-                      style: textTheme.headlineMedium?.copyWith(
-                        color: Colors.white,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xl,
-                    ),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'municipality.destination'.tr(),
-                        style: textTheme.bodySmall?.copyWith(
-                          color: AppColors.textMuted,
-                          fontSize: 12,
-                          letterSpacing: 1.2,
+                      CulturalHeaderMedallion(identity: departmentIdentity),
+                      const SizedBox(height: AppSpacing.md),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.lg,
+                        ),
+                        child: Text(
+                          department.name,
+                          style: textTheme.headlineMedium?.copyWith(
+                            color: Colors.white,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
                       ),
-                    ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.lg,
+                        ),
+                        child: Text(
+                          departmentIdentity.tagKey.tr(),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: accentColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.xl,
+                        ),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'municipality.destination'.tr(),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              fontSize: 12,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                    ],
                   ),
-                  const SizedBox(height: AppSpacing.xl),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -309,25 +333,52 @@ class _MunicipalityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final identity = CityVisualIdentityCatalog.forMunicipality(
+      municipalityCode: municipality.code,
+      departmentCode: municipality.departmentCode,
+      isPilot: municipality.isPilot,
+    );
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 52),
+          constraints: const BoxConstraints(minHeight: 58),
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.lg,
-              vertical: AppSpacing.md,
+              vertical: AppSpacing.sm,
             ),
             child: Row(
               children: [
-                Expanded(
-                  child: Text(municipality.name, style: textTheme.titleMedium),
+                DepartmentCulturalEmblemBadge(
+                  identity: identity,
+                  size: 38,
+                  highlight: municipality.isPilot,
                 ),
-                if (municipality.isPilot)
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(municipality.name, style: textTheme.titleMedium),
+                      Text(
+                        identity.tagKey.tr(),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                if (municipality.isPilot) ...[
+                  const SizedBox(width: AppSpacing.xs),
                   VjBadge(label: 'municipality.pilot_badge'.tr()),
+                ],
               ],
             ),
           ),

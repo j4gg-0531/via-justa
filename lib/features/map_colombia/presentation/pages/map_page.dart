@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,9 +13,11 @@ import 'package:via_justa/core/widgets/vj_search_field.dart';
 import 'package:via_justa/features/map_colombia/domain/department.dart';
 import 'package:via_justa/features/map_colombia/domain/department_shape.dart';
 import 'package:via_justa/features/map_colombia/presentation/state/map_providers.dart';
+import 'package:via_justa/features/municipality/domain/city_visual_identity.dart';
+import 'package:via_justa/features/municipality/presentation/widgets/city_cultural_illustration.dart';
 
-/// Pantalla 3 (M03 · VJ-09) · Mapa real de los 33 territorios de Colombia
-/// (32 departamentos + Bogotá, D.C.) con buscador y selección táctil.
+/// Pantalla 3 (M03 · VJ-09) · Croquis ilustrado de los 33 territorios de Colombia
+/// (32 departamentos + Bogotá, D.C.) con resaltado dinámico por zona seleccionada.
 class MapPage extends ConsumerWidget {
   const MapPage({super.key});
 
@@ -40,6 +44,9 @@ class MapPage extends ConsumerWidget {
     final geometryAsync = ref.watch(colombiaMapGeometryProvider);
     final features = ref.watch(colombiaMapFeaturesProvider);
     final selectedDepartment = ref.watch(selectedDepartmentProvider);
+    final selectedIdentity = CityVisualIdentityCatalog.forDepartment(
+      selectedDepartment.code,
+    );
     final hasQuery = ref.watch(hasDepartmentQueryProvider);
     final suggestions = ref.watch(filteredDepartmentsProvider);
     final textTheme = Theme.of(context).textTheme;
@@ -48,7 +55,7 @@ class MapPage extends ConsumerWidget {
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // 1. Lienzo cartográfico vectorial de Colombia con zoom y desplazamiento
+          // 1. Lienzo estilo Croquis de Colombia con zona seleccionada destacada
           Positioned.fill(
             child: Semantics(
               label: 'map.semantics'.tr(),
@@ -104,8 +111,7 @@ class MapPage extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    // Recuadro accesible para San Andrés y Providencia (código 88),
-                    // cuyas islas son muy pequeñas a escala nacional.
+                    // Recuadro accesible para San Andrés y Providencia (código 88)
                     _SanAndresInsetChip(
                       isSelected:
                           selectedDepartment.code == Departments.sanAndres.code,
@@ -151,8 +157,23 @@ class MapPage extends ConsumerWidget {
                           ),
                           itemBuilder: (context, index) {
                             final dept = suggestions[index];
+                            final deptIdentity =
+                                CityVisualIdentityCatalog.forDepartment(
+                                  dept.code,
+                                );
                             return ListTile(
+                              leading: DepartmentCulturalEmblemBadge(
+                                identity: deptIdentity,
+                                size: 34,
+                                highlight: dept.isAvailable,
+                              ),
                               title: Text(dept.name),
+                              subtitle: Text(
+                                deptIdentity.tagKey.tr(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.bodySmall,
+                              ),
                               trailing: dept.isAvailable
                                   ? VjBadge(
                                       label: 'municipality.pilot_badge'.tr(),
@@ -174,7 +195,7 @@ class MapPage extends ConsumerWidget {
               ),
             ),
 
-          // 4. Tarjeta inferior del departamento seleccionado + crédito de fuente
+          // 4. Tarjeta inferior del departamento seleccionado con emblema ilustrado + crédito de fuente
           Positioned(
             bottom: AppSpacing.lg,
             left: AppSpacing.lg,
@@ -197,25 +218,10 @@ class MapPage extends ConsumerWidget {
                     ),
                     child: Row(
                       children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: selectedDepartment.isAvailable
-                                ? AppColors.primarySoft
-                                : AppColors.background,
-                            borderRadius: BorderRadius.circular(AppRadius.sm),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            selectedDepartment.code,
-                            style: textTheme.titleMedium?.copyWith(
-                              color: selectedDepartment.isAvailable
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
+                        DepartmentCulturalEmblemBadge(
+                          identity: selectedIdentity,
+                          size: 44,
+                          highlight: selectedDepartment.isAvailable,
                         ),
                         const SizedBox(width: AppSpacing.md),
                         Expanded(
@@ -233,11 +239,27 @@ class MapPage extends ConsumerWidget {
                                       fontSize: 15,
                                     ),
                                   ),
+                                  Text(
+                                    '· ${selectedDepartment.code}',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                                   if (selectedDepartment.isAvailable)
                                     VjBadge(
                                       label: 'municipality.pilot_badge'.tr(),
                                     ),
                                 ],
+                              ),
+                              Text(
+                                selectedIdentity.tagKey.tr(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               Text(
                                 selectedDepartment.isAvailable
@@ -311,6 +333,8 @@ class MapPage extends ConsumerWidget {
 
     final bounds = geometry.bounds;
     final cesarAnchor = geometry.canvasAnchorForCode(Departments.cesar.code);
+    final selectedAnchor =
+        geometry.canvasAnchorForCode(selectedDepartment.code) ?? cesarAnchor;
 
     return InteractiveViewer(
       minScale: 1,
@@ -350,12 +374,14 @@ class MapPage extends ConsumerWidget {
                         features: features,
                         bounds: bounds,
                         selectedCode: selectedDepartment.code,
+                        cesarAnchor: cesarAnchor,
+                        selectedAnchor: selectedAnchor,
                       ),
                     ),
                     if (cesarAnchor != null)
                       Positioned(
-                        left: cesarAnchor.x - 42,
-                        top: cesarAnchor.y - 24,
+                        left: cesarAnchor.x - 52,
+                        top: cesarAnchor.y - 28,
                         child: _DepartmentBubble(
                           department: Departments.cesar,
                           onTap: () => _handleDepartmentSelection(
@@ -376,64 +402,120 @@ class MapPage extends ConsumerWidget {
   }
 }
 
+/// Pintor estilo Croquis Ilustrado de Colombia:
+/// 1. Silueta celeste desplazada (`Offset(9, 8)`) exactamente como en el croquis de referencia.
+/// 2. Contorno exterior continuo en tinta oscura (`#181F26`) que bordea el croquis de Colombia.
+/// 3. Relleno interior celeste claro unificado con divisiones departamentales sutiles.
+/// 4. Resaltado vivo de la zona/departamento seleccionado (`selectedCode`, p. ej. Cesar `20`)
+///    con su borde en tinta y adornos culturales.
 class _ColombiaMapPainter extends CustomPainter {
   const _ColombiaMapPainter({
     required this.features,
     required this.bounds,
     required this.selectedCode,
+    this.cesarAnchor,
+    this.selectedAnchor,
   });
 
   final List<DepartmentMapFeature> features;
   final MapBounds bounds;
   final String selectedCode;
+  final MapPoint? cesarAnchor;
+  final MapPoint? selectedAnchor;
+
+  static const Color _croquisOffsetFillColor = Color(0xFFB3DCFA);
+  static const Color _croquisBaseFillColor = Color(0xFFC9E6FC);
+  static const Color _croquisPilotFillColor = Color(0xFFA9D6FA);
+  static const Color _croquisOuterInkColor = Color(0xFF181F26);
+  static const Color _croquisInternalLineColor = Color(0xFF8ABBE6);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final fillPaint = Paint()..style = PaintingStyle.fill;
-    final borderPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..color = AppColors.surface
-      ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 2.0;
-
-    final selectedBorderPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..color = AppColors.primary
-      ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 3.0;
-
-    // 1. Pintar primero los departamentos no seleccionados ni piloto
+    final pathsByCode = <String, Path>{};
     for (final feature in features) {
-      final dept = feature.department;
-      final isSelected = dept.code == selectedCode;
-      if (isSelected || dept.isAvailable) continue;
-
-      final path = _buildShapePath(feature.shape);
-      fillPaint.color = AppColors.border;
-      canvas.drawPath(path, fillPaint);
-      canvas.drawPath(path, borderPaint);
+      pathsByCode[feature.department.code] = _buildShapePath(feature.shape);
     }
 
-    // 2. Pintar encima el departamento piloto (Cesar) y el seleccionado
-    // para que su borde azul no quede tapado por vecinos adyacentes.
+    // 1. Capa de sombra/relleno celeste desplazada (efecto croquis offset)
+    final offsetFillPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = _croquisOffsetFillColor;
+    canvas.save();
+    canvas.translate(9.0, 8.0);
+    for (final path in pathsByCode.values) {
+      canvas.drawPath(path, offsetFillPaint);
+    }
+    canvas.restore();
+
+    // 2. Contorno exterior en tinta oscura del croquis de Colombia:
+    // Al trazar primero el borde grueso negro en todos los polígonos y luego
+    // rellenar el interior encima, las fronteras internas quedan cubiertas y
+    // solo sobresale el trazo negro continuo de la silueta exterior de Colombia.
+    final outerInkPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..color = _croquisOuterInkColor
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 7.5;
+    for (final path in pathsByCode.values) {
+      canvas.drawPath(path, outerInkPaint);
+    }
+
+    // 3. Relleno interior celeste del croquis y líneas divisorias internas sutiles
+    final baseFillPaint = Paint()..style = PaintingStyle.fill;
+    final internalStrokePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..color = _croquisInternalLineColor.withValues(alpha: 0.65)
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = 1.1;
+
     for (final feature in features) {
       final dept = feature.department;
-      final isSelected = dept.code == selectedCode;
-      if (!isSelected && !dept.isAvailable) continue;
+      final path = pathsByCode[dept.code]!;
+      baseFillPaint.color = dept.isAvailable
+          ? _croquisPilotFillColor
+          : _croquisBaseFillColor;
+      canvas.drawPath(path, baseFillPaint);
+      canvas.drawPath(path, internalStrokePaint);
+    }
 
-      final path = _buildShapePath(feature.shape);
-      if (dept.isAvailable) {
-        fillPaint.color = isSelected
-            ? AppColors.primary.withValues(alpha: 0.34)
-            : AppColors.primarySoft;
-      } else {
-        fillPaint.color = AppColors.primary.withValues(alpha: 0.22);
-      }
-      canvas.drawPath(path, fillPaint);
+    // 4. Destacar encima la zona/departamento actualmente seleccionado (ej. Cesar)
+    for (final feature in features) {
+      final dept = feature.department;
+      if (dept.code != selectedCode) continue;
+
+      final path = pathsByCode[dept.code]!;
+      final identity = CityVisualIdentityCatalog.forDepartment(dept.code);
+      final accentColor = Color(identity.accentHex);
+
+      // Relleno destacado de la zona seleccionada
+      final selectedFillPaint = Paint()
+        ..style = PaintingStyle.fill
+        ..color = dept.isAvailable
+            ? const Color(0xFF3B82F6).withValues(alpha: 0.82)
+            : accentColor.withValues(alpha: 0.72);
+
+      // Contorno tipo croquis para separar con nitidez la zona seleccionada
+      final selectedBorderPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..color = _croquisOuterInkColor
+        ..strokeJoin = StrokeJoin.round
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 3.2;
+
+      canvas.drawPath(path, selectedFillPaint);
       canvas.drawPath(path, selectedBorderPaint);
     }
 
-    // 3. Recuadro guía alrededor del archipiélago de San Andrés y Providencia (esquina sup. izq.)
+    // 5. Adorno ilustrado sutil de flores amarillas de Cañaguate alrededor del Cesar
+    if (cesarAnchor != null) {
+      _paintSubtleCanaguateGarnish(
+        canvas,
+        Offset(cesarAnchor!.x, cesarAnchor!.y),
+      );
+    }
+
+    // 6. Recuadro guía alrededor del archipiélago de San Andrés y Providencia (esquina sup. izq.)
     final insetRect = RRect.fromRectAndRadius(
       const Rect.fromLTWH(-8, -8, 42, 62),
       const Radius.circular(AppRadius.sm),
@@ -442,9 +524,54 @@ class _ColombiaMapPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..color = selectedCode == Departments.sanAndres.code
           ? AppColors.primary
-          : AppColors.textSecondary.withValues(alpha: 0.5)
-      ..strokeWidth = 1.6;
+          : _croquisOuterInkColor.withValues(alpha: 0.45)
+      ..strokeWidth = 1.8;
     canvas.drawRRect(insetRect, insetPaint);
+  }
+
+  void _paintSubtleCanaguateGarnish(Canvas canvas, Offset anchor) {
+    const goldColor = Color(0xFFFFCA28);
+    _drawMiniBlossom(
+      canvas,
+      Offset(anchor.dx + 22, anchor.dy - 28),
+      6.2,
+      goldColor,
+    );
+    _drawMiniBlossom(
+      canvas,
+      Offset(anchor.dx - 24, anchor.dy + 20),
+      5.4,
+      goldColor,
+    );
+    _drawMiniBlossom(
+      canvas,
+      Offset(anchor.dx + 18, anchor.dy + 24),
+      4.8,
+      goldColor,
+    );
+  }
+
+  void _drawMiniBlossom(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    Color petalColor,
+  ) {
+    final petalPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = petalColor;
+    for (var i = 0; i < 5; i++) {
+      final angle = (i * 2 * math.pi / 5) - (math.pi / 2);
+      final offset = Offset(
+        center.dx + math.cos(angle) * (radius * 0.6),
+        center.dy + math.sin(angle) * (radius * 0.6),
+      );
+      canvas.drawCircle(offset, radius * 0.52, petalPaint);
+    }
+    final corePaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFFE65100);
+    canvas.drawCircle(center, radius * 0.28, corePaint);
   }
 
   Path _buildShapePath(DepartmentShape shape) {
@@ -557,17 +684,17 @@ class _DepartmentBubble extends StatelessWidget {
           child: Center(
             child: Container(
               padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
+                horizontal: AppSpacing.sm,
                 vertical: AppSpacing.xs,
               ),
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(color: AppColors.primary),
+                border: Border.all(color: const Color(0xFF181F26), width: 1.5),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    blurRadius: 4,
+                    color: Colors.black.withValues(alpha: 0.16),
+                    blurRadius: 5,
                     offset: const Offset(0, 2),
                   ),
                 ],
@@ -575,15 +702,33 @@ class _DepartmentBubble extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFCA28).withValues(alpha: 0.32),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      department.isAvailable
+                          ? Icons.music_note_rounded
+                          : Icons.place_rounded,
+                      size: 13,
+                      color: department.isAvailable
+                          ? const Color(0xFFD84315)
+                          : AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
                   Text(
                     department.name,
                     style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF181F26),
+                      fontWeight: FontWeight.w800,
                       fontSize: 13,
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.xs),
+                  const SizedBox(width: 2),
                   const Icon(
                     Icons.chevron_right,
                     color: AppColors.primary,
