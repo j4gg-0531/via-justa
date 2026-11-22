@@ -51,6 +51,20 @@ class SessionController {
   /// intereses registrados y filtros de búsqueda.
   void signOut() {
     unawaited(_ref.read(authControllerProvider.notifier).signOut());
+    _clearLocalFeatureState();
+  }
+
+  /// Elimina la cuenta en el servidor y solo limpia el estado local si el borrado tuvo éxito (`RF-06`).
+  Future<bool> deleteAccount() async {
+    final deleted = await _ref
+        .read(authControllerProvider.notifier)
+        .deleteAccount();
+    if (!deleted) return false;
+    _clearLocalFeatureState();
+    return true;
+  }
+
+  void _clearLocalFeatureState() {
     _ref.read(userNameProvider.notifier).clear();
     _ref.read(profileTypeProvider.notifier).clear();
     _ref.read(selectedMunicipalityProvider.notifier).clear();

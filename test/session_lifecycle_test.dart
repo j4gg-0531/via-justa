@@ -1,7 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:via_justa/core/demo/demo_data.dart';
 import 'package:via_justa/core/session/session_providers.dart';
+import 'package:via_justa/features/auth/domain/auth_failure.dart';
+import 'package:via_justa/features/auth/domain/auth_repository.dart';
+import 'package:via_justa/features/auth/domain/auth_session.dart';
+import 'package:via_justa/features/auth/domain/consent_document.dart';
+import 'package:via_justa/features/auth/domain/sign_up_result.dart';
+import 'package:via_justa/features/auth/domain/user_profile.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 import 'package:via_justa/features/municipality/domain/municipality.dart';
@@ -93,5 +102,124 @@ void main() {
         BusinessCategory.food,
       );
     });
+
+    test('deleteAccount clears feature state only when deletion succeeds', () async {
+      final failingRepo = _SessionFakeAuthRepository(failDelete: true);
+      final failingContainer = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(failingRepo)],
+      );
+      addTearDown(failingContainer.dispose);
+      addTearDown(failingRepo.dispose);
+
+      failingContainer.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+      failingContainer.read(userNameProvider.notifier).setName('Ana');
+      failingContainer
+          .read(profileTypeProvider.notifier)
+          .select(ProfileType.settler);
+
+      final failedResult = await failingContainer
+          .read(sessionControllerProvider)
+          .deleteAccount();
+      expect(failedResult, isFalse);
+      expect(failingContainer.read(userNameProvider), 'Ana');
+      expect(failingContainer.read(profileTypeProvider), ProfileType.settler);
+
+      final successRepo = _SessionFakeAuthRepository(failDelete: false);
+      final successContainer = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(successRepo)],
+      );
+      addTearDown(successContainer.dispose);
+      addTearDown(successRepo.dispose);
+
+      successContainer.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+      successContainer.read(userNameProvider.notifier).setName('Ana');
+      successContainer
+          .read(profileTypeProvider.notifier)
+          .select(ProfileType.settler);
+
+      final okResult = await successContainer
+          .read(sessionControllerProvider)
+          .deleteAccount();
+      expect(okResult, isTrue);
+      expect(successContainer.read(userNameProvider), isNull);
+      expect(successContainer.read(profileTypeProvider), isNull);
+    });
   });
+}
+
+class _SessionFakeAuthRepository implements AuthRepository {
+  _SessionFakeAuthRepository({required this.failDelete});
+
+  final bool failDelete;
+  final StreamController<AuthSession?> _sessions =
+      StreamController<AuthSession?>.broadcast();
+  AuthSession? _session = const AuthSession(
+    userId: 'user-1',
+    email: 'ana@viajusta.co',
+  );
+
+  @override
+  bool get usesDemoData => false;
+
+  @override
+  Stream<AuthSession?> watchSession() => _sessions.stream;
+
+  @override
+  Future<AuthSession?> currentSession() async => _session;
+
+  @override
+  Future<AuthSession> signIn({
+    required String email,
+    required String password,
+  }) async =>
+      _session!;
+
+  @override
+  Future<SignUpResult> signUp({
+    required String email,
+    required String password,
+    required String displayName,
+  }) async =>
+      SignUpResult(session: _session);
+
+  @override
+  Future<void> signOut() async {
+    _session = null;
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    if (failDelete) throw const AuthFailure(AuthFailureKind.network);
+    _session = null;
+  }
+
+  @override
+  Future<UserProfile?> fetchProfile(String userId) async =>
+      const UserProfile(id: 'user-1', displayName: 'Ana');
+
+  @override
+  Future<void> saveDisplayName(String userId, String displayName) async {}
+
+  @override
+  Future<void> saveLanguage(String userId, String language) async {}
+
+  @override
+  Future<void> saveProfileType(String userId, ProfileType type) async {}
+
+  @override
+  Future<void> saveCurrentMunicipality(
+    String userId,
+    String municipalityCode,
+  ) async {}
+
+  @override
+  Future<void> registerConsents({
+    required String userId,
+    required List<ConsentDocType> documents,
+    required String version,
+  }) async {}
+
+  void dispose() => _sessions.close();
 }

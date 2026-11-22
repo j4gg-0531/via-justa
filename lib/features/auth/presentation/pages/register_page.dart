@@ -11,7 +11,6 @@ import 'package:via_justa/features/auth/presentation/state/register_form_provide
 import 'package:via_justa/features/auth/presentation/widgets/auth_error_texts.dart';
 import 'package:via_justa/features/auth/presentation/widgets/auth_failure_text.dart';
 import 'package:via_justa/features/auth/presentation/widgets/legal_text.dart';
-import 'package:via_justa/features/auth/presentation/widgets/or_divider.dart';
 
 /// Pantalla de creación de cuenta.
 ///
@@ -61,11 +60,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
     }
-  }
-
-  void _showComingSoon() {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('common.coming_soon'.tr())));
   }
 
   @override
@@ -173,14 +167,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       VjButton(
                         label: 'register.submit'.tr(),
                         onPressed: authState.isBusy ? null : _submit,
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
-                      const OrDivider(),
-                      const SizedBox(height: AppSpacing.xl),
-                      VjButton(
-                        label: 'login.google'.tr(),
-                        variant: VjButtonVariant.outlined,
-                        onPressed: _showComingSoon,
                       ),
                       if (authState.usesDemoData) ...[
                         const SizedBox(height: AppSpacing.xl),

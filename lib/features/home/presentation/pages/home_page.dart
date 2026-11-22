@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/session/session_providers.dart';
+import 'package:via_justa/core/supabase/supabase_providers.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
@@ -213,7 +214,7 @@ class _ProfileBadge extends StatelessWidget {
 }
 
 /// M05: Inicio para Visitante / Turista
-class _VisitorHomeView extends StatelessWidget {
+class _VisitorHomeView extends ConsumerWidget {
   const _VisitorHomeView({required this.onShowDialog});
 
   final void Function(
@@ -223,8 +224,9 @@ class _VisitorHomeView extends StatelessWidget {
   }) onShowDialog;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
+    final isDemoMode = ref.watch(isDemoModeProvider);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -237,6 +239,7 @@ class _VisitorHomeView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 padding: const EdgeInsets.all(AppSpacing.xs),
@@ -252,15 +255,24 @@ class _VisitorHomeView extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
-                child: Text(
-                  'home.visitor_banner_title'.tr(),
-                  style: textTheme.titleMedium?.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
+                child: Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'home.visitor_banner_title'.tr(),
+                      style: textTheme.titleMedium?.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    VjBadge(
+                      label: isDemoMode
+                          ? 'home.visitor_banner_badge'.tr()
+                          : 'home.visitor_banner_live_badge'.tr(),
+                    ),
+                  ],
                 ),
-              ),
-              VjBadge(
-                label: 'home.visitor_banner_badge'.tr(),
               ),
             ],
           ),

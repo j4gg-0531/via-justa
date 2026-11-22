@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:via_justa/features/auth/data/auth_failure_mapper.dart';
@@ -50,13 +53,21 @@ void main() {
       );
     });
 
-    test('maps retryable fetch errors to network', () {
+    test('maps retryable fetch, socket and timeout errors to network', () {
       expect(
         toAuthFailure(AuthRetryableFetchException()).kind,
         AuthFailureKind.network,
       );
       expect(
         toAuthFailure(const AuthException('offline', statusCode: '0')).kind,
+        AuthFailureKind.network,
+      );
+      expect(
+        toAuthFailure(const SocketException('offline')).kind,
+        AuthFailureKind.network,
+      );
+      expect(
+        toAuthFailure(TimeoutException('timeout')).kind,
         AuthFailureKind.network,
       );
     });

@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:via_justa/features/auth/domain/auth_failure.dart';
 
@@ -5,6 +8,10 @@ import 'package:via_justa/features/auth/domain/auth_failure.dart';
 /// dominio. Mantiene a las pantallas ajenas a GoTrue y a PostgREST.
 AuthFailure toAuthFailure(Object error) {
   if (error is AuthFailure) return error;
+
+  if (error is SocketException || error is TimeoutException) {
+    return const AuthFailure(AuthFailureKind.network);
+  }
 
   // Los fallos de red reintentables heredan de AuthException: se evalúan antes.
   if (error is AuthRetryableFetchException) {

@@ -10,7 +10,6 @@ import 'package:via_justa/features/auth/presentation/state/auth_controller.dart'
 import 'package:via_justa/features/auth/presentation/state/login_form_provider.dart';
 import 'package:via_justa/features/auth/presentation/widgets/auth_error_texts.dart';
 import 'package:via_justa/features/auth/presentation/widgets/auth_failure_text.dart';
-import 'package:via_justa/features/auth/presentation/widgets/or_divider.dart';
 
 /// Pantalla de inicio de sesión.
 ///
@@ -54,11 +53,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
     }
-  }
-
-  void _showComingSoon() {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('common.coming_soon'.tr())));
   }
 
   @override
@@ -130,31 +124,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           ),
                         ),
                       ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _showComingSoon,
-                          style: TextButton.styleFrom(
-                            minimumSize: const Size(0, 48),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.sm,
-                            ),
-                          ),
-                          child: Text('auth.forgot_password'.tr()),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
+                      const SizedBox(height: AppSpacing.xl),
                       VjButton(
                         label: 'common.continue'.tr(),
                         onPressed: authState.isBusy ? null : _submit,
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
-                      const OrDivider(),
-                      const SizedBox(height: AppSpacing.xl),
-                      VjButton(
-                        label: 'login.google'.tr(),
-                        variant: VjButtonVariant.outlined,
-                        onPressed: _showComingSoon,
                       ),
                       if (authState.usesDemoData) ...[
                         const SizedBox(height: AppSpacing.xl),

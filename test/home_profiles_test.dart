@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:via_justa/core/router/app_router.dart';
+import 'package:via_justa/core/supabase/supabase_providers.dart';
 import 'package:via_justa/features/home/presentation/pages/home_page.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/onboarding/domain/profile_type.dart';
@@ -41,6 +42,27 @@ void main() {
       expect(find.text('home.visitor_banner_badge'), findsOneWidget);
       expect(find.text('home.profile_tag_visitor'), findsOneWidget);
       expect(find.text('home.tools_title'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'renders live pilot badge for visitor view when connected to Supabase',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            isDemoModeProvider.overrideWithValue(false),
+            profileTypeProvider.overrideWith(
+              () => _FakeProfileTypeNotifier(ProfileType.visitor),
+            ),
+          ],
+          child: const MaterialApp(home: HomePage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('home.visitor_banner_live_badge'), findsOneWidget);
+      expect(find.text('home.visitor_banner_badge'), findsNothing);
     },
   );
 

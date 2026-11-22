@@ -2,20 +2,21 @@
 
 > **Alcance y Responsabilidad:**  
 > Este documento establece el procedimiento reproducible en Windows (PowerShell) para empaquetar, firmar, restringir credenciales de nube (Supabase Auth, Google Maps SDK, Google OAuth y Gemini Edge Function), verificar en teléfono Android real y respaldar el proyecto para la entrega de producción (`VJ-20`).  
-> *Nota de estado actual:* En el árbol de código actual, `android/app/build.gradle.kts` conserva temporalmente `applicationId = "com.example.via_justa"` y firma con llave debug para pruebas locales de desarrollo. La migración del paquete y del `signingConfig` de release en Gradle debe ejecutarse en coordinación con el responsable de Frontend una vez el equipo confirme el identificador definitivo (p. ej. `co.viajusta.app`).
+> *Nota de estado actual:* `android/app/build.gradle.kts` y `MainActivity.kt` ya fueron migrados al paquete definitivo `co.viajusta.app`, `AndroidManifest.xml` usa `android:label="Vía Justa"`, y Gradle lee `android/key.properties` para configurar `signingConfigs.release` (manteniendo respaldo a `debug` únicamente mientras no exista `android/key.properties` local). Queda pendiente crear el keystore `.jks` local fuera del repositorio, actualizar las restricciones de `MAPS_API_KEY` con el nuevo `applicationId` y el `SHA-1` de release, y verificar el `app-release.apk` en dispositivo físico.
 
 ---
 
 ## 1. Definición de Identidad del Paquete (`applicationId` y `namespace`)
 
-Antes de generar el APK definitivo o registrar clientes OAuth de producción:
+Antes de generar el APK definitivo o registrar clientes en la nube:
 
-1. **Identificador actual (Desarrollo):** `com.example.via_justa`
-2. **Identificador objetivo (Release):** Definir con el equipo un dominio inverso propio (ej. `co.viajusta.app` o `edu.unicesar.viajusta`).
-3. **Archivos de Frontend impactados al cambiar el `applicationId`:**
-   - `android/app/build.gradle.kts` (`namespace` y `defaultConfig.applicationId`).
-   - Ruta del paquete de `MainActivity.kt` bajo `android/app/src/main/kotlin/...`.
-   - Reglas de restricción de API Key en Google Cloud Console y Redirect URIs en Supabase Auth.
+1. **Identificador previo (Desarrollo):** `com.example.via_justa`
+2. **Identificador definitivo (Aplicado en código):** `co.viajusta.app`
+3. **Archivos de Frontend actualizados:**
+   - `android/app/build.gradle.kts` (`namespace`, `defaultConfig.applicationId` y lectura condicional de `android/key.properties`).
+   - `android/app/src/main/kotlin/co/viajusta/app/MainActivity.kt` (`package co.viajusta.app`).
+   - `android/app/src/main/AndroidManifest.xml` (`android:label="Vía Justa"`).
+   - Reglas de restricción de API Key en Google Cloud Console (`co.viajusta.app` + `SHA-1` de debug y release).
 
 ---
 
@@ -154,8 +155,9 @@ Conectar el teléfono físico por USB con *Depuración por USB* activa:
    - Aporte de precio real en 4 pasos (`submit_price_report`) → verificación de actualización.
    - Mapa de precios y servicios (`get_municipality_map_items`) → renderizado de tiles de Google Maps con certificado de release.
    - Escaneo OCR local de contrato sintético → análisis con Gemini (`analyze_contract`) → descuento de cuota diaria (`get_my_ai_quota_status`).
-   - Vista cultural de Valledupar (`get_city_overview` en `es`/`en`) → directorio de negocios aprobados (`get_business_catalog` y `get_business_detail`) → apertura de enlaces externos (`wa.me`, `tel:`, Google Maps).
-   - Cierre de sesión limpio (`logout`) verificando que el botón "Atrás" de Android no regrese a pantallas privadas.
+   - Directorio de negocios aprobados (`get_business_catalog` y `get_business_detail`), registro de negocios, valoraciones y apertura de enlaces externos (`wa.me`, `tel:`, Google Maps).
+   - *(Diferido en UI)*: Vista cultural `get_city_overview` / `get_city_events_status` (`VJ-15`); la identidad visual ilustrada de departamentos y municipios ya está integrada.
+   - Cierre de sesión (`logout`) y eliminación definitiva de cuenta en Perfil (`delete_my_account`), verificando que el botón "Atrás" de Android no regrese a pantallas privadas.
 2. **Sin Internet (Modo Avión / Fallback):**
    - Verificar que la app no sufra *crash* ni pantallas blancas al perder red, mostrando estados de error traducidos con opción de reintentar o el modo DEMO explícitamente rotulado.
 

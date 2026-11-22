@@ -1,4 +1,4 @@
-package com.example.via_justa
+package co.viajusta.app
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -36,6 +36,9 @@ abstract class AuthRepository {
   /// Cierra la sesión en el dispositivo (y en el servidor si aplica).
   Future<void> signOut();
 
+  /// Elimina definitivamente la cuenta autenticada y sus datos personales (`RF-06`).
+  Future<void> deleteAccount();
+
   /// Perfil del usuario o `null` si todavía no existe la fila.
   Future<UserProfile?> fetchProfile(String userId);
 
