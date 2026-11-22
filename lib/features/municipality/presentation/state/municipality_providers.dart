@@ -6,6 +6,7 @@ import 'package:via_justa/features/map_colombia/presentation/state/map_providers
 import 'package:via_justa/features/municipality/data/local_municipality_repository.dart';
 import 'package:via_justa/features/municipality/data/supabase_municipality_repository.dart';
 import 'package:via_justa/features/municipality/domain/municipality.dart';
+import 'package:via_justa/features/municipality/domain/municipality_grouping.dart';
 import 'package:via_justa/features/municipality/domain/municipality_repository.dart';
 import 'package:via_justa/features/municipality/domain/municipality_search.dart';
 
@@ -125,6 +126,41 @@ final filteredMunicipalitiesProvider = Provider.autoDispose
   );
   return municipalities.whenData((all) => searchMunicipalities(all, query));
 });
+
+/// Municipios filtrados y particionados en piloto vs. próximos usando regla de dominio.
+final partitionedMunicipalitiesProvider = Provider.autoDispose
+    .family<AsyncValue<MunicipalityListPartition>, String>((
+  ref,
+  departmentCode,
+) {
+  final filtered = ref.watch(filteredMunicipalitiesProvider(departmentCode));
+  return filtered.whenData(partitionMunicipalities);
+});
+
+/// Total de municipios cargados para un departamento (usado en el badge de cabecera).
+final departmentMunicipalityCountProvider =
+    Provider.autoDispose.family<int?, String>((ref, departmentCode) {
+  return ref
+      .watch(municipalitiesByDepartmentProvider(departmentCode))
+      .value
+      ?.length;
+});
+
+/// Índice activo del carrusel fotográfico de sitios icónicos en `MunicipalityPage`.
+/// Se descarta al salir de la pantalla para iniciar siempre en la primera fotografía.
+class MunicipalityGalleryIndexNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void selectIndex(int index, {required int total}) {
+    state = clampGalleryIndex(index, total);
+  }
+}
+
+final municipalityGalleryIndexProvider =
+    NotifierProvider.autoDispose<MunicipalityGalleryIndexNotifier, int>(
+  MunicipalityGalleryIndexNotifier.new,
+);
 
 /// Códigos de municipios en los que el usuario pidió ser notificado.
 /// Solo en memoria: preparado para conectar con `public.interest_registrations` en Supabase.

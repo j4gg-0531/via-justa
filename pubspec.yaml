@@ -71,6 +71,7 @@ flutter:
   assets:
     - assets/translations/
     - assets/images/
+    - assets/images/cities/valledupar/
     - assets/data/
 
   # To add assets to your application, add an assets section, like this:

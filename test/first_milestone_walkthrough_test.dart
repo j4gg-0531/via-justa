@@ -116,7 +116,9 @@ void main() {
       router.push(AppRoutes.departmentPath('20'));
       await tester.pumpAndSettle();
       expect(find.byType(MunicipalitySelectorPage), findsOneWidget);
-      expect(find.text('municipality.search_prompt'), findsOneWidget);
+      expect(find.text('municipality.available_now_section'), findsOneWidget);
+      expect(find.text('Valledupar'), findsOneWidget);
+      expect(find.text('Aguachica'), findsOneWidget);
 
       await tester.enterText(find.byType(TextField), 'a');
       await tester.pumpAndSettle();

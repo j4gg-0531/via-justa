@@ -172,9 +172,21 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Default selected department is Cesar ('20')
+      // Default state is unselected (clean white map with subtle pilot hint on Cesar)
+      expect(container.read(selectedDepartmentProvider), isNull);
+      expect(find.text('map.select_prompt_title'), findsOneWidget);
+      expect(find.text('Cesar'), findsOneWidget);
+
+      // Select Cesar ('20') via real SVG interior point
+      final cesarCenter = realGeometry.shapeByCode('20')!.primaryCenter;
+      final cesarHit = container
+          .read(selectedDepartmentProvider.notifier)
+          .selectAtMapPoint(cesarCenter);
+      await tester.pumpAndSettle();
+
+      expect(cesarHit, Departments.cesar);
       expect(container.read(selectedDepartmentProvider), Departments.cesar);
-      expect(find.text('Cesar'), findsWidgets);
+      expect(find.text('map.explore_department'), findsOneWidget);
 
       // Select Antioquia ('05') via real SVG interior point
       final antioquiaCenter = realGeometry.shapeByCode('05')!.primaryCenter;
@@ -185,6 +197,11 @@ void main() {
 
       expect(hit, Departments.antioquia);
       expect(find.text('Antioquia'), findsOneWidget);
+
+      // Clear selection returns to unselected white map
+      container.read(selectedDepartmentProvider.notifier).clear();
+      await tester.pumpAndSettle();
+      expect(container.read(selectedDepartmentProvider), isNull);
       expect(tester.takeException(), isNull);
     });
   });
