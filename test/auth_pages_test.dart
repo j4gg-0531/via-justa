@@ -55,6 +55,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(_buildPage(const WelcomePage()));
+    await tester.pumpAndSettle();
 
     await tester.tapOnText(find.textRange.ofSubstring('login.legal_terms'));
     await tester.pumpAndSettle();

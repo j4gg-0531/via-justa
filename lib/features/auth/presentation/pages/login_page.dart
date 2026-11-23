@@ -4,13 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
+import 'package:via_justa/core/widgets/vj_brand_logo.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
+import 'package:via_justa/core/widgets/vj_card.dart';
+import 'package:via_justa/core/widgets/vj_google_mark.dart';
+import 'package:via_justa/core/widgets/vj_modal_sheet.dart';
 import 'package:via_justa/core/widgets/vj_text_field.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/auth/presentation/state/login_form_provider.dart';
 import 'package:via_justa/features/auth/presentation/state/password_management_providers.dart';
 import 'package:via_justa/features/auth/presentation/widgets/auth_error_texts.dart';
 import 'package:via_justa/features/auth/presentation/widgets/auth_failure_text.dart';
+import 'package:via_justa/features/auth/presentation/widgets/or_divider.dart';
 
 /// Pantalla de inicio de sesión.
 ///
@@ -72,7 +77,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   Future<void> _showForgotPasswordDialog() async {
     final initialEmail = _emailController.text.trim();
-    final updated = await showDialog<bool>(
+    final updated = await showVjModalSheet<bool>(
       context: context,
       builder: (_) => _ForgotPasswordDialog(initialEmail: initialEmail),
     );
@@ -99,18 +104,41 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           child: Column(
             children: [
               const SizedBox(height: AppSpacing.sm),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  tooltip: 'common.back'.tr(),
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => context.pop(),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.surface,
-                    foregroundColor: AppColors.textPrimary,
-                    minimumSize: const Size(48, 48),
+              Row(
+                children: [
+                  Material(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    child: InkWell(
+                      onTap: () => context.pop(),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Icon(
+                          Icons.arrow_back_rounded,
+                          size: 20,
+                          color: AppColors.textPrimary,
+                          semanticLabel: 'common.back'.tr(),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  const Expanded(
+                    child: Center(
+                      child: VjBrandLogo(
+                        size: 40,
+                        borderRadius: AppRadius.md,
+                        padding: 6,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 48),
+                ],
               ),
               Expanded(
                 child: SingleChildScrollView(
@@ -121,83 +149,79 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     children: [
                       const SizedBox(height: AppSpacing.lg),
                       Text('login.title'.tr(), style: textTheme.headlineMedium),
-                      const SizedBox(height: AppSpacing.xl),
-                      VjTextField(
-                        label: 'auth.email'.tr(),
-                        controller: _emailController,
-                        onChanged: notifier.setEmail,
-                        errorText: emailErrorText(state.emailError),
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'login.tagline'.tr(),
+                        style: textTheme.bodyMedium,
                       ),
                       const SizedBox(height: AppSpacing.lg),
-                      VjTextField(
-                        label: 'auth.password'.tr(),
-                        controller: _passwordController,
-                        onChanged: notifier.setPassword,
-                        errorText: passwordErrorText(state.passwordError),
-                        obscureText: state.obscurePassword,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _submit(),
-                        suffixIcon: IconButton(
-                          tooltip: state.obscurePassword
-                              ? 'auth.show_password'.tr()
-                              : 'auth.hide_password'.tr(),
-                          icon: Icon(
-                            state.obscurePassword
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                          ),
-                          onPressed: notifier.toggleObscurePassword,
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size(48, 48),
-                          ),
+                      VjCard(
+                        borderRadius: AppRadius.xl,
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            VjTextField(
+                              label: 'auth.email'.tr(),
+                              controller: _emailController,
+                              onChanged: notifier.setEmail,
+                              errorText: emailErrorText(state.emailError),
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            VjTextField(
+                              label: 'auth.password'.tr(),
+                              controller: _passwordController,
+                              onChanged: notifier.setPassword,
+                              errorText: passwordErrorText(state.passwordError),
+                              obscureText: state.obscurePassword,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _submit(),
+                              suffixIcon: IconButton(
+                                tooltip: state.obscurePassword
+                                    ? 'auth.show_password'.tr()
+                                    : 'auth.hide_password'.tr(),
+                                icon: Icon(
+                                  state.obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
+                                onPressed: notifier.toggleObscurePassword,
+                                style: IconButton.styleFrom(
+                                  minimumSize: const Size(48, 48),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: authState.isBusy
+                                    ? null
+                                    : _showForgotPasswordDialog,
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.primary,
+                                  minimumSize: const Size(48, 48),
+                                ),
+                                child: Text('auth.forgot_password'.tr()),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: authState.isBusy
-                              ? null
-                              : _showForgotPasswordDialog,
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.primary,
-                            minimumSize: const Size(48, 48),
-                          ),
-                          child: Text('auth.forgot_password'.tr()),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
+                      const SizedBox(height: AppSpacing.lg),
                       VjButton(
                         label: 'common.continue'.tr(),
                         onPressed: authState.isBusy ? null : _submit,
                       ),
                       const SizedBox(height: AppSpacing.lg),
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Divider(color: AppColors.border),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                            ),
-                            child: Text(
-                              'login.or'.tr(),
-                              style: textTheme.bodySmall,
-                            ),
-                          ),
-                          const Expanded(
-                            child: Divider(color: AppColors.border),
-                          ),
-                        ],
-                      ),
+                      const OrDivider(),
                       const SizedBox(height: AppSpacing.lg),
                       VjButton(
                         label: 'login.google'.tr(),
                         variant: VjButtonVariant.outlined,
-                        leadingIcon: Icons.account_circle_outlined,
+                        leading: const VjGoogleMark(size: 18),
                         onPressed: authState.isBusy ? null : _signInWithGoogle,
                       ),
                       if (authState.usesDemoData) ...[
@@ -317,21 +341,32 @@ class _ForgotPasswordDialogState extends ConsumerState<_ForgotPasswordDialog> {
     final form = ref.watch(forgotPasswordFormProvider);
     final notifier = ref.read(forgotPasswordFormProvider.notifier);
     final authState = ref.watch(authControllerProvider);
-    final textTheme = Theme.of(context).textTheme;
 
-    return AlertDialog(
-      scrollable: true,
-      title: Text('auth.forgot_password_title'.tr()),
-      content: Column(
+    return VjModalSheet(
+      icon: Icons.lock_reset_rounded,
+      title: 'auth.forgot_password_title'.tr(),
+      subtitle: form.codeSent
+          ? 'auth.forgot_password_code_body'.tr()
+          : 'auth.forgot_password_body'.tr(),
+      closeEnabled: !authState.isBusy,
+      onClose: () => Navigator.of(context).pop(false),
+      footer: VjModalActionRow(
+        cancelLabel: 'common.close'.tr(),
+        onCancel: authState.isBusy
+            ? null
+            : () => Navigator.of(context).pop(false),
+        confirmLabel: form.codeSent
+            ? 'common.save'.tr()
+            : 'auth.forgot_password_cta'.tr(),
+        onConfirm: authState.isBusy
+            ? null
+            : (form.codeSent ? _submitStepTwo : _submitStepOne),
+      ),
+      child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (!form.codeSent) ...[
-            Text(
-              'auth.forgot_password_body'.tr(),
-              style: textTheme.bodyMedium,
-            ),
-            const SizedBox(height: AppSpacing.md),
             VjTextField(
               label: 'auth.email'.tr(),
               controller: _emailController,
@@ -342,11 +377,6 @@ class _ForgotPasswordDialogState extends ConsumerState<_ForgotPasswordDialog> {
               onSubmitted: (_) => _submitStepOne(),
             ),
           ] else ...[
-            Text(
-              'auth.forgot_password_code_body'.tr(),
-              style: textTheme.bodyMedium,
-            ),
-            const SizedBox(height: AppSpacing.md),
             VjTextField(
               label: 'auth.otp_code_label'.tr(),
               controller: _otpController,
@@ -413,29 +443,6 @@ class _ForgotPasswordDialogState extends ConsumerState<_ForgotPasswordDialog> {
           ],
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: authState.isBusy
-              ? null
-              : () => Navigator.of(context).pop(false),
-          style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-          child: Text('common.close'.tr()),
-        ),
-        TextButton(
-          onPressed: authState.isBusy
-              ? null
-              : (form.codeSent ? _submitStepTwo : _submitStepOne),
-          style: TextButton.styleFrom(
-            foregroundColor: AppColors.primary,
-            minimumSize: const Size(48, 48),
-          ),
-          child: Text(
-            form.codeSent
-                ? 'common.save'.tr()
-                : 'auth.forgot_password_cta'.tr(),
-          ),
-        ),
-      ],
     );
   }
 }

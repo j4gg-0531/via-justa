@@ -39,11 +39,9 @@ class DemoContractSummary extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: AppColors.primarySoft,
+              color: AppColors.primarySoft.withValues(alpha: 0.65),
               borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.35),
-              ),
+              border: Border.all(color: AppColors.primaryBorder),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,6 +82,8 @@ class DemoContractSummary extends StatelessWidget {
 
         // Encabezado del caso de ejemplo
         VjCard(
+          borderRadius: AppRadius.xl,
+          elevated: true,
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,7 +102,10 @@ class DemoContractSummary extends StatelessWidget {
                     analysis.localizedContractType(languageCode),
                     style: textTheme.titleMedium,
                   ),
-                  VjBadge(label: 'common.demo_badge'.tr()),
+                  VjBadge(
+                    label: 'common.demo_badge'.tr(),
+                    variant: VjBadgeVariant.neutral,
+                  ),
                 ],
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -135,6 +138,8 @@ class DemoContractSummary extends StatelessWidget {
 
         // Acciones de archivo/foto marcadas como Próximamente (sin solicitar permisos Android)
         VjCard(
+          borderRadius: AppRadius.xl,
+          elevated: true,
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,7 +152,10 @@ class DemoContractSummary extends StatelessWidget {
                       style: textTheme.titleMedium,
                     ),
                   ),
-                  VjBadge(label: 'common.coming_soon'.tr()),
+                  VjBadge(
+                    label: 'common.coming_soon'.tr(),
+                    variant: VjBadgeVariant.neutral,
+                  ),
                 ],
               ),
               const SizedBox(height: AppSpacing.xs),
@@ -212,10 +220,12 @@ class _ContractPointTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: isReview
+            ? AppColors.primarySoft.withValues(alpha: 0.45)
+            : AppColors.surfaceSubtle,
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
-          color: isReview ? AppColors.primary : AppColors.border,
+          color: isReview ? AppColors.primaryBorder : AppColors.border,
         ),
       ),
       child: Row(

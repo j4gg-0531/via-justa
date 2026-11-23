@@ -80,7 +80,7 @@
     }
   },
   "onboarding": {
-    "greeting": "¡Hola, {name}! 👋",
+    "greeting": "¡Hola, {name}!",
     "subtitle": "Para configurar tus herramientas y adaptarnos a tus necesidades, cuéntanos tu situación actual.",
     "visitor": {
       "title": "Visitante / Turista",
@@ -476,9 +476,18 @@
     "contact_dialog_body": "En el MVP piloto, las acciones de contacto conectarán directamente por WhatsApp o llamada con el comercio registrado.",
     "action_edit": "Editar",
     "action_withdraw": "Retirar",
+    "action_view": "Ver ficha",
     "withdraw_error": "No se pudo retirar el negocio. Comprueba tu conexión e inténtalo de nuevo.",
     "load_more": "Cargar más negocios",
-    "no_results": "Aún no hay negocios en esta zona"
+    "no_results": "Aún no hay negocios en esta zona",
+    "your_businesses_section": "Tus negocios",
+    "other_businesses_section": "Otros negocios",
+    "owner_badge": "Tuyo",
+    "status_pending": "En revisión",
+    "status_rejected": "Requiere ajustes",
+    "my_businesses_sheet_title": "Mis negocios",
+    "my_businesses_empty": "Aún no tienes negocios registrados.",
+    "my_businesses_add_another": "Registrar otro negocio"
   },
   "business_detail": {
     "photo_placeholder": "Foto del negocio",
@@ -514,6 +523,8 @@
     "section_profile_desc": "Adapta la experiencia de inicio y sugerencias según tu objetivo.",
     "section_location": "Municipio activo",
     "section_location_desc": "Precios y directorio filtrados por esta localidad.",
+    "section_my_businesses": "Mis negocios",
+    "my_businesses_register_hint": "Registrar",
     "change_city": "Cambiar municipio",
     "section_language": "Idioma de la aplicación",
     "lang_es": "Español",

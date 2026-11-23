@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
+import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 
-/// Tarjeta de opción de perfil con radio visual y badge opcional.
+/// Tarjeta seleccionable moderna para perfiles de onboarding con ícono tonal y check animado.
 class ProfileOptionCard extends StatelessWidget {
   const ProfileOptionCard({
     super.key,
@@ -32,78 +33,87 @@ class ProfileOptionCard extends StatelessWidget {
       inMutuallyExclusiveGroup: true,
       label: title,
       child: VjCard(
-        padding: EdgeInsets.zero,
+        borderRadius: AppRadius.xl,
+        padding: const EdgeInsets.all(AppSpacing.lg),
         selected: selected,
         onTap: onTap,
-        child: Stack(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Row(
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: selected ? AppColors.primary : AppColors.surfaceSubtle,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Icon(
+                icon,
+                size: 22,
+                color: selected ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    selected
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    color: selected ? AppColors.primary : AppColors.textMuted,
-                    size: 24,
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (badge != null)
-                          const SizedBox(height: AppSpacing.md),
-                        Row(
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.xs,
                           children: [
-                            Icon(icon, size: 18, color: AppColors.textMuted),
-                            const SizedBox(width: AppSpacing.sm),
-                            Flexible(
-                              child: Text(
-                                title,
-                                style: textTheme.titleMedium,
+                            Text(title, style: textTheme.titleMedium),
+                            if (badge != null)
+                              VjBadge(
+                                label: badge!,
+                                variant: selected
+                                    ? VjBadgeVariant.navy
+                                    : VjBadgeVariant.tonal,
                               ),
-                            ),
                           ],
                         ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          description,
-                          style: textTheme.bodyMedium,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: selected
+                              ? AppColors.primary
+                              : Colors.transparent,
+                          border: Border.all(
+                            color: selected
+                                ? AppColors.primary
+                                : AppColors.border,
+                            width: 1.5,
+                          ),
                         ),
-                      ],
-                    ),
+                        child: selected
+                            ? const Icon(
+                                Icons.check_rounded,
+                                size: 14,
+                                color: Colors.white,
+                              )
+                            : null,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    description,
+                    style: textTheme.bodyMedium,
                   ),
                 ],
               ),
             ),
-            if (badge != null)
-              Positioned(
-                top: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm,
-                    vertical: AppSpacing.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(AppRadius.sm),
-                    ),
-                  ),
-                  child: Text(
-                    badge!,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),

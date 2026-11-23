@@ -80,7 +80,7 @@
     }
   },
   "onboarding": {
-    "greeting": "Hi, {name}! 👋",
+    "greeting": "Hi, {name}!",
     "subtitle": "To set up your tools and adapt to your needs, tell us about your current situation.",
     "visitor": {
       "title": "Visitor / Tourist",
@@ -476,9 +476,18 @@
     "contact_dialog_body": "In the pilot MVP, contact actions will connect directly via WhatsApp or phone call with the registered business.",
     "action_edit": "Edit",
     "action_withdraw": "Withdraw",
+    "action_view": "View listing",
     "withdraw_error": "Could not withdraw the business. Check your connection and try again.",
     "load_more": "Load more businesses",
-    "no_results": "There are no businesses in this zone yet"
+    "no_results": "There are no businesses in this zone yet",
+    "your_businesses_section": "Your businesses",
+    "other_businesses_section": "Other businesses",
+    "owner_badge": "Yours",
+    "status_pending": "Under review",
+    "status_rejected": "Needs changes",
+    "my_businesses_sheet_title": "My businesses",
+    "my_businesses_empty": "You don't have any registered businesses yet.",
+    "my_businesses_add_another": "Register another business"
   },
   "business_detail": {
     "photo_placeholder": "Business photo",
@@ -514,6 +523,8 @@
     "section_profile_desc": "Adapts your home experience and suggestions to your goal.",
     "section_location": "Active municipality",
     "section_location_desc": "Prices and directory filtered by this location.",
+    "section_my_businesses": "My businesses",
+    "my_businesses_register_hint": "Register",
     "change_city": "Change municipality",
     "section_language": "App language",
     "lang_es": "Español",

@@ -351,6 +351,65 @@ void main() {
       expect(find.text(r'$10.000 COP'), findsNothing);
     },
   );
+
+  testWidgets(
+    'Hoja de lugares con nombre y dirección largos no produce overflow a 360dp y 1.5x',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 780);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final repo = _ConfigurableMapRepository(
+        items: const [
+          PriceMapItem(
+            id: 'biz-long-address',
+            name: 'Agrupación Vallenata Los Juglares del Cañaguate',
+            description:
+                'Conjunto vallenato tradicional (acordeón, caja, guacharaca y voz líder) disponible para serenatas.',
+            category: PriceMapCategory.services,
+            pinKind: PriceMapPinKind.food,
+            status: PricePinStatus.info,
+            pinLabel: '',
+            badgeText:
+                'Calle 15 #6-48 · Plaza Alfonso López, Centro Histórico, Valledupar',
+            normalizedX: 0.5,
+            normalizedY: 0.5,
+            latitude: 10.4742,
+            longitude: -73.2436,
+            address:
+                'Calle 15 #6-48 · Plaza Alfonso López, Centro Histórico, Valledupar',
+            sourceType: 'business',
+            municipalityCode: '20001',
+            isDemo: false,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [priceMapRepositoryProvider.overrideWithValue(repo)],
+          child: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(360, 780),
+              textScaler: TextScaler.linear(1.5),
+            ),
+            child: const MaterialApp(home: PriceMapPage()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('price_map.view_list'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Agrupación Vallenata Los Juglares del Cañaguate'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 class _WidgetTaxiVerdictRepository implements PriceVerdictRepository {

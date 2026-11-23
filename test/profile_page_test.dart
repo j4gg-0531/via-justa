@@ -150,7 +150,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('profile.title'), findsOneWidget);
-    expect(find.text('profile.subtitle'), findsOneWidget);
     expect(find.text('Carlos Vives'), findsOneWidget);
     expect(find.text('profile.user_email'), findsOneWidget);
     expect(find.text('profile.section_profile'), findsOneWidget);
@@ -173,8 +172,8 @@ void main() {
     // Default profile is null / visitor
     expect(container.read(profileTypeProvider), isNull);
 
-    // Tap change profile button
-    await tester.tap(find.text('profile.change_profile'));
+    // Tap compact profile row
+    await tester.tap(find.text('profile.section_profile'));
     await tester.pumpAndSettle();
 
     expect(find.text('profile.dialog_profile_title'), findsOneWidget);
@@ -394,6 +393,126 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'fila Mis negocios se oculta para visitante sin comercios, aparece para dueño y abre hoja de gestión sin overflow',
+    (tester) async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/shared_preferences'),
+            (call) async => call.method == 'getAll' ? <String, Object>{} : true,
+          );
+      await EasyLocalization.ensureInitialized();
+      final translations = jsonDecode(
+        File('assets/translations/es.json').readAsStringSync(),
+      ) as Map<String, dynamic>;
+
+      tester.view.physicalSize = const Size(360, 780);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      Widget wrapWithLocale(ProviderContainer container, Key key) {
+        return UncontrolledProviderScope(
+          key: key,
+          container: container,
+          child: EasyLocalization(
+            supportedLocales: const [Locale('es')],
+            startLocale: const Locale('es'),
+            path: 'assets/translations',
+            assetLoader: _ProfileTestTranslations(translations),
+            child: Builder(
+              builder: (context) => MediaQuery(
+                data: const MediaQueryData(
+                  size: Size(360, 780),
+                  textScaler: TextScaler.linear(1.5),
+                ),
+                child: MaterialApp(
+                  localizationsDelegates: context.localizationDelegates,
+                  supportedLocales: context.supportedLocales,
+                  locale: context.locale,
+                  home: const ProfilePage(),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      // 1. Visitante sin negocios: fila oculta
+      final guestContainer = ProviderContainer(
+        overrides: [
+          myBusinessesProvider.overrideWith((ref) async => const <Business>[]),
+        ],
+      );
+      addTearDown(guestContainer.dispose);
+      await guestContainer.read(myBusinessesProvider.future);
+      await tester.pumpWidget(
+        wrapWithLocale(guestContainer, const ValueKey('guest-profile-scope')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text(translations['profile']['section_my_businesses'] as String),
+        findsNothing,
+      );
+
+      // 2. Dueño con 1 negocio: fila visible con contador y abre hoja modal
+      final ownerContainer = ProviderContainer(
+        overrides: [
+          myBusinessesProvider.overrideWith(
+            (ref) async => const <Business>[
+              Business(
+                id: 'biz-owner-1',
+                ownerId: 'owner-1',
+                name: 'Cafetería El Guatapurí',
+                category: BusinessCategory.food,
+                address: 'Calle 12 #8-20, Valledupar',
+                phone: '',
+                municipalityCode: '20001',
+                status: 'approved',
+              ),
+            ],
+          ),
+        ],
+      );
+      addTearDown(ownerContainer.dispose);
+      await ownerContainer.read(myBusinessesProvider.future);
+      await tester.pumpWidget(
+        wrapWithLocale(ownerContainer, const ValueKey('owner-profile-scope')),
+      );
+      await tester.pumpAndSettle();
+
+      final rowLabel =
+          translations['profile']['section_my_businesses'] as String;
+      expect(find.text(rowLabel), findsOneWidget);
+      expect(find.text('1'), findsOneWidget);
+
+      await tester.ensureVisible(find.text(rowLabel));
+      await tester.tap(find.text(rowLabel));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          translations['businesses']['my_businesses_sheet_title'] as String,
+        ),
+        findsWidgets,
+      );
+      expect(find.text('Cafetería El Guatapurí'), findsOneWidget);
+      expect(
+        find.text(translations['businesses']['action_view'] as String),
+        findsOneWidget,
+      );
+      expect(
+        find.text(translations['businesses']['action_edit'] as String),
+        findsOneWidget,
+      );
+      expect(
+        find.text(translations['businesses']['action_withdraw'] as String),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 class _ProfileTestTranslations extends AssetLoader {

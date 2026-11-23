@@ -10,6 +10,7 @@ class VjTextField extends StatelessWidget {
     required this.controller,
     required this.onChanged,
     this.errorText,
+    this.hintText,
     this.keyboardType,
     this.obscureText = false,
     this.suffixIcon,
@@ -22,6 +23,7 @@ class VjTextField extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final String? errorText;
+  final String? hintText;
   final TextInputType? keyboardType;
   final bool obscureText;
   final Widget? suffixIcon;
@@ -43,15 +45,20 @@ class VjTextField extends StatelessWidget {
           ?.copyWith(color: AppColors.textPrimary),
       decoration: InputDecoration(
         labelText: label,
+        hintText: hintText,
+        labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w500,
+        ),
         errorText: errorText,
         errorMaxLines: 3,
         filled: true,
         fillColor: AppColors.surface,
         suffixIcon: suffixIcon,
-        constraints: const BoxConstraints(minHeight: 48),
+        constraints: const BoxConstraints(minHeight: 52),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.lg,
-          vertical: AppSpacing.lg,
+          vertical: AppSpacing.md,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
@@ -63,7 +70,7 @@ class VjTextField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(color: AppColors.primary),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
       ),
     );

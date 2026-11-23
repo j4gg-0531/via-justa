@@ -105,6 +105,43 @@ class SupabaseBusinessRepository implements BusinessRepository {
           photosCount: (row['photos_count'] as num?)?.toInt() ?? 0,
           dishesCount: (row['dishes_count'] as num?)?.toInt() ?? 0,
           minDishPriceCop: (row['min_dish_price_cop'] as num?)?.toInt(),
+          status: status,
+        ),
+      );
+    }
+    return result;
+  }
+
+  /// Convierte filas devueltas por `public.get_my_businesses` en entidades `Business`.
+  static List<Business> parseMyBusinessesRows(
+    List<dynamic> rows, {
+    required String currentOwnerId,
+  }) {
+    final result = <Business>[];
+    for (final dynamic raw in rows) {
+      if (raw is! Map) continue;
+      final row = Map<String, dynamic>.from(raw);
+      final id = (row['id'] ?? '').toString().trim();
+      final name = (row['name'] as String?)?.trim() ?? '';
+      if (id.isEmpty || name.isEmpty) continue;
+      final type = (row['type'] as String?)?.trim() ?? 'service';
+      final status = (row['status'] as String?)?.trim() ?? 'approved';
+      result.add(
+        Business(
+          id: id,
+          ownerId: currentOwnerId,
+          name: name,
+          type: type,
+          category: _mapTypeToCategory(type, null),
+          address: (row['address'] as String?)?.trim() ?? 'Valledupar, Cesar',
+          phone: '',
+          municipalityCode:
+              (row['municipality_code'] as String?)?.trim() ?? '20001',
+          isVerified: status == 'approved',
+          photosCount: (row['photos_count'] as num?)?.toInt() ?? 0,
+          dishesCount: (row['dishes_count'] as num?)?.toInt() ?? 0,
+          status: status,
+          rejectionReason: (row['rejection_reason'] as String?)?.trim(),
         ),
       );
     }
@@ -343,5 +380,16 @@ class SupabaseBusinessRepository implements BusinessRepository {
       ratingAverage: (map['rating_average'] as num?)?.toDouble(),
       ratingCount: (map['rating_count'] as num?)?.toInt() ?? 0,
     );
+  }
+
+  @override
+  Future<List<Business>> getMyBusinesses() async {
+    final currentOwnerId = client.auth.currentUser?.id;
+    if (currentOwnerId == null) return const <Business>[];
+    final dynamic myRows = await client.rpc('get_my_businesses');
+    if (myRows is List) {
+      return parseMyBusinessesRows(myRows, currentOwnerId: currentOwnerId);
+    }
+    return const <Business>[];
   }
 }

@@ -8,8 +8,9 @@ import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
+import 'package:via_justa/core/widgets/vj_confirm_dialog.dart';
 import 'package:via_justa/core/widgets/vj_dashed_box.dart';
-import 'package:via_justa/core/widgets/vj_text_field.dart';
+import 'package:via_justa/core/widgets/vj_skeleton_box.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis_result.dart';
 import 'package:via_justa/features/contracts/domain/contract_capture.dart';
 import 'package:via_justa/features/contracts/presentation/state/contract_analysis_provider.dart';
@@ -56,32 +57,17 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     ContractCaptureNotifier notifier,
     String languageCode,
   ) {
-    showDialog<void>(
+    showVjConfirmDialog(
       context: context,
+      icon: Icons.shield_outlined,
       barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-        ),
-        title: Text('contract_capture.consent_dialog_title'.tr()),
-        content: Text('contract_capture.consent_dialog_body'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              notifier.cancelConsent();
-            },
-            child: Text('contract_capture.consent_cancel'.tr()),
-          ),
-          VjButton(
-            label: 'contract_capture.consent_continue'.tr(),
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              notifier.confirmConsentAndProceed(languageCode: languageCode);
-            },
-          ),
-        ],
-      ),
+      title: 'contract_capture.consent_dialog_title'.tr(),
+      body: 'contract_capture.consent_dialog_body'.tr(),
+      cancelLabel: 'contract_capture.consent_cancel'.tr(),
+      confirmLabel: 'contract_capture.consent_continue'.tr(),
+      onCancel: notifier.cancelConsent,
+      onConfirm: () =>
+          notifier.confirmConsentAndProceed(languageCode: languageCode),
     );
   }
 
@@ -89,32 +75,16 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     BuildContext context,
     ContractAnalysisNotifier notifier,
   ) {
-    showDialog<void>(
+    showVjConfirmDialog(
       context: context,
+      icon: Icons.auto_awesome_outlined,
       barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-        ),
-        title: Text('contract_analysis.ai_consent_dialog_title'.tr()),
-        content: Text('contract_analysis.ai_consent_dialog_body'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              notifier.cancelAiConsent();
-            },
-            child: Text('contract_analysis.ai_consent_cancel'.tr()),
-          ),
-          VjButton(
-            label: 'contract_analysis.ai_consent_continue'.tr(),
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              notifier.confirmAiConsentAndProceed();
-            },
-          ),
-        ],
-      ),
+      title: 'contract_analysis.ai_consent_dialog_title'.tr(),
+      body: 'contract_analysis.ai_consent_dialog_body'.tr(),
+      cancelLabel: 'contract_analysis.ai_consent_cancel'.tr(),
+      confirmLabel: 'contract_analysis.ai_consent_continue'.tr(),
+      onCancel: notifier.cancelAiConsent,
+      onConfirm: notifier.confirmAiConsentAndProceed,
     );
   }
 
@@ -178,6 +148,8 @@ class _ScanPageState extends ConsumerState<ScanPage> {
       );
     }
 
+    final canPopRoute = GoRouter.maybeOf(context)?.canPop() ?? false;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -187,34 +159,50 @@ class _ScanPageState extends ConsumerState<ScanPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.md),
 
-              // Barra superior limpia con botón atrás y título
+              // Cabecera compacta sin duplicar títulos ni flecha innecesaria en pestaña raíz
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back,
-                        color: AppColors.textPrimary),
-                    onPressed: () {
-                      if (context.canPop()) {
-                        context.pop();
-                      } else {
-                        context.go(AppRoutes.home);
-                      }
-                    },
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 48),
-                        child: Text(
-                          'scan.app_bar_title'.tr(),
-                          style: textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
+                  if (canPopRoute) ...[
+                    Material(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      child: InkWell(
+                        onTap: () => context.pop(),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Icon(
+                            Icons.arrow_back_rounded,
+                            size: 20,
                             color: AppColors.textPrimary,
+                            semanticLabel: 'common.back'.tr(),
                           ),
                         ),
                       ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                  ],
+                  Expanded(
+                    child: Text(
+                      'scan.headline'.tr(),
+                      style: textTheme.headlineMedium?.copyWith(fontSize: 22),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 148),
+                    child: VjBadge(
+                      label: cityName,
+                      icon: Icons.location_on_outlined,
+                      variant: VjBadgeVariant.neutral,
                     ),
                   ),
                 ],
@@ -222,92 +210,83 @@ class _ScanPageState extends ConsumerState<ScanPage> {
 
               const SizedBox(height: AppSpacing.md),
 
-              // Encabezado principal
-              Text(
-                'scan.headline'.tr(),
-                style: textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'scan.subtitle'.tr(),
-                style: textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                  height: 1.35,
-                ),
-              ),
-
-              const SizedBox(height: AppSpacing.lg),
-
-              // Selector visual de dos tarjetas: Precio vs Contrato
-              Row(
-                children: [
-                  Expanded(
-                    child: _ModeSelectorCard(
-                      title: 'scan.tab_price'.tr(),
-                      description: 'scan.price_card_desc'.tr(),
-                      icon: Icons.sell_outlined,
-                      selected: selectedMode == ScanMode.price,
-                      onTap: () => modeNotifier.selectMode(ScanMode.price),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: _ModeSelectorCard(
-                      title: 'scan.tab_contract'.tr(),
-                      description: 'scan.contract_card_desc'.tr(),
-                      icon: Icons.description_outlined,
-                      selected: selectedMode == ScanMode.contract,
-                      onTap: () => modeNotifier.selectMode(ScanMode.contract),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: AppSpacing.lg),
-
-              // Contenido interactivo según el modo seleccionado
-              if (selectedMode == ScanMode.contract)
-                _ContractContentSection(
-                  captureState: captureState,
-                  analysisState: analysisState,
-                  captureNotifier: captureNotifier,
-                  analysisNotifier: analysisNotifier,
-                  textController: _contractTextController,
-                  languageCode: languageCode,
-                )
-              else
-                _PriceContentSection(
-                  scanState: scanState,
-                  zonesAsync: zonesAsync,
-                  categoriesAsync: categoriesAsync,
-                  cityName: cityName,
-                  activeZone: activeZone,
-                  activeDestinationZone: activeDestinationZone,
-                  languageCode: languageCode,
-                  amountController: _amountController,
-                  onEvaluatePressed: _onEvaluatePressed,
-                ),
-
-              const SizedBox(height: AppSpacing.lg),
-
-              // Banner inferior de seguridad y confianza
+              // Segmented control limpio animado: Precio vs Contrato
               Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppSpacing.md),
+                padding: const EdgeInsets.all(AppSpacing.xs),
                 decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  color: AppColors.surfaceSubtle,
+                  borderRadius: BorderRadius.circular(AppRadius.xl),
+                  border: Border.all(color: AppColors.border),
                 ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _ModeSegmentTab(
+                        title: 'scan.tab_price'.tr(),
+                        icon: Icons.sell_outlined,
+                        selected: selectedMode == ScanMode.price,
+                        onTap: () => modeNotifier.selectMode(ScanMode.price),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: _ModeSegmentTab(
+                        title: 'scan.tab_contract'.tr(),
+                        icon: Icons.description_outlined,
+                        selected: selectedMode == ScanMode.contract,
+                        onTap: () =>
+                            modeNotifier.selectMode(ScanMode.contract),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.lg),
+
+              // Transición suave entre Precio y Contrato
+              AnimatedSwitcher(
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 220),
+                switchInCurve: Curves.easeOutCubic,
+                child: KeyedSubtree(
+                  key: ValueKey(selectedMode),
+                  child: selectedMode == ScanMode.contract
+                      ? _ContractContentSection(
+                          captureState: captureState,
+                          analysisState: analysisState,
+                          captureNotifier: captureNotifier,
+                          analysisNotifier: analysisNotifier,
+                          textController: _contractTextController,
+                          languageCode: languageCode,
+                        )
+                      : _PriceContentSection(
+                          scanState: scanState,
+                          zonesAsync: zonesAsync,
+                          categoriesAsync: categoriesAsync,
+                          cityName: cityName,
+                          activeZone: activeZone,
+                          activeDestinationZone: activeDestinationZone,
+                          languageCode: languageCode,
+                          amountController: _amountController,
+                          onEvaluatePressed: _onEvaluatePressed,
+                        ),
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.lg),
+
+              // Línea discreta de confianza y privacidad
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(
                       Icons.shield_outlined,
                       color: AppColors.primary,
-                      size: 22,
+                      size: 17,
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
@@ -316,8 +295,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                             ? 'scan.reassurance_contract'.tr()
                             : 'scan.reassurance_price'.tr(),
                         style: textTheme.bodySmall?.copyWith(
-                          color: AppColors.textPrimary,
-                          height: 1.35,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ),
@@ -334,18 +312,16 @@ class _ScanPageState extends ConsumerState<ScanPage> {
   }
 }
 
-/// Tarjeta selectora visual superior (Precio vs Contrato) con borde activo azul.
-class _ModeSelectorCard extends StatelessWidget {
-  const _ModeSelectorCard({
+/// Segmento táctil animado superior (Precio / Contrato).
+class _ModeSegmentTab extends StatelessWidget {
+  const _ModeSegmentTab({
     required this.title,
-    required this.description,
     required this.icon,
     required this.selected,
     required this.onTap,
   });
 
   final String title;
-  final String description;
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
@@ -354,44 +330,64 @@ class _ModeSelectorCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return VjCard(
+    return Semantics(
+      button: true,
       selected: selected,
-      onTap: onTap,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 38,
-            height: 38,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            constraints: const BoxConstraints(minHeight: 48),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
             decoration: BoxDecoration(
-              color: AppColors.primarySoft,
-              borderRadius: BorderRadius.circular(AppRadius.md),
+              color: selected ? AppColors.surface : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: AppColors.brandNavy.withValues(alpha: 0.06),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
             ),
-            child: Icon(
-              icon,
-              color: AppColors.primary,
-              size: 20,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: selected
+                      ? AppColors.brandNavy
+                      : AppColors.textSecondary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Flexible(
+                  child: Text(
+                    title,
+                    style: textTheme.labelLarge?.copyWith(
+                      fontSize: 14,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                      color: selected
+                          ? AppColors.brandNavy
+                          : AppColors.textSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            title,
-            style: textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            description,
-            style: textTheme.bodySmall?.copyWith(
-              color: AppColors.textSecondary,
-              fontSize: 12,
-              height: 1.3,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -448,113 +444,133 @@ class _ContractContentSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Caja punteada para subir foto o archivo TXT (PDF marcado Próximamente)
-        VjDashedBox(
+        // Tarjeta unificada de captura de contratos: dropzone limpio + 2 acciones lado a lado
+        VjCard(
+          borderRadius: AppRadius.xl,
+          elevated: true,
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'scan.upload_box_title'.tr(),
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'scan.upload_box_hint'.tr(),
-                style: textTheme.bodySmall?.copyWith(
-                  color: AppColors.textMuted,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              ActionChip(
-                avatar: const Icon(
-                  Icons.picture_as_pdf_outlined,
-                  size: 16,
-                  color: AppColors.primary,
-                ),
-                label: Text(
-                  'contract_capture.pdf_coming_soon_chip'.tr(),
-                  style: textTheme.bodySmall?.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
+              InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                onTap: captureState.status ==
+                        ContractCaptureStatus.readingDocument
+                    ? null
+                    : () => captureNotifier.requestFilePicker(
+                          languageCode: languageCode,
+                        ),
+                child: VjDashedBox(
+                  borderRadius: AppRadius.xl,
+                  color: AppColors.primary.withValues(alpha: 0.40),
+                  backgroundColor: AppColors.surfaceSubtle,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.xl,
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: AppColors.primarySoft,
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                          border: Border.all(color: AppColors.primaryBorder),
+                        ),
+                        child: const Icon(
+                          Icons.upload_file_rounded,
+                          color: AppColors.primary,
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        'scan.upload_box_title'.tr(),
+                        style: textTheme.titleMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'scan.upload_box_hint'.tr(),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
-                backgroundColor: AppColors.primarySoft,
-                side: const BorderSide(color: AppColors.primary),
-                onPressed: captureState.status ==
-                        ContractCaptureStatus.readingDocument
-                    ? null
-                    : () => captureNotifier.requestFilePicker(
-                          languageCode: languageCode,
-                        ),
               ),
-              const SizedBox(height: AppSpacing.sm),
-              VjButton(
-                label: 'scan.upload_box_action'.tr(),
-                leadingIcon: Icons.file_upload_outlined,
-                onPressed: captureState.status ==
-                        ContractCaptureStatus.readingDocument
-                    ? null
-                    : () => captureNotifier.requestFilePicker(
-                          languageCode: languageCode,
-                        ),
+              const SizedBox(height: AppSpacing.md),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final textScale =
+                      MediaQuery.textScalerOf(context).scale(14) / 14;
+                  final stacked =
+                      constraints.maxWidth < 290 || textScale >= 1.55;
+                  final isBusy =
+                      captureState.status ==
+                      ContractCaptureStatus.readingDocument;
+
+                  final fileButton = VjButton(
+                    label: 'scan.upload_box_action'.tr(),
+                    leadingIcon: Icons.file_upload_outlined,
+                    onPressed: isBusy
+                        ? null
+                        : () => captureNotifier.requestFilePicker(
+                              languageCode: languageCode,
+                            ),
+                  );
+                  final cameraButton = VjButton(
+                    label: 'scan.action_take_photo_now'.tr(),
+                    leadingIcon: Icons.camera_alt_outlined,
+                    variant: VjButtonVariant.outlined,
+                    onPressed: isBusy
+                        ? null
+                        : () => captureNotifier.requestCameraCapture(
+                              languageCode: languageCode,
+                            ),
+                  );
+
+                  if (stacked) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        fileButton,
+                        const SizedBox(height: AppSpacing.sm),
+                        cameraButton,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(child: fileButton),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(child: cameraButton),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Center(
+                child: TextButton.icon(
+                  onPressed: captureNotifier.startManualEntry,
+                  icon: const Icon(
+                    Icons.edit_note_rounded,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                  label: Text(
+                    'scan.manual_text_toggle'.tr(),
+                    style: textTheme.labelLarge?.copyWith(
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
               ),
             ],
-          ),
-        ),
-
-        const SizedBox(height: AppSpacing.md),
-
-        // Botón secundario para tomar foto con la cámara
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: OutlinedButton.icon(
-            onPressed: captureState.status ==
-                    ContractCaptureStatus.readingDocument
-                ? null
-                : () => captureNotifier.requestCameraCapture(
-                      languageCode: languageCode,
-                    ),
-            icon: const Icon(
-              Icons.camera_alt_outlined,
-              size: 20,
-              color: AppColors.textPrimary,
-            ),
-            label: Text(
-              'scan.action_take_photo_now'.tr(),
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.border),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: AppSpacing.xs),
-
-        // Opción sutil para redactar o pegar texto manualmente
-        Center(
-          child: TextButton.icon(
-            onPressed: captureNotifier.startManualEntry,
-            icon:
-                const Icon(Icons.edit_note, size: 18, color: AppColors.primary),
-            label: Text(
-              'scan.manual_text_toggle'.tr(),
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
           ),
         ),
 
@@ -562,20 +578,27 @@ class _ContractContentSection extends StatelessWidget {
         if (captureState.status == ContractCaptureStatus.readingDocument) ...[
           const SizedBox(height: AppSpacing.md),
           VjCard(
+            borderRadius: AppRadius.xl,
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: Row(
               children: [
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                const VjSkeletonBox(
+                  width: 36,
+                  height: 36,
+                  borderRadius: AppRadius.md,
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
-                  child: Text(
-                    'contract_capture.status_reading'.tr(),
-                    style: textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'contract_capture.status_reading'.tr(),
+                        style: textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      const VjSkeletonBox(height: 10, width: 150),
+                    ],
                   ),
                 ),
               ],
@@ -642,6 +665,8 @@ class _ContractContentSection extends StatelessWidget {
         if (captureState.showTextEditor) ...[
           const SizedBox(height: AppSpacing.md),
           VjCard(
+            borderRadius: AppRadius.xl,
+            elevated: true,
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -658,10 +683,14 @@ class _ContractContentSection extends StatelessWidget {
                       ),
                     ),
                     if (captureState.isReadyForAnalysis)
-                      VjBadge(label: 'contract_capture.status_ready'.tr()),
+                      VjBadge(
+                        label: 'contract_capture.status_ready'.tr(),
+                        variant: VjBadgeVariant.navy,
+                      ),
                     if (captureState.wasTempFileDeleted)
                       VjBadge(
                         label: 'contract_capture.rn10_temp_deleted_badge'.tr(),
+                        variant: VjBadgeVariant.neutral,
                       ),
                   ],
                 ),
@@ -740,32 +769,49 @@ class _ContractContentSection extends StatelessWidget {
         if (analysisState.isAnalyzing) ...[
           const SizedBox(height: AppSpacing.md),
           VjCard(
-            child: Row(
+            borderRadius: AppRadius.xl,
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2.5),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'contract_analysis.analyzing_status'.tr(),
-                        style: textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.primarySoft,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'contract_analysis.analyzing_hint'.tr(),
-                        style: textTheme.bodySmall,
+                      child: const Icon(
+                        Icons.auto_awesome_outlined,
+                        color: AppColors.primary,
+                        size: 20,
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'contract_analysis.analyzing_status'.tr(),
+                            style: textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'contract_analysis.analyzing_hint'.tr(),
+                            style: textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: AppSpacing.md),
+                const VjSkeletonBox(height: 12),
+                const SizedBox(height: AppSpacing.xs),
+                const VjSkeletonBox(height: 12, width: 220),
               ],
             ),
           ),
@@ -774,20 +820,17 @@ class _ContractContentSection extends StatelessWidget {
         // Error de análisis con reintento
         if (analysisState.hasError && analysisState.error != null) ...[
           const SizedBox(height: AppSpacing.md),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: AppColors.semaphoreRed, width: 1.5),
-            ),
+          VjCard(
+            borderRadius: AppRadius.xl,
+            backgroundColor: AppColors.semaphoreRedSoft,
+            borderColor: AppColors.semaphoreRed.withValues(alpha: 0.45),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'contract_analysis.error_title'.tr(),
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+                  style: textTheme.titleSmall?.copyWith(
                     color: AppColors.semaphoreRed,
                   ),
                 ),
@@ -933,23 +976,47 @@ class _PriceContentSection extends ConsumerWidget {
         : 'price_verdict.taxi_destination_placeholder'.tr();
     final zones = zonesAsync.value ?? const <MunicipalityZone>[];
 
-    return VjCard(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. Selector de categoría comparable
-          Text(
-            'price_verdict.category_field_label'.tr(),
-            style: textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+    void applyPreset(String preset) {
+      notifier.setRawAmount(preset);
+      amountController.value = TextEditingValue(
+        text: preset,
+        selection: TextSelection.collapsed(offset: preset.length),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 1. Carrusel horizontal de categorías (una sola fila limpia, sin escalera vertical)
+        categoriesAsync.when(
+          loading: () => const SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                VjSkeletonBox(
+                  width: 112,
+                  height: 44,
+                  borderRadius: AppRadius.pill,
+                ),
+                SizedBox(width: AppSpacing.sm),
+                VjSkeletonBox(
+                  width: 124,
+                  height: 44,
+                  borderRadius: AppRadius.pill,
+                ),
+                SizedBox(width: AppSpacing.sm),
+                VjSkeletonBox(
+                  width: 108,
+                  height: 44,
+                  borderRadius: AppRadius.pill,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: AppSpacing.xs),
-          categoriesAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, st) => Row(
+          error: (err, st) => VjCard(
+            borderRadius: AppRadius.lg,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
               children: [
                 Expanded(
                   child: Text(
@@ -963,128 +1030,484 @@ class _PriceContentSection extends ConsumerWidget {
                 ),
               ],
             ),
-            data: (categories) => Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
+          ),
+          data: (categories) => SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
               children: [
-                for (final category in categories)
-                  ChoiceChip(
-                    avatar: Icon(
-                      _iconForGroup(category.groupKey),
-                      size: 16,
-                      color: scanState.selectedCategoryId == category.id
-                          ? AppColors.primary
-                          : AppColors.textSecondary,
-                    ),
-                    label: Text(category.localizedName(languageCode)),
-                    selected: scanState.selectedCategoryId == category.id,
-                    onSelected: (selected) {
-                      if (selected) notifier.selectCategory(category.id);
-                    },
-                    selectedColor: AppColors.primarySoft,
-                    backgroundColor: AppColors.background,
-                    labelStyle: TextStyle(
-                      color: scanState.selectedCategoryId == category.id
-                          ? AppColors.primary
-                          : AppColors.textPrimary,
-                      fontWeight: scanState.selectedCategoryId == category.id
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      fontSize: 13,
-                    ),
+                for (var i = 0; i < categories.length; i++) ...[
+                  if (i > 0) const SizedBox(width: AppSpacing.sm),
+                  _HorizontalCategoryPill(
+                    icon: _iconForGroup(categories[i].groupKey),
+                    label: categories[i].localizedName(languageCode),
+                    selected: scanState.selectedCategoryId == categories[i].id,
+                    onTap: () => notifier.selectCategory(categories[i].id),
                   ),
+                ],
               ],
             ),
           ),
+        ),
 
-          const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: AppSpacing.md),
 
-          // 2. Ubicación dinámica: Origen + Destino si es Taxi, o Ubicación única para el resto
-          if (scanState.isTaxiCategory) ...[
-            Text(
-              'price_verdict.taxi_origin_label'.tr(),
-              style: textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            _LocationSelectorRow(
-              icon: Icons.my_location,
-              label: '$cityName · $originZoneName',
-              actionLabel: 'scan.change_zone_action'.tr(),
-              onTap: zones.isEmpty
-                  ? null
-                  : () => _openOriginPicker(context, notifier, zones),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'price_verdict.taxi_destination_label'.tr(),
-              style: textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            _LocationSelectorRow(
-              icon: Icons.flag_outlined,
-              label: destinationZoneName,
-              isHighlighted: activeDestinationZone != null,
-              hasError: scanState.destinationError,
-              actionLabel: 'price_verdict.pick_point_on_map_btn'.tr(),
-              onTap: zones.isEmpty
-                  ? null
-                  : () => _openDestinationPicker(context, notifier, zones),
-            ),
-            if (scanState.destinationError) ...[
-              const SizedBox(height: 4),
-              Text(
-                'price_contribute.error_destination_required'.tr(),
-                style: textTheme.bodySmall?.copyWith(
-                  color: AppColors.semaphoreRed,
-                  fontWeight: FontWeight.w600,
+        // 2. Tarjeta principal con ruta/zona compacta y monto protagonista estilo fintech
+        VjCard(
+          borderRadius: AppRadius.xl,
+          elevated: true,
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Selector de ubicación conectado (Ruta Origen -> Destino para Taxi o zona única)
+              if (scanState.isTaxiCategory) ...[
+                _ConnectedTaxiRouteCard(
+                  originLabel: '$cityName · $originZoneName',
+                  destinationLabel: destinationZoneName,
+                  hasDestination: activeDestinationZone != null,
+                  hasDestinationError: scanState.destinationError,
+                  onOriginTap: zones.isEmpty
+                      ? null
+                      : () => _openOriginPicker(context, notifier, zones),
+                  onDestinationTap: zones.isEmpty
+                      ? null
+                      : () => _openDestinationPicker(context, notifier, zones),
+                ),
+                if (scanState.destinationError) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 16,
+                        color: AppColors.semaphoreRed,
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(
+                        child: Text(
+                          'price_contribute.error_destination_required'.tr(),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: AppColors.semaphoreRed,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ] else
+                _LocationSelectorRow(
+                  icon: Icons.location_on_outlined,
+                  eyebrow: 'price_verdict.establishment_location_label'.tr(),
+                  label: '$cityName · $originZoneName',
+                  actionLabel: 'scan.change_zone_action'.tr(),
+                  onTap: zones.isEmpty
+                      ? null
+                      : () => _openOriginPicker(context, notifier, zones),
+                ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              // Bloque protagonista de monto en COP con montos rápidos
+              Container(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                ),
+                decoration: BoxDecoration(
+                  color: scanState.amountError
+                      ? AppColors.semaphoreRedSoft.withValues(alpha: 0.45)
+                      : AppColors.surfaceSubtle,
+                  borderRadius: BorderRadius.circular(AppRadius.xl),
+                  border: Border.all(
+                    color: scanState.amountError
+                        ? AppColors.semaphoreRed
+                        : AppColors.border,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'price_verdict.amount_field_label'.tr().toUpperCase(),
+                      style: textTheme.labelSmall?.copyWith(
+                        color: AppColors.textSecondary,
+                        letterSpacing: 0.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    TextField(
+                      controller: amountController,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      onChanged: notifier.setRawAmount,
+                      style: textTheme.headlineLarge?.copyWith(
+                        fontSize: 30,
+                        color: AppColors.brandNavy,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '0',
+                        hintStyle: textTheme.headlineLarge?.copyWith(
+                          fontSize: 30,
+                          color: AppColors.textMuted,
+                        ),
+                        prefixText: r'$ ',
+                        prefixStyle: textTheme.titleLarge?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                        suffixText: ' COP',
+                        suffixStyle: textTheme.labelLarge?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                        filled: false,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: AppSpacing.xs,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xs,
+                      children: [
+                        for (final preset in const [
+                          ('10000', r'$10k'),
+                          ('18000', r'$18k'),
+                          ('25000', r'$25k'),
+                          ('50000', r'$50k'),
+                        ])
+                          _QuickAmountChip(
+                            label: preset.$2,
+                            selected: scanState.rawAmount == preset.$1,
+                            onTap: () => applyPreset(preset.$1),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
+              if (scanState.amountError) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 16,
+                      color: AppColors.semaphoreRed,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        'price_verdict.amount_error_invalid'.tr(),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppColors.semaphoreRed,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
+              const SizedBox(height: AppSpacing.lg),
+
+              // 4. Botón principal de evaluar precio
+              VjButton(
+                label: 'price_verdict.evaluate_cta'.tr(),
+                trailingIcon: Icons.arrow_forward_rounded,
+                onPressed:
+                    scanState.verdictAsync.isLoading ? null : onEvaluatePressed,
+              ),
             ],
-          ] else ...[
-            Text(
-              'price_verdict.establishment_location_label'.tr(),
-              style: textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Píldora horizontal táctil de categoría comparable en el escáner de precios.
+class _HorizontalCategoryPill extends StatelessWidget {
+  const _HorizontalCategoryPill({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? AppColors.brandNavy : AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            constraints: const BoxConstraints(minHeight: 48),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              border: Border.all(
+                color: selected ? AppColors.brandNavy : AppColors.border,
               ),
             ),
-            const SizedBox(height: AppSpacing.xs),
-            _LocationSelectorRow(
-              icon: Icons.location_on_outlined,
-              label: '$cityName · $originZoneName',
-              actionLabel: 'scan.change_zone_action'.tr(),
-              onTap: zones.isEmpty
-                  ? null
-                  : () => _openOriginPicker(context, notifier, zones),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 16,
+                  color: selected ? Colors.white : AppColors.primary,
+                ),
+                const SizedBox(width: AppSpacing.xs + 2),
+                Text(
+                  label,
+                  style: textTheme.labelMedium?.copyWith(
+                    color: selected ? Colors.white : AppColors.textPrimary,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
-          ],
-
-          const SizedBox(height: AppSpacing.md),
-
-          // 3. Campo de monto observado en COP
-          VjTextField(
-            label: 'price_verdict.amount_field_label'.tr(),
-            controller: amountController,
-            keyboardType: TextInputType.number,
-            onChanged: notifier.setRawAmount,
-            errorText: scanState.amountError
-                ? 'price_verdict.amount_error_invalid'.tr()
-                : null,
           ),
+        ),
+      ),
+    );
+  }
+}
 
-          const SizedBox(height: AppSpacing.lg),
+/// Tarjeta compacta conectada Origen -> Destino para cotizaciones de taxi.
+class _ConnectedTaxiRouteCard extends StatelessWidget {
+  const _ConnectedTaxiRouteCard({
+    required this.originLabel,
+    required this.destinationLabel,
+    required this.hasDestination,
+    required this.hasDestinationError,
+    required this.onOriginTap,
+    required this.onDestinationTap,
+  });
 
-          // 4. Botón principal de evaluar precio
-          VjButton(
-            label: 'price_verdict.evaluate_cta'.tr(),
-            leadingIcon: Icons.analytics_outlined,
-            onPressed:
-                scanState.verdictAsync.isLoading ? null : onEvaluatePressed,
+  final String originLabel;
+  final String destinationLabel;
+  final bool hasDestination;
+  final bool hasDestinationError;
+  final VoidCallback? onOriginTap;
+  final VoidCallback? onDestinationTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSubtle,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: hasDestinationError
+              ? AppColors.semaphoreRed
+              : AppColors.border,
+        ),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onOriginTap,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadius.lg),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 50),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'price_verdict.taxi_origin_label'.tr(),
+                            style: textTheme.labelSmall?.copyWith(
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                          Text(
+                            originLabel,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      'scan.change_zone_action'.tr(),
+                      style: textTheme.labelMedium?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const Divider(height: 1, indent: AppSpacing.xl + 8),
+          InkWell(
+            onTap: onDestinationTap,
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(AppRadius.lg),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 50),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.flag_rounded,
+                      size: 16,
+                      color: hasDestinationError
+                          ? AppColors.semaphoreRed
+                          : (hasDestination
+                              ? AppColors.brandNavy
+                              : AppColors.primary),
+                    ),
+                    const SizedBox(width: AppSpacing.sm + 2),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'price_verdict.taxi_destination_label'.tr(),
+                            style: textTheme.labelSmall?.copyWith(
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                          Text(
+                            destinationLabel,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: hasDestination
+                                  ? AppColors.textPrimary
+                                  : AppColors.textSecondary,
+                              fontWeight: hasDestination
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      'price_verdict.pick_point_on_map_btn'.tr(),
+                      style: textTheme.labelMedium?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Chip rápido de monto de referencia dentro de la caja protagonista COP.
+class _QuickAmountChip extends StatelessWidget {
+  const _QuickAmountChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48, minWidth: 52),
+          child: Center(
+            widthFactor: 1.0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.brandNavy : AppColors.surface,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                border: Border.all(
+                  color: selected ? AppColors.brandNavy : AppColors.border,
+                ),
+              ),
+              child: Text(
+                label,
+                style: textTheme.labelSmall?.copyWith(
+                  color: selected ? Colors.white : AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1093,68 +1516,84 @@ class _PriceContentSection extends ConsumerWidget {
 class _LocationSelectorRow extends StatelessWidget {
   const _LocationSelectorRow({
     required this.icon,
+    required this.eyebrow,
     required this.label,
     required this.actionLabel,
     required this.onTap,
-    this.isHighlighted = true,
-    this.hasError = false,
   });
 
   final IconData icon;
+  final String eyebrow;
   final String label;
   final String actionLabel;
   final VoidCallback? onTap;
-  final bool isHighlighted;
-  final bool hasError;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: hasError
-              ? AppColors.semaphoreRed
-              : (isHighlighted ? AppColors.border : AppColors.primary),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 56),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs + 2,
         ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            color: hasError ? AppColors.semaphoreRed : AppColors.primary,
-            size: 18,
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: Text(
-              label,
-              style: textTheme.bodySmall?.copyWith(
-                fontWeight: isHighlighted ? FontWeight.w600 : FontWeight.w500,
-                color: isHighlighted
-                    ? AppColors.textPrimary
-                    : AppColors.textSecondary,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceSubtle,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: AppColors.primary,
+              size: 18,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    eyebrow,
+                    style: textTheme.labelSmall?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    label,
+                    style: textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
-          ),
-          TextButton(
-            onPressed: onTap,
-            child: Text(
-              actionLabel,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+            TextButton(
+              onPressed: onTap,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+              ),
+              child: Text(
+                actionLabel,
+                style: textTheme.labelMedium?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

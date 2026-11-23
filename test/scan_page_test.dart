@@ -96,7 +96,7 @@ void main() {
   });
 
   testWidgets(
-      'contract mode shows dashed upload box with PDF coming soon chip, camera button, manual text review, and no synthetic sample list',
+      'contract mode shows unified upload box with file and camera actions, manual text review, and no synthetic sample list',
       (tester) async {
     await tester.pumpWidget(_buildScanPage());
     await tester.pumpAndSettle();
@@ -106,15 +106,15 @@ void main() {
 
     expect(find.text('scan.upload_box_title'), findsOneWidget);
     expect(find.text('scan.upload_box_hint'), findsOneWidget);
-    expect(find.text('contract_capture.pdf_coming_soon_chip'), findsOneWidget);
+    expect(find.text('scan.upload_box_action'), findsOneWidget);
     expect(find.text('scan.action_take_photo_now'), findsOneWidget);
     expect(find.text('scan.manual_text_toggle'), findsOneWidget);
 
     // No synthetic sample list in ScanPage
     expect(find.text('contract_capture.samples_title'), findsNothing);
 
-    // Tapping PDF chip opens the RN-10 local processing consent dialog to pick a PDF file
-    await tester.tap(find.text('contract_capture.pdf_coming_soon_chip'));
+    // Tapping Select file opens the RN-10 local processing consent dialog
+    await tester.tap(find.text('scan.upload_box_action'));
     await tester.pumpAndSettle();
     expect(find.text('contract_capture.consent_dialog_title'), findsOneWidget);
     await tester.tap(find.text('contract_capture.consent_cancel'));

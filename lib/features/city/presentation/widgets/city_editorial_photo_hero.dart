@@ -24,7 +24,7 @@ class CityEditorialPhotoHero extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
           child: AspectRatio(
             aspectRatio: 16 / 9,
             child: Stack(

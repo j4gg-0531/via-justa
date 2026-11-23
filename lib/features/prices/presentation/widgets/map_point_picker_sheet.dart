@@ -37,9 +37,9 @@ Future<PickedMapPoint?> showMapPointPickerSheet({
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: AppColors.background,
+    backgroundColor: AppColors.surface,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
     ),
     builder: (sheetContext) => _MapPointPickerSheetContent(
       title: title,
@@ -165,6 +165,10 @@ class _MapPointPickerSheetContentState
                   tooltip: 'common.close'.tr(),
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close),
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                    foregroundColor: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),

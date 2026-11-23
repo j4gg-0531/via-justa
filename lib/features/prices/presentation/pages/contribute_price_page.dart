@@ -5,8 +5,11 @@ import 'package:go_router/go_router.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
+import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
+import 'package:via_justa/core/widgets/vj_page_header.dart';
+import 'package:via_justa/core/widgets/vj_skeleton_box.dart';
 import 'package:via_justa/core/widgets/vj_text_field.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
@@ -132,7 +135,6 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
     final isDemoMode = ref.watch(isDemoContributionModeProvider);
     final municipality = ref.watch(selectedMunicipalityProvider);
     final municipalityCode = municipality?.code ?? '20001';
-    final textTheme = Theme.of(context).textTheme;
 
     String languageCode;
     try {
@@ -148,45 +150,19 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
       body: SafeArea(
         child: SingleChildScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: AppSpacing.md),
 
-              // Cabecera con botón Atrás y título
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  IconButton(
-                    tooltip: 'common.back'.tr(),
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: () => _handleBack(context),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.surface,
-                      foregroundColor: AppColors.textPrimary,
-                      minimumSize: const Size(48, 48),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.xs,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          'price_contribute.page_title'.tr(),
-                          style:
-                              textTheme.headlineMedium?.copyWith(fontSize: 22),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              // Cabecera consistente
+              VjPageHeader(
+                title: 'price_contribute.page_title'.tr(),
+                onBack: () => _handleBack(context),
               ),
 
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.lg),
 
               if (wizard.isCompleted)
                 _CompletedContributionView(
@@ -208,66 +184,74 @@ class _ContributePricePageState extends ConsumerState<ContributePricePage> {
 
                 const SizedBox(height: AppSpacing.lg),
 
-                if (wizard.currentStep == 0)
-                  _Step1CategorySelection(
-                    categoriesAsync: categoriesAsync,
-                    selectedCategoryId: wizard.selectedCategoryId,
-                    languageCode: languageCode,
-                    onSelectCategory: notifier.selectCategory,
-                  )
-                else if (wizard.currentStep == 1)
-                  _Step2AmountInput(
-                    controller: _amountController,
-                    errorText: amountErrorKey?.tr(),
-                    activeCategory: activeCategory,
-                    languageCode: languageCode,
-                    onChanged: notifier.setRawAmount,
-                    onQuickAmountTap: _applyQuickAmount,
-                  )
-                else if (wizard.currentStep == 2)
-                  _Step3ZoneAndNoteSelection(
-                    wizard: wizard,
-                    zonesAsync: zonesAsync,
-                    activeZone: activeZone,
-                    activeDestinationZone: activeDestZone,
-                    cityName: cityName,
-                    municipalityCode: municipalityCode,
-                    languageCode: languageCode,
-                    noteController: _noteController,
-                    onRequestGpsPermission: () =>
-                        notifier.grantLocationPermissionAndDetect(
-                          municipalityCode: municipalityCode,
-                        ),
-                    onDenyGpsPermission:
-                        notifier.denyLocationPermissionAndOpenMap,
-                    onToggleManualMap: notifier.toggleManualMapPicker,
-                    onZoneTapped: notifier.selectZone,
-                    onMapPointTapped: (normX, normY, zones) =>
-                        notifier.selectPointOnMap(
-                          normalizedX: normX,
-                          normalizedY: normY,
-                          zones: zones,
-                        ),
-                    onPickDestinationOnMap: (zones) => _openDestinationMapSheet(
-                      context: context,
-                      zones: zones,
-                      wizard: wizard,
-                      cityName: cityName,
-                      languageCode: languageCode,
-                    ),
-                    onNoteChanged: notifier.setRawPlaceNote,
-                  )
-                else
-                  _Step4ReviewAndConfirm(
-                    wizard: wizard,
-                    category: activeCategory,
-                    zone: activeZone,
-                    destinationZone: activeDestZone,
-                    cityName: cityName,
-                    languageCode: languageCode,
-                    isDemoMode: isDemoMode,
-                    onEditStep: notifier.goToStep,
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  child: KeyedSubtree(
+                    key: ValueKey<int>(wizard.currentStep),
+                    child: wizard.currentStep == 0
+                        ? _Step1CategorySelection(
+                            categoriesAsync: categoriesAsync,
+                            selectedCategoryId: wizard.selectedCategoryId,
+                            languageCode: languageCode,
+                            onSelectCategory: notifier.selectCategory,
+                          )
+                        : wizard.currentStep == 1
+                        ? _Step2AmountInput(
+                            controller: _amountController,
+                            errorText: amountErrorKey?.tr(),
+                            activeCategory: activeCategory,
+                            languageCode: languageCode,
+                            onChanged: notifier.setRawAmount,
+                            onQuickAmountTap: _applyQuickAmount,
+                          )
+                        : wizard.currentStep == 2
+                        ? _Step3ZoneAndNoteSelection(
+                            wizard: wizard,
+                            zonesAsync: zonesAsync,
+                            activeZone: activeZone,
+                            activeDestinationZone: activeDestZone,
+                            cityName: cityName,
+                            municipalityCode: municipalityCode,
+                            languageCode: languageCode,
+                            noteController: _noteController,
+                            onRequestGpsPermission: () =>
+                                notifier.grantLocationPermissionAndDetect(
+                                  municipalityCode: municipalityCode,
+                                ),
+                            onDenyGpsPermission:
+                                notifier.denyLocationPermissionAndOpenMap,
+                            onToggleManualMap: notifier.toggleManualMapPicker,
+                            onZoneTapped: notifier.selectZone,
+                            onMapPointTapped: (normX, normY, zones) =>
+                                notifier.selectPointOnMap(
+                                  normalizedX: normX,
+                                  normalizedY: normY,
+                                  zones: zones,
+                                ),
+                            onPickDestinationOnMap: (zones) =>
+                                _openDestinationMapSheet(
+                                  context: context,
+                                  zones: zones,
+                                  wizard: wizard,
+                                  cityName: cityName,
+                                  languageCode: languageCode,
+                                ),
+                            onNoteChanged: notifier.setRawPlaceNote,
+                          )
+                        : _Step4ReviewAndConfirm(
+                            wizard: wizard,
+                            category: activeCategory,
+                            zone: activeZone,
+                            destinationZone: activeDestZone,
+                            cityName: cityName,
+                            languageCode: languageCode,
+                            isDemoMode: isDemoMode,
+                            onEditStep: notifier.goToStep,
+                          ),
                   ),
+                ),
 
                 const SizedBox(height: AppSpacing.xl),
 
@@ -347,31 +331,30 @@ class _StepProgressHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'price_contribute.step_counter'.tr(
+        VjBadge(
+          label: 'price_contribute.step_counter'.tr(
             namedArgs: {'step': displayStepNumber.toString(), 'total': '4'},
           ),
-          style: textTheme.bodySmall?.copyWith(
-            color: AppColors.primary,
-            fontWeight: FontWeight.w700,
-          ),
+          variant: VjBadgeVariant.tonal,
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           _stepTitleKey(currentStep).tr(),
-          style: textTheme.titleMedium?.copyWith(fontSize: 18),
+          style: textTheme.titleLarge,
         ),
         const SizedBox(height: AppSpacing.sm),
         Row(
           children: List.generate(4, (index) {
             final isActiveOrDone = index <= currentStep;
             return Expanded(
-              child: Container(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
                 height: 6,
                 margin: EdgeInsets.only(right: index < 3 ? AppSpacing.xs : 0),
                 decoration: BoxDecoration(
                   color: isActiveOrDone ? AppColors.primary : AppColors.border,
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
               ),
             );
@@ -401,6 +384,8 @@ class _Step1CategorySelection extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return VjCard(
+      borderRadius: AppRadius.xl,
+      elevated: true,
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -411,7 +396,15 @@ class _Step1CategorySelection extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           categoriesAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const Column(
+              children: [
+                VjSkeletonBox(height: 56, borderRadius: AppRadius.md),
+                SizedBox(height: AppSpacing.sm),
+                VjSkeletonBox(height: 56, borderRadius: AppRadius.md),
+                SizedBox(height: AppSpacing.sm),
+                VjSkeletonBox(height: 56, borderRadius: AppRadius.md),
+              ],
+            ),
             error: (err, st) => Text(
               'price_verdict.load_error'.tr(),
               style: textTheme.bodySmall,
@@ -462,26 +455,65 @@ class _Step2AmountInput extends StatelessWidget {
     final unitLabel = activeCategory?.localizedUnit(languageCode) ?? '';
 
     return VjCard(
+      borderRadius: AppRadius.xl,
+      elevated: true,
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (categoryLabel.isNotEmpty) ...[
             Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.primarySoft,
-                borderRadius: BorderRadius.circular(AppRadius.md),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm + 2,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              decoration: BoxDecoration(
+                color: AppColors.primarySoft.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(color: AppColors.primaryBorder),
+              ),
+              child: Row(
                 children: [
-                  Text(
-                    categoryLabel,
-                    style: textTheme.titleMedium?.copyWith(fontSize: 14),
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Icon(
+                      _iconForContributeCategory(activeCategory),
+                      size: 18,
+                      color: Colors.white,
+                    ),
                   ),
-                  if (unitLabel.isNotEmpty)
-                    Text(unitLabel, style: textTheme.bodySmall),
+                  const SizedBox(width: AppSpacing.sm + 2),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          categoryLabel,
+                          style: textTheme.titleSmall?.copyWith(
+                            color: AppColors.brandNavy,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (unitLabel.isNotEmpty)
+                          Text(
+                            unitLabel,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -489,32 +521,146 @@ class _Step2AmountInput extends StatelessWidget {
           ],
           Text(
             'price_contribute.step2_subtitle'.tr(),
-            style: textTheme.bodyMedium,
+            style: textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
-          VjTextField(
-            label: 'price_contribute.amount_label'.tr(),
-            controller: controller,
-            keyboardType: TextInputType.number,
-            onChanged: onChanged,
-            errorText: errorText,
+          // Caja numérica focal estilo fintech
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.sm + 4,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceSubtle,
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+              border: Border.all(
+                color: errorText != null
+                    ? Theme.of(context).colorScheme.error
+                    : AppColors.primaryBorder,
+                width: 1.5,
+              ),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'price_contribute.amount_label'.tr(),
+                  style: textTheme.labelMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      r'$',
+                      style: textTheme.headlineMedium?.copyWith(
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        onChanged: onChanged,
+                        style: textTheme.headlineLarge?.copyWith(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.6,
+                          color: AppColors.brandNavy,
+                        ),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          focusedErrorBorder: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: AppSpacing.xs,
+                          ),
+                          hintText: '12000',
+                          hintStyle: textTheme.headlineLarge?.copyWith(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textMuted.withValues(alpha: 0.45),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
+          if (errorText != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              errorText!,
+              style: textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           Text(
             'price_contribute.quick_amounts_label'.tr(),
-            style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+            style: textTheme.labelMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: AppSpacing.xs),
           Wrap(
-            spacing: AppSpacing.sm,
+            spacing: AppSpacing.xs + 2,
             runSpacing: AppSpacing.xs,
             children: [
               for (final preset in const ['10000', '12000', '16000', '80000'])
-                ActionChip(
-                  label: Text(formatCop(int.parse(preset))),
-                  onPressed: () => onQuickAmountTap(preset),
-                  backgroundColor: AppColors.surface,
-                  side: const BorderSide(color: AppColors.border),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => onQuickAmountTap(preset),
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minHeight: 48,
+                        minWidth: 48,
+                      ),
+                      child: Center(
+                        widthFactor: 1.0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.xs + 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Text(
+                            formatCop(int.parse(preset)),
+                            style: textTheme.labelMedium?.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -569,12 +715,18 @@ class _Step3ZoneAndNoteSelection extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return VjCard(
+      borderRadius: AppRadius.xl,
+      elevated: true,
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           zonesAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const Column(
+              children: [
+                VjSkeletonBox(height: 140, borderRadius: AppRadius.lg),
+              ],
+            ),
             error: (err, st) => Text(
               'price_verdict.load_error'.tr(),
               style: textTheme.bodySmall,
@@ -750,6 +902,8 @@ class _Step4ReviewAndConfirm extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         VjCard(
+          borderRadius: AppRadius.xl,
+          elevated: true,
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -768,13 +922,13 @@ class _Step4ReviewAndConfirm extends StatelessWidget {
                 subtitle: unitName,
                 onEdit: () => onEditStep(0),
               ),
-              const Divider(height: AppSpacing.lg, color: AppColors.border),
+              const Divider(height: AppSpacing.lg),
               _SummaryRow(
                 label: 'price_contribute.amount_label'.tr(),
                 value: formattedAmount,
                 onEdit: () => onEditStep(1),
               ),
-              const Divider(height: AppSpacing.lg, color: AppColors.border),
+              const Divider(height: AppSpacing.lg),
               _SummaryRow(
                 label: destName != null
                     ? 'price_contribute.route_summary_label'.tr()
@@ -783,7 +937,7 @@ class _Step4ReviewAndConfirm extends StatelessWidget {
                 onEdit: () => onEditStep(2),
               ),
               if (note != null) ...[
-                const Divider(height: AppSpacing.lg, color: AppColors.border),
+                const Divider(height: AppSpacing.lg),
                 _SummaryRow(
                   label: 'price_contribute.note_label'.tr(),
                   value: note,
@@ -797,9 +951,9 @@ class _Step4ReviewAndConfirm extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: AppColors.primarySoft,
+            color: AppColors.primarySoft.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: AppColors.primary),
+            border: Border.all(color: AppColors.primaryBorder),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -868,30 +1022,34 @@ class _CompletedContributionView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
+        VjCard(
+          borderRadius: AppRadius.xl,
+          elevated: true,
+          backgroundColor: AppColors.primarySoft.withValues(alpha: 0.6),
+          borderColor: AppColors.primaryBorder,
           padding: const EdgeInsets.all(AppSpacing.xl),
-          decoration: BoxDecoration(
-            color: AppColors.semaphoreGreenSoft,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: AppColors.semaphoreGreen, width: 1.8),
-          ),
           child: Column(
             children: [
-              const Icon(
-                Icons.check_circle_outline,
-                color: AppColors.semaphoreGreen,
-                size: 48,
+              Container(
+                width: 60,
+                height: 60,
+                decoration: const BoxDecoration(
+                  color: AppColors.brandNavy,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: 32,
+                ),
               ),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.md),
               Text(
                 (isDemoMode
                         ? 'price_contribute.success_title'
                         : 'price_contribute.live_success_title')
                     .tr(),
-                style: textTheme.headlineMedium?.copyWith(
-                  fontSize: 20,
-                  color: AppColors.textPrimary,
-                ),
+                style: textTheme.titleLarge,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.xs),
@@ -901,16 +1059,16 @@ class _CompletedContributionView extends StatelessWidget {
                         : 'price_contribute.live_saved_disclaimer')
                     .tr(),
                 style: textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textPrimary,
+                  color: AppColors.textSecondary,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.md),
-              const Divider(color: AppColors.border),
+              const Divider(),
               const SizedBox(height: AppSpacing.sm),
               Text(
                 categoryName,
-                style: textTheme.titleMedium,
+                style: textTheme.titleSmall,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 4),
@@ -949,6 +1107,21 @@ class _CompletedContributionView extends StatelessWidget {
   }
 }
 
+IconData _iconForContributeCategory(PriceCategory? category) {
+  switch (category?.groupKey) {
+    case 'transport':
+      return Icons.local_taxi_outlined;
+    case 'food':
+      return Icons.restaurant_outlined;
+    case 'lodging':
+      return Icons.bed_outlined;
+    case 'services':
+      return Icons.local_laundry_service_outlined;
+    default:
+      return Icons.sell_outlined;
+  }
+}
+
 class _SelectableCategoryCard extends StatelessWidget {
   const _SelectableCategoryCard({
     required this.category,
@@ -967,29 +1140,45 @@ class _SelectableCategoryCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Material(
-      color: selected ? AppColors.primarySoft : AppColors.background,
-      borderRadius: BorderRadius.circular(AppRadius.md),
+      color: selected
+          ? AppColors.primarySoft.withValues(alpha: 0.75)
+          : AppColors.surfaceSubtle,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 52),
-          child: Container(
+          constraints: const BoxConstraints(minHeight: 58),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
               border: Border.all(
                 color: selected ? AppColors.primary : AppColors.border,
-                width: selected ? 1.8 : 1,
+                width: selected ? 1.5 : 1,
               ),
             ),
             child: Row(
               children: [
-                Icon(
-                  selected ? Icons.check_circle : Icons.circle_outlined,
-                  color: selected ? AppColors.primary : AppColors.textMuted,
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.primary : AppColors.surface,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: selected
+                        ? null
+                        : Border.all(color: AppColors.border),
+                  ),
+                  child: Icon(
+                    _iconForContributeCategory(category),
+                    size: 20,
+                    color: selected ? Colors.white : AppColors.brandNavy,
+                  ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -999,15 +1188,23 @@ class _SelectableCategoryCard extends StatelessWidget {
                         style: textTheme.bodyMedium?.copyWith(
                           color: AppColors.textPrimary,
                           fontWeight:
-                              selected ? FontWeight.w700 : FontWeight.w500,
+                              selected ? FontWeight.w700 : FontWeight.w600,
                         ),
                       ),
                       Text(
                         category.localizedUnit(languageCode),
-                        style: textTheme.bodySmall,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Icon(
+                  selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                  size: 20,
+                  color: selected ? AppColors.primary : AppColors.textMuted,
                 ),
               ],
             ),

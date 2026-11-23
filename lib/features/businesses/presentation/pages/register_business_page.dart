@@ -5,10 +5,16 @@ import 'package:go_router/go_router.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
+import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
+import 'package:via_justa/core/widgets/vj_card.dart';
+import 'package:via_justa/core/widgets/vj_confirm_dialog.dart';
+import 'package:via_justa/core/widgets/vj_modal_sheet.dart';
+import 'package:via_justa/core/widgets/vj_skeleton_box.dart';
 import 'package:via_justa/features/businesses/domain/business_draft.dart';
 import 'package:via_justa/features/businesses/domain/business_price_notice.dart';
 import 'package:via_justa/features/businesses/presentation/state/register_business_provider.dart';
+import 'package:via_justa/features/businesses/presentation/widgets/business_withdraw_dialog.dart';
 import 'package:via_justa/features/prices/domain/price_verdict.dart';
 import 'package:via_justa/features/prices/presentation/widgets/map_point_picker_sheet.dart';
 
@@ -54,23 +60,7 @@ class _RegisterBusinessPageState extends ConsumerState<RegisterBusinessPage> {
   Future<void> _confirmWithdraw() async {
     final state = ref.read(registerBusinessProvider);
     if (state.busy || !state.isEditing) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('businessRegistration.withdrawTitle'.tr()),
-        content: Text('businessRegistration.withdrawBody'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text('businessRegistration.stay'.tr()),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text('businessRegistration.withdrawConfirm'.tr()),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showWithdrawBusinessDialog(context);
     if (mounted && confirmed == true) {
       await ref.read(registerBusinessProvider.notifier).withdraw();
     }
@@ -81,22 +71,14 @@ class _RegisterBusinessPageState extends ConsumerState<RegisterBusinessPage> {
     if (state.busy || _askingToExit) return;
     if (state.publishedId == null && !state.withdrawn && state.available) {
       _askingToExit = true;
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showVjConfirmDialog(
         context: context,
-        builder: (context) => AlertDialog(
-          title: Text('businessRegistration.leaveTitle'.tr()),
-          content: Text('businessRegistration.leaveBody'.tr()),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text('businessRegistration.stay'.tr()),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text('businessRegistration.leave'.tr()),
-            ),
-          ],
-        ),
+        icon: Icons.exit_to_app_rounded,
+        tone: VjModalTone.neutral,
+        title: 'businessRegistration.leaveTitle'.tr(),
+        body: 'businessRegistration.leaveBody'.tr(),
+        cancelLabel: 'businessRegistration.stay'.tr(),
+        confirmLabel: 'businessRegistration.leave'.tr(),
       );
       _askingToExit = false;
       if (!mounted || confirmed != true) return;
@@ -156,69 +138,194 @@ class _RegisterBusinessPageState extends ConsumerState<RegisterBusinessPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (!state.available) ...[
-                    Text(
-                      'businessRegistration.unavailable'.tr(),
-                      style: theme.bodyLarge,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    VjButton(
-                      label: 'businessRegistration.back'.tr(),
-                      onPressed: _exit,
+                    VjCard(
+                      borderRadius: AppRadius.xl,
+                      elevated: true,
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'businessRegistration.unavailable'.tr(),
+                            style: theme.bodyLarge,
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          VjButton(
+                            label: 'businessRegistration.back'.tr(),
+                            onPressed: _exit,
+                          ),
+                        ],
+                      ),
                     ),
                   ] else if (state.withdrawn) ...[
-                    const Icon(
-                      Icons.delete_outline,
-                      size: 48,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      'businessRegistration.withdrawnTitle'.tr(),
-                      style: theme.headlineSmall,
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text('businessRegistration.withdrawnBody'.tr()),
-                    const SizedBox(height: AppSpacing.xl),
-                    VjButton(
-                      label: 'businessRegistration.done'.tr(),
-                      onPressed: _exit,
+                    VjCard(
+                      borderRadius: AppRadius.xl,
+                      elevated: true,
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 60,
+                              height: 60,
+                              decoration: const BoxDecoration(
+                                color: AppColors.surfaceSubtle,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.delete_outline,
+                                size: 30,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          Text(
+                            'businessRegistration.withdrawnTitle'.tr(),
+                            style: theme.headlineSmall,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            'businessRegistration.withdrawnBody'.tr(),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: AppSpacing.xl),
+                          VjButton(
+                            label: 'businessRegistration.done'.tr(),
+                            onPressed: _exit,
+                          ),
+                        ],
+                      ),
                     ),
                   ] else if (state.publishedId != null) ...[
-                    const Icon(
-                      Icons.storefront,
-                      size: 48,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      'businessRegistration.publishedTitle'.tr(),
-                      style: theme.headlineSmall,
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text('businessRegistration.publishedBody'.tr()),
-                    const SizedBox(height: AppSpacing.xl),
-                    VjButton(
-                      label: 'businessRegistration.done'.tr(),
-                      onPressed: _exit,
+                    VjCard(
+                      borderRadius: AppRadius.xl,
+                      elevated: true,
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 60,
+                              height: 60,
+                              decoration: const BoxDecoration(
+                                color: AppColors.primarySoft,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.storefront_rounded,
+                                size: 30,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          Text(
+                            'businessRegistration.publishedTitle'.tr(),
+                            style: theme.headlineSmall,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            'businessRegistration.publishedBody'.tr(),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: AppSpacing.xl),
+                          VjButton(
+                            label: 'businessRegistration.done'.tr(),
+                            onPressed: _exit,
+                          ),
+                        ],
+                      ),
                     ),
                   ] else ...[
+                    Wrap(
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xs,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        VjBadge(
+                          label: '${state.step + 1} / 4',
+                          variant: VjBadgeVariant.navy,
+                        ),
+                        if (state.municipalityName.isNotEmpty)
+                          VjBadge(
+                            label: state.municipalityName,
+                            icon: Icons.location_on_outlined,
+                            variant: VjBadgeVariant.tonal,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
                     Text(
                       'businessRegistration.step${state.step}'.tr(),
                       style: theme.headlineSmall,
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    Text(state.municipalityName, style: theme.bodyMedium),
-                    const SizedBox(height: AppSpacing.xl),
-                    AbsorbPointer(
-                      absorbing: state.busy || state.locked,
-                      child: _StepContent(state: state),
+                    Row(
+                      children: List.generate(4, (index) {
+                        final isDone = index <= state.step;
+                        return Expanded(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOutCubic,
+                            height: 6,
+                            margin: EdgeInsets.only(
+                              right: index < 3 ? AppSpacing.xs : 0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDone
+                                  ? AppColors.primary
+                                  : AppColors.border,
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.pill,
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      child: VjCard(
+                        key: ValueKey<int>(state.step),
+                        borderRadius: AppRadius.xl,
+                        elevated: true,
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        child: AbsorbPointer(
+                          absorbing: state.busy || state.locked,
+                          child: _StepContent(state: state),
+                        ),
+                      ),
                     ),
                     if (state.error != null) ...[
                       const SizedBox(height: AppSpacing.lg),
                       Semantics(
                         liveRegion: true,
-                        child: Text(
-                          'businessRegistration.errors.${state.error}'.tr(),
+                        child: VjCard(
+                          borderRadius: AppRadius.md,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .error
+                              .withValues(alpha: 0.08),
+                          borderColor: Theme.of(context)
+                              .colorScheme
+                              .error
+                              .withValues(alpha: 0.4),
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          child: Text(
+                            'businessRegistration.errors.${state.error}'.tr(),
+                            style: theme.bodyMedium?.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -228,9 +335,10 @@ class _RegisterBusinessPageState extends ConsumerState<RegisterBusinessPage> {
                     ],
                     const SizedBox(height: AppSpacing.xl),
                     if (state.busy) ...[
-                      const LinearProgressIndicator(),
-                      const SizedBox(height: AppSpacing.md),
+                      const VjSkeletonBox(height: 8, borderRadius: AppRadius.pill),
+                      const SizedBox(height: AppSpacing.sm),
                       Text('businessRegistration.working'.tr()),
+                      const SizedBox(height: AppSpacing.md),
                     ],
                     VjButton(
                       label: state.step == 3
@@ -349,7 +457,8 @@ class _StepContent extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             state.zones.when(
-              loading: () => const LinearProgressIndicator(),
+              loading: () =>
+                  const VjSkeletonBox(height: 52, borderRadius: AppRadius.md),
               error: (_, _) => VjButton(
                 label: 'businessRegistration.reloadZones'.tr(),
                 onPressed: notifier.reloadZones,
@@ -381,8 +490,40 @@ class _StepContent extends ConsumerWidget {
             ),
             if (draft.latitude != null) ...[
               const SizedBox(height: AppSpacing.md),
-              Text(state.zoneName),
-              Text('${draft.latitude}, ${draft.longitude}'),
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: AppColors.primaryBorder),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.place_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            state.zoneName,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(color: AppColors.brandNavy),
+                          ),
+                          Text(
+                            '${draft.latitude}, ${draft.longitude}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
             const SizedBox(height: AppSpacing.lg),
             _field(ref, BusinessField.address),
@@ -467,52 +608,112 @@ class _StepContent extends ConsumerWidget {
           ],
         );
       default:
+        final textTheme = Theme.of(context).textTheme;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('businessRegistration.types.${draft.type.name}'.tr()),
-            for (final field in BusinessField.values)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: VjBadge(
+                label: 'businessRegistration.types.${draft.type.name}'.tr(),
+                variant: VjBadgeVariant.tonal,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            for (var i = 0; i < BusinessField.values.length; i++) ...[
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs + 2),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'businessRegistration.fields.${field.name}'.tr(),
-                      style: Theme.of(context).textTheme.labelLarge,
+                      'businessRegistration.fields.${BusinessField.values[i].name}'
+                          .tr(),
+                      style: textTheme.labelSmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
-                      draft.text(field).isEmpty
+                      draft.text(BusinessField.values[i]).isEmpty
                           ? 'businessRegistration.notProvided'.tr()
-                          : draft.text(field),
+                          : draft.text(BusinessField.values[i]),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
               ),
-            Text(state.zoneName),
-            Text('${draft.latitude}, ${draft.longitude}'),
-            const SizedBox(height: AppSpacing.lg),
+              if (i < BusinessField.values.length - 1)
+                const Divider(height: AppSpacing.sm),
+            ],
+            const Divider(height: AppSpacing.lg),
+            Row(
+              children: [
+                const Icon(
+                  Icons.place_outlined,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        state.zoneName,
+                        style: textTheme.titleSmall,
+                      ),
+                      Text(
+                        '${draft.latitude}, ${draft.longitude}',
+                        style: textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: AppSpacing.lg),
             for (final day in BusinessDraft.days)
-              Text(
-                'businessRegistration.daySummary'.tr(
-                  args: [
-                    'businessRegistration.days.$day'.tr(),
-                    draft.hours[day]?.enabled == true
-                        ? '${draft.hours[day]!.open} – ${draft.hours[day]!.close}'
-                        : 'businessRegistration.closed'.tr(),
-                  ],
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text(
+                  'businessRegistration.daySummary'.tr(
+                    args: [
+                      'businessRegistration.days.$day'.tr(),
+                      draft.hours[day]?.enabled == true
+                          ? '${draft.hours[day]!.open} – ${draft.hours[day]!.close}'
+                          : 'businessRegistration.closed'.tr(),
+                    ],
+                  ),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
-            const SizedBox(height: AppSpacing.lg),
+            const Divider(height: AppSpacing.lg),
             Text(
               'businessRegistration.photoCount'.tr(
                 args: [draft.photos.length.toString()],
               ),
+              style: textTheme.labelMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
+            if (draft.dishes.isNotEmpty) const SizedBox(height: AppSpacing.sm),
             for (final dish in draft.dishes) ...[
-              Text(
-                'businessRegistration.dishSummary'.tr(
-                  args: [dish.name, dish.price],
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text(
+                  'businessRegistration.dishSummary'.tr(
+                    args: [dish.name, dish.price],
+                  ),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               if (state.dishPriceNoticeFor(dish) case final noticeAsync?) ...[
@@ -526,13 +727,29 @@ class _StepContent extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.md),
               ],
             ],
-            const SizedBox(height: AppSpacing.lg),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              value: draft.publicationConsent,
-              title: Text('businessRegistration.publicationConsent'.tr()),
-              onChanged: (value) =>
-                  notifier.setPublicationConsent(value ?? false),
+            const SizedBox(height: AppSpacing.md),
+            Material(
+              color: AppColors.surfaceSubtle,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                side: const BorderSide(color: AppColors.border),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                child: CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: draft.publicationConsent,
+                  title: Text(
+                    'businessRegistration.publicationConsent'.tr(),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  onChanged: (value) =>
+                      notifier.setPublicationConsent(value ?? false),
+                ),
+              ),
             ),
           ],
         );
@@ -549,69 +766,94 @@ class _DayEditor extends ConsumerWidget {
     final notifier = ref.read(registerBusinessProvider.notifier);
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.sm),
-      child: Column(
-        children: [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('businessRegistration.days.$day'.tr()),
-            value: hours.enabled,
-            onChanged: (value) => notifier.setHours(
-              day,
-              BusinessDayHours(
-                enabled: value,
-                open: hours.open,
-                close: hours.close,
-              ),
-            ),
+      child: Material(
+        color: AppColors.surfaceSubtle,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          side: BorderSide(
+            color: hours.enabled ? AppColors.primaryBorder : AppColors.border,
           ),
-          if (hours.enabled)
-            Wrap(
-              spacing: AppSpacing.md,
-              runSpacing: AppSpacing.md,
-              children: [
-                SizedBox(
-                  width: 120,
-                  child: TextFormField(
-                    key: ValueKey('open-$day-${hours.open}'),
-                    initialValue: hours.open,
-                    decoration: InputDecoration(
-                      labelText: 'businessRegistration.open'.tr(),
-                      hintText: '08:00',
-                    ),
-                    keyboardType: TextInputType.datetime,
-                    onChanged: (value) => notifier.setHours(
-                      day,
-                      BusinessDayHours(
-                        enabled: true,
-                        open: value,
-                        close: hours.close,
-                      ),
-                    ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          child: Column(
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  'businessRegistration.days.$day'.tr(),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                SizedBox(
-                  width: 120,
-                  child: TextFormField(
-                    key: ValueKey('close-$day-${hours.close}'),
-                    initialValue: hours.close,
-                    decoration: InputDecoration(
-                      labelText: 'businessRegistration.close'.tr(),
-                      hintText: '18:00',
-                    ),
-                    keyboardType: TextInputType.datetime,
-                    onChanged: (value) => notifier.setHours(
-                      day,
-                      BusinessDayHours(
-                        enabled: true,
-                        open: hours.open,
-                        close: value,
-                      ),
-                    ),
+                value: hours.enabled,
+                onChanged: (value) => notifier.setHours(
+                  day,
+                  BusinessDayHours(
+                    enabled: value,
+                    open: hours.open,
+                    close: hours.close,
                   ),
                 ),
-              ],
-            ),
-        ],
+              ),
+              if (hours.enabled)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Wrap(
+                    spacing: AppSpacing.md,
+                    runSpacing: AppSpacing.md,
+                    children: [
+                      SizedBox(
+                        width: 120,
+                        child: TextFormField(
+                          key: ValueKey('open-$day-${hours.open}'),
+                          initialValue: hours.open,
+                          decoration: InputDecoration(
+                            labelText: 'businessRegistration.open'.tr(),
+                            hintText: '08:00',
+                          ),
+                          keyboardType: TextInputType.datetime,
+                          onChanged: (value) => notifier.setHours(
+                            day,
+                            BusinessDayHours(
+                              enabled: true,
+                              open: value,
+                              close: hours.close,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 120,
+                        child: TextFormField(
+                          key: ValueKey('close-$day-${hours.close}'),
+                          initialValue: hours.close,
+                          decoration: InputDecoration(
+                            labelText: 'businessRegistration.close'.tr(),
+                            hintText: '18:00',
+                          ),
+                          keyboardType: TextInputType.datetime,
+                          onChanged: (value) => notifier.setHours(
+                            day,
+                            BusinessDayHours(
+                              enabled: true,
+                              open: hours.open,
+                              close: value,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -631,8 +873,14 @@ class _DishEditor extends ConsumerWidget {
     final selectedCategoryId = state.dishCategoryId(index);
     final noticeAsync = state.dishPriceNoticeFor(dish);
 
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.lg),
+    return Container(
+      margin: const EdgeInsets.only(top: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSubtle,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -847,7 +1095,7 @@ class _DishComparisonFeedback extends StatelessWidget {
       loading: () => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const LinearProgressIndicator(),
+          const VjSkeletonBox(height: 10, borderRadius: AppRadius.pill),
           if (showCheckingLabel) ...[
             const SizedBox(height: AppSpacing.xs),
             Text(

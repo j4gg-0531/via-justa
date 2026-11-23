@@ -5,6 +5,7 @@ import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
+import 'package:via_justa/core/widgets/vj_google_mark.dart';
 import 'package:via_justa/features/auth/presentation/widgets/legal_text.dart';
 
 /// Confirmación explícita cuando un inicio de sesión con Google corresponde a
@@ -61,18 +62,23 @@ class NewAccountConsentView extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 VjCard(
+                  borderRadius: AppRadius.xl,
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          CircleAvatar(
-                            radius: 22,
-                            backgroundColor: AppColors.primarySoft,
-                            child: const Icon(
-                              Icons.account_circle_outlined,
-                              color: AppColors.primary,
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceSubtle,
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: const Center(
+                              child: VjGoogleMark(size: 20),
                             ),
                           ),
                           const SizedBox(width: AppSpacing.md),
@@ -91,6 +97,8 @@ class NewAccountConsentView extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: AppSpacing.lg),
+                      const Divider(),
+                      const SizedBox(height: AppSpacing.md),
                       LegalText(
                         prefix: 'onboarding.google_consent.accept_prefix'.tr(),
                       ),

@@ -7,6 +7,8 @@ import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
+import 'package:via_justa/core/widgets/vj_confirm_dialog.dart';
+import 'package:via_justa/core/widgets/vj_skeleton_box.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis_result.dart';
 import 'package:via_justa/features/contracts/domain/contract_capture.dart';
 import 'package:via_justa/features/contracts/presentation/state/contract_analysis_provider.dart';
@@ -69,32 +71,17 @@ class _ContractCaptureSectionState
     ContractCaptureNotifier notifier,
     String languageCode,
   ) {
-    showDialog<void>(
+    showVjConfirmDialog(
       context: context,
+      icon: Icons.shield_outlined,
       barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-        ),
-        title: Text('contract_capture.consent_dialog_title'.tr()),
-        content: Text('contract_capture.consent_dialog_body'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              notifier.cancelConsent();
-            },
-            child: Text('contract_capture.consent_cancel'.tr()),
-          ),
-          VjButton(
-            label: 'contract_capture.consent_continue'.tr(),
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              notifier.confirmConsentAndProceed(languageCode: languageCode);
-            },
-          ),
-        ],
-      ),
+      title: 'contract_capture.consent_dialog_title'.tr(),
+      body: 'contract_capture.consent_dialog_body'.tr(),
+      cancelLabel: 'contract_capture.consent_cancel'.tr(),
+      confirmLabel: 'contract_capture.consent_continue'.tr(),
+      onCancel: notifier.cancelConsent,
+      onConfirm: () =>
+          notifier.confirmConsentAndProceed(languageCode: languageCode),
     );
   }
 
@@ -102,32 +89,16 @@ class _ContractCaptureSectionState
     BuildContext context,
     ContractAnalysisNotifier notifier,
   ) {
-    showDialog<void>(
+    showVjConfirmDialog(
       context: context,
+      icon: Icons.auto_awesome_outlined,
       barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-        ),
-        title: Text('contract_analysis.ai_consent_dialog_title'.tr()),
-        content: Text('contract_analysis.ai_consent_dialog_body'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              notifier.cancelAiConsent();
-            },
-            child: Text('contract_analysis.ai_consent_cancel'.tr()),
-          ),
-          VjButton(
-            label: 'contract_analysis.ai_consent_continue'.tr(),
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              notifier.confirmAiConsentAndProceed();
-            },
-          ),
-        ],
-      ),
+      title: 'contract_analysis.ai_consent_dialog_title'.tr(),
+      body: 'contract_analysis.ai_consent_dialog_body'.tr(),
+      cancelLabel: 'contract_analysis.ai_consent_cancel'.tr(),
+      confirmLabel: 'contract_analysis.ai_consent_continue'.tr(),
+      onCancel: notifier.cancelAiConsent,
+      onConfirm: notifier.confirmAiConsentAndProceed,
     );
   }
 
@@ -181,11 +152,9 @@ class _ContractCaptureSectionState
           width: double.infinity,
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: AppColors.primarySoft,
+            color: AppColors.primarySoft.withValues(alpha: 0.65),
             borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.35),
-            ),
+            border: Border.all(color: AppColors.primaryBorder),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -193,7 +162,7 @@ class _ContractCaptureSectionState
               const Icon(
                 Icons.privacy_tip_outlined,
                 color: AppColors.primary,
-                size: 20,
+                size: 18,
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
@@ -212,6 +181,8 @@ class _ContractCaptureSectionState
 
         // 2. Tarjeta de captura: Cámara, Archivo (JPG/PNG/TXT), PDF (Próximamente) y Entrada manual
         VjCard(
+          borderRadius: AppRadius.xl,
+          elevated: true,
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -225,7 +196,10 @@ class _ContractCaptureSectionState
                     'contract_capture.title'.tr(),
                     style: textTheme.titleMedium,
                   ),
-                  VjBadge(label: 'contract_capture.formats_badge'.tr()),
+                  VjBadge(
+                    label: 'contract_capture.formats_badge'.tr(),
+                    variant: VjBadgeVariant.neutral,
+                  ),
                 ],
               ),
               const SizedBox(height: AppSpacing.xs),
@@ -250,7 +224,11 @@ class _ContractCaptureSectionState
                     label: Text('contract_capture.action_camera'.tr()),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary),
+                      backgroundColor: AppColors.primarySoft.withValues(alpha: 0.4),
+                      side: const BorderSide(color: AppColors.primaryBorder),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
                       minimumSize: const Size(48, 48),
                     ),
                   ),
@@ -265,7 +243,11 @@ class _ContractCaptureSectionState
                     label: Text('contract_capture.action_file'.tr()),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary),
+                      backgroundColor: AppColors.primarySoft.withValues(alpha: 0.4),
+                      side: const BorderSide(color: AppColors.primaryBorder),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
                       minimumSize: const Size(48, 48),
                     ),
                   ),
@@ -275,7 +257,11 @@ class _ContractCaptureSectionState
                     label: Text('contract_capture.action_manual'.tr()),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textPrimary,
+                      backgroundColor: AppColors.surfaceSubtle,
                       side: const BorderSide(color: AppColors.border),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
                       minimumSize: const Size(48, 48),
                     ),
                   ),
@@ -290,7 +276,10 @@ class _ContractCaptureSectionState
                     label: Text('contract_capture.pdf_coming_soon_chip'.tr()),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary),
+                      side: const BorderSide(color: AppColors.primaryBorder),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
                       minimumSize: const Size(48, 48),
                     ),
                   ),
@@ -305,6 +294,7 @@ class _ContractCaptureSectionState
         // 3. Selector de contratos sintéticos de prueba (solo en modo DEMO)
         if (isDemoMode)
         VjCard(
+          borderRadius: AppRadius.xl,
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -340,20 +330,27 @@ class _ContractCaptureSectionState
         if (captureState.status == ContractCaptureStatus.readingDocument) ...[
           const SizedBox(height: AppSpacing.lg),
           VjCard(
+            borderRadius: AppRadius.xl,
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: Row(
               children: [
-                const Icon(
-                  Icons.document_scanner_outlined,
-                  color: AppColors.primary,
+                const VjSkeletonBox(
+                  width: 36,
+                  height: 36,
+                  borderRadius: AppRadius.md,
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
-                  child: Text(
-                    'contract_capture.status_reading'.tr(),
-                    style: textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'contract_capture.status_reading'.tr(),
+                        style: textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      const VjSkeletonBox(height: 10, width: 140),
+                    ],
                   ),
                 ),
               ],
@@ -419,6 +416,8 @@ class _ContractCaptureSectionState
         if (captureState.showTextEditor) ...[
           const SizedBox(height: AppSpacing.lg),
           VjCard(
+            borderRadius: AppRadius.xl,
+            elevated: true,
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -433,10 +432,14 @@ class _ContractCaptureSectionState
                       style: textTheme.titleMedium,
                     ),
                     if (captureState.isReadyForAnalysis)
-                      VjBadge(label: 'contract_capture.status_ready'.tr()),
+                      VjBadge(
+                        label: 'contract_capture.status_ready'.tr(),
+                        variant: VjBadgeVariant.navy,
+                      ),
                     if (captureState.wasTempFileDeleted)
                       VjBadge(
                         label: 'contract_capture.rn10_temp_deleted_badge'.tr(),
+                        variant: VjBadgeVariant.neutral,
                       ),
                   ],
                 ),
@@ -519,33 +522,49 @@ class _ContractCaptureSectionState
         if (analysisState.isAnalyzing) ...[
           const SizedBox(height: AppSpacing.lg),
           VjCard(
+            borderRadius: AppRadius.xl,
             padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2.5),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'contract_analysis.analyzing_status'.tr(),
-                        style: textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.primarySoft,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'contract_analysis.analyzing_hint'.tr(),
-                        style: textTheme.bodySmall,
+                      child: const Icon(
+                        Icons.auto_awesome_outlined,
+                        color: AppColors.primary,
+                        size: 20,
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'contract_analysis.analyzing_status'.tr(),
+                            style: textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'contract_analysis.analyzing_hint'.tr(),
+                            style: textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: AppSpacing.md),
+                const VjSkeletonBox(height: 12),
+                const SizedBox(height: AppSpacing.xs),
+                const VjSkeletonBox(height: 12, width: 220),
               ],
             ),
           ),
@@ -554,14 +573,11 @@ class _ContractCaptureSectionState
         // 7. Error durante el análisis con IA y acción de reintento si es seguro
         if (analysisState.hasError && analysisState.error != null) ...[
           const SizedBox(height: AppSpacing.lg),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: AppColors.semaphoreRed, width: 1.5),
-            ),
+          VjCard(
+            borderRadius: AppRadius.xl,
+            backgroundColor: AppColors.semaphoreRedSoft,
+            borderColor: AppColors.semaphoreRed.withValues(alpha: 0.45),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -580,9 +596,8 @@ class _ContractCaptureSectionState
                         children: [
                           Text(
                             'contract_analysis.error_title'.tr(),
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w700,
+                            style: textTheme.titleSmall?.copyWith(
+                              color: AppColors.semaphoreRed,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -643,7 +658,9 @@ class _SyntheticSampleTile extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Material(
-      color: selected ? AppColors.primarySoft : AppColors.background,
+      color: selected
+          ? AppColors.primarySoft.withValues(alpha: 0.7)
+          : AppColors.surfaceSubtle,
       borderRadius: BorderRadius.circular(AppRadius.md),
       child: InkWell(
         onTap: onTap,
@@ -655,8 +672,8 @@ class _SyntheticSampleTile extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(
-                color: selected ? AppColors.primary : AppColors.border,
-                width: selected ? 1.8 : 1,
+                color: selected ? AppColors.primaryBorder : AppColors.border,
+                width: selected ? 1.5 : 1,
               ),
             ),
             child: Row(

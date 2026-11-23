@@ -84,3 +84,10 @@ int countCompletedSettlerSteps(Set<String> completedIds) {
   }
   return count;
 }
+
+/// Calcula el progreso proporcional (0.0 a 1.0) del checklist de instalación.
+double settlerChecklistProgress(Set<String> completedIds) {
+  if (kSettlerInstallationSteps.isEmpty) return 0;
+  return countCompletedSettlerSteps(completedIds) /
+      kSettlerInstallationSteps.length;
+}

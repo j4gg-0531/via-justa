@@ -706,6 +706,7 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
   void _published(String id) {
     state = state.copyWith(busy: false, locked: false, publishedId: id);
     ref.invalidate(businessCatalogProvider);
+    ref.invalidate(myBusinessesProvider);
     ref.invalidate(allPriceMapItemsProvider);
   }
 
@@ -720,6 +721,7 @@ class RegisterBusinessNotifier extends Notifier<RegisterBusinessState> {
       if (!ref.mounted || generation != _generation) return;
       state = state.copyWith(busy: false, locked: false, withdrawn: true);
       ref.invalidate(businessCatalogProvider);
+      ref.invalidate(myBusinessesProvider);
       ref.invalidate(allPriceMapItemsProvider);
     } catch (error) {
       if (ref.mounted && generation == _generation) {
