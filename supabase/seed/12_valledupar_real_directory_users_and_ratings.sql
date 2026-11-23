@@ -980,5 +980,22 @@ values
 on conflict (business_id, user_id) do update
   set stars = excluded.stars,
       updated_at = excluded.updated_at;
+
+-- ---------------------------------------------------------------------------
+-- 5. Depuración de registros DEMO de la base de datos conectada
+--    Al contar ya con el directorio real de negocios, agrupaciones vallenatas,
+--    reportes de precios reales y el evento oficial del Festival Vallenato,
+--    eliminamos las filas de ejemplo (`is_demo = true`) para que la base de
+--    datos en producción/nube contenga únicamente información verificada.
+-- ---------------------------------------------------------------------------
+delete from public.businesses
+where is_demo = true;
+
+delete from public.price_reports
+where is_demo = true;
+
+delete from public.events
+where is_demo = true;
+
 -- push execution
 
