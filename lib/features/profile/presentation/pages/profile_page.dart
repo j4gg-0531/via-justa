@@ -2,6 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:via_justa/core/currency/currency_formatter.dart';
+import 'package:via_justa/core/currency/currency_providers.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/session/session_providers.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
@@ -12,6 +14,7 @@ import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/core/widgets/vj_confirm_dialog.dart';
 import 'package:via_justa/core/widgets/vj_modal_sheet.dart';
 import 'package:via_justa/core/widgets/vj_text_field.dart';
+import 'package:via_justa/features/activity/presentation/state/user_activity_providers.dart';
 import 'package:via_justa/features/auth/domain/consent_document.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/auth/presentation/state/password_management_providers.dart';
@@ -160,6 +163,8 @@ class ProfilePage extends ConsumerWidget {
     final locationLabel = ref.watch(selectedLocationLabelProvider);
     final showMyBusinesses = ref.watch(showMyBusinessesInProfileProvider);
     final myBusinessesCount = ref.watch(myBusinessesCountProvider);
+    final activityTotalCount = ref.watch(userActivityTotalCountProvider);
+    final copPerUsdRate = ref.watch(activeCopPerUsdRateProvider);
     final textTheme = Theme.of(context).textTheme;
     Locale currentLocale;
     try {
@@ -168,6 +173,9 @@ class ProfilePage extends ConsumerWidget {
       currentLocale =
           Localizations.maybeLocaleOf(context) ?? const Locale('es');
     }
+    final currencyMode = ref.watch(
+      effectiveCurrencyModeProvider(currentLocale.languageCode),
+    );
 
     final cityName = locationLabel ?? 'home.default_city'.tr();
     final initials = _extractInitials(displayName);
@@ -330,6 +338,17 @@ class ProfilePage extends ConsumerWidget {
                       ),
                     ],
                     const Divider(height: 1, indent: 56),
+                    _CompactSettingRow(
+                      icon: Icons.history_rounded,
+                      label: 'activity.profile_row_title'.tr(),
+                      value: activityTotalCount > 0
+                          ? '$activityTotalCount'
+                          : null,
+                      onTap: () => GoRouter.maybeOf(context)?.push(
+                        AppRoutes.activity,
+                      ),
+                    ),
+                    const Divider(height: 1, indent: 56),
                     _InlineLanguageRow(
                       label: 'profile.section_language'.tr(),
                       isSpanish: currentLocale.languageCode == 'es',
@@ -339,6 +358,22 @@ class ProfilePage extends ConsumerWidget {
                           _changeLocale(context, ref, const Locale('es')),
                       onSelectEnglish: () =>
                           _changeLocale(context, ref, const Locale('en')),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    _InlineCurrencyRow(
+                      label: 'currency.section_label'.tr(),
+                      rateHint: 'currency.rate_hint'.tr(
+                        namedArgs: {
+                          'rate': formatCopCurrency(copPerUsdRate),
+                        },
+                      ),
+                      activeMode: currencyMode,
+                      copLabel: 'currency.mode_cop'.tr(),
+                      bothLabel: 'currency.mode_both'.tr(),
+                      usdLabel: 'currency.mode_usd'.tr(),
+                      onSelectMode: (mode) => ref
+                          .read(currencyOverrideProvider.notifier)
+                          .select(mode),
                     ),
                   ],
                 ),
@@ -1264,6 +1299,210 @@ class _CompactLangChip extends StatelessWidget {
                       fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
                     ),
                   ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fila de moneda con selector segmentado (`COP / + USD / USD`) resistente a
+/// anchos estrechos (360 dp) y escalas de texto grandes.
+class _InlineCurrencyRow extends StatelessWidget {
+  const _InlineCurrencyRow({
+    required this.label,
+    required this.rateHint,
+    required this.activeMode,
+    required this.copLabel,
+    required this.bothLabel,
+    required this.usdLabel,
+    required this.onSelectMode,
+  });
+
+  final String label;
+  final String rateHint;
+  final CurrencyDisplayMode activeMode;
+  final String copLabel;
+  final String bothLabel;
+  final String usdLabel;
+  final ValueChanged<CurrencyDisplayMode> onSelectMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+
+    final iconBox = Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSubtle,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: const Icon(
+        Icons.attach_money_rounded,
+        color: AppColors.brandNavy,
+        size: 18,
+      ),
+    );
+
+    final labelColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: textTheme.bodyMedium?.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          rateHint,
+          style: textTheme.bodySmall?.copyWith(
+            color: AppColors.textMuted,
+          ),
+        ),
+      ],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm + 2,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              iconBox,
+              const SizedBox(width: AppSpacing.md),
+              Expanded(child: labelColumn),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (textScale >= 1.25)
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
+                _CompactLangChip(
+                  label: copLabel,
+                  selected: activeMode == CurrencyDisplayMode.copOnly,
+                  onTap: () => onSelectMode(CurrencyDisplayMode.copOnly),
+                ),
+                _CompactLangChip(
+                  label: bothLabel,
+                  selected: activeMode == CurrencyDisplayMode.copAndUsd,
+                  onTap: () => onSelectMode(CurrencyDisplayMode.copAndUsd),
+                ),
+                _CompactLangChip(
+                  label: usdLabel,
+                  selected: activeMode == CurrencyDisplayMode.usdOnly,
+                  onTap: () => onSelectMode(CurrencyDisplayMode.usdOnly),
+                ),
+              ],
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceSubtle,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _CurrencySegmentOption(
+                      label: copLabel,
+                      selected: activeMode == CurrencyDisplayMode.copOnly,
+                      onTap: () => onSelectMode(CurrencyDisplayMode.copOnly),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Expanded(
+                    child: _CurrencySegmentOption(
+                      label: bothLabel,
+                      selected: activeMode == CurrencyDisplayMode.copAndUsd,
+                      onTap: () => onSelectMode(CurrencyDisplayMode.copAndUsd),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Expanded(
+                    child: _CurrencySegmentOption(
+                      label: usdLabel,
+                      selected: activeMode == CurrencyDisplayMode.usdOnly,
+                      onTap: () => onSelectMode(CurrencyDisplayMode.usdOnly),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CurrencySegmentOption extends StatelessWidget {
+  const _CurrencySegmentOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            constraints: const BoxConstraints(minHeight: 42),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xs + 2,
+              vertical: AppSpacing.xs,
+            ),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.surface : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: selected ? Border.all(color: AppColors.border) : null,
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: AppColors.brandNavy.withValues(alpha: 0.06),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Center(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelMedium?.copyWith(
+                  color: selected
+                      ? AppColors.brandNavy
+                      : AppColors.textSecondary,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                 ),
               ),
             ),

@@ -2,6 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:via_justa/core/currency/currency_formatter.dart';
+import 'package:via_justa/core/currency/currency_providers.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
@@ -9,6 +11,7 @@ import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/core/widgets/vj_skeleton_box.dart';
+import 'package:via_justa/features/activity/presentation/state/user_activity_providers.dart';
 import 'package:via_justa/features/businesses/domain/business_detail.dart';
 import 'package:via_justa/features/businesses/domain/business_rating.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
@@ -137,6 +140,14 @@ class BusinessDetailPage extends ConsumerWidget {
             final isOwner =
                 currentOwnerId != null && detail.ownerId == currentOwnerId;
             final description = detail.localizedDescription(localeCode);
+            final isFavorite = ref
+                .watch(userActivityProvider)
+                .isFavorite(detail.id);
+            final currencyMode = ref.watch(
+              effectiveCurrencyModeProvider(localeCode),
+            );
+            final copPerUsd = ref.watch(activeCopPerUsdRateProvider);
+            final errorColor = Theme.of(context).colorScheme.error;
 
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(
@@ -152,7 +163,7 @@ class BusinessDetailPage extends ConsumerWidget {
                   _PhotoHeader(photos: detail.photos),
                   const SizedBox(height: AppSpacing.md),
 
-                  // 2. Cabecera editorial: categoría, nombre y valoración
+                  // 2. Cabecera editorial: categoría, nombre, favorito y valoración
                   VjCard(
                     borderRadius: AppRadius.xl,
                     elevated: true,
@@ -160,12 +171,40 @@ class BusinessDetailPage extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        VjBadge(
-                          label:
-                              '${'businessRegistration.types.${detail.type}'.tr()} · $cityName',
-                          variant: VjBadgeVariant.tonal,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: VjBadge(
+                                  label:
+                                      '${'businessRegistration.types.${detail.type}'.tr()} · $cityName',
+                                  variant: VjBadgeVariant.tonal,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: isFavorite
+                                  ? 'activity.favorite_remove_tooltip'.tr()
+                                  : 'activity.favorite_add_tooltip'.tr(),
+                              onPressed: () => ref
+                                  .read(userActivityProvider.notifier)
+                                  .toggleFavoriteBusiness(detail.id),
+                              icon: Icon(
+                                isFavorite
+                                    ? Icons.favorite_rounded
+                                    : Icons.favorite_border_rounded,
+                                color: isFavorite
+                                    ? errorColor
+                                    : AppColors.textMuted,
+                              ),
+                              style: IconButton.styleFrom(
+                                minimumSize: const Size(48, 48),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: AppSpacing.sm),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           detail.name,
                           style: textTheme.headlineMedium?.copyWith(
@@ -296,7 +335,13 @@ class BusinessDetailPage extends ConsumerWidget {
                                   ),
                                 ),
                                 Text(
-                                  detail.dishes[i].formattedPriceCop,
+                                  currencyMode == CurrencyDisplayMode.copOnly
+                                      ? detail.dishes[i].formattedPriceCop
+                                      : formatMoney(
+                                          amountCop: detail.dishes[i].priceCop,
+                                          mode: currencyMode,
+                                          copPerUsd: copPerUsd,
+                                        ).inline,
                                   style: textTheme.bodyMedium?.copyWith(
                                     color: AppColors.primary,
                                     fontWeight: FontWeight.w700,

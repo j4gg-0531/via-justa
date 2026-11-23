@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:via_justa/core/currency/currency_formatter.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/theme/semantic_status_colors.dart';
@@ -18,12 +19,16 @@ class PriceVerdictCard extends StatelessWidget {
     this.category,
     this.zone,
     this.destinationZone,
+    this.currencyMode = CurrencyDisplayMode.copOnly,
+    this.copPerUsd = kDefaultCopPerUsd,
   });
 
   final PriceVerdict verdict;
   final PriceCategory? category;
   final MunicipalityZone? zone;
   final MunicipalityZone? destinationZone;
+  final CurrencyDisplayMode currencyMode;
+  final int copPerUsd;
 
   VjSemaphoreLight _lightForLevel(PriceVerdictLevel level) {
     switch (level) {
@@ -107,8 +112,17 @@ class PriceVerdictCard extends StatelessWidget {
             categoryTag: headerTitle,
             statusLabel: _titleKeyForLevel(verdict.level).tr(),
             statusIcon: style.icon,
-            headline: formatCop(verdict.submittedCop),
-            subMetric: 'price_verdict.evaluated_now'.tr(),
+            headline: currencyMode == CurrencyDisplayMode.copOnly
+                ? formatCop(verdict.submittedCop)
+                : formatMoney(
+                    amountCop: verdict.submittedCop,
+                    mode: currencyMode,
+                    copPerUsd: copPerUsd,
+                    includeCopCode: true,
+                  ).primary,
+            subMetric: currencyMode == CurrencyDisplayMode.copOnly
+                ? 'price_verdict.evaluated_now'.tr()
+                : '${formatMoney(amountCop: verdict.submittedCop, mode: currencyMode, copPerUsd: copPerUsd).secondary ?? ''} · ${'price_verdict.evaluated_now'.tr()}',
             accentColor: style.foreground,
             badgeBackground: style.background,
             badgeForeground: style.foreground,
@@ -137,6 +151,8 @@ class PriceVerdictCard extends StatelessWidget {
             _QuantifiedMetricsSection(
               verdict: verdict,
               accentColor: style.foreground,
+              currencyMode: currencyMode,
+              copPerUsd: copPerUsd,
             ),
 
           // 3. Contexto de evento activo real en azul institucional independiente
@@ -271,10 +287,14 @@ class _QuantifiedMetricsSection extends StatelessWidget {
   const _QuantifiedMetricsSection({
     required this.verdict,
     required this.accentColor,
+    required this.currencyMode,
+    required this.copPerUsd,
   });
 
   final PriceVerdict verdict;
   final Color accentColor;
+  final CurrencyDisplayMode currencyMode;
+  final int copPerUsd;
 
   @override
   Widget build(BuildContext context) {
@@ -293,7 +313,13 @@ class _QuantifiedMetricsSection extends StatelessWidget {
               if (verdict.referenceCop != null)
                 _MetricColumn(
                   label: 'price_verdict.reference_median_label'.tr(),
-                  value: formatCop(verdict.referenceCop!),
+                  value: currencyMode == CurrencyDisplayMode.copOnly
+                      ? formatCop(verdict.referenceCop!)
+                      : formatMoney(
+                          amountCop: verdict.referenceCop!,
+                          mode: currencyMode,
+                          copPerUsd: copPerUsd,
+                        ).inline,
                   valueColor: AppColors.primary,
                 ),
               if (verdict.deviationPct != null)

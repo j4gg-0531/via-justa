@@ -158,13 +158,31 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
       sortOrder: 1,
     ),
     PriceCategory(
+      id: 'transport_airport_transfer',
+      groupKey: 'transport',
+      nameEs: 'Traslado Aeropuerto / Terminal',
+      nameEn: 'Airport / Bus Terminal transfer',
+      unitDescriptionEs: 'Trayecto directo entre aeropuerto o terminal y la zona',
+      unitDescriptionEn: 'Direct ride between airport or bus terminal and the zone',
+      sortOrder: 2,
+    ),
+    PriceCategory(
       id: 'food_corrientazo',
       groupKey: 'food',
       nameEs: 'Almuerzo ejecutivo / corriente',
       nameEn: 'Standard daily lunch',
       unitDescriptionEs: 'Plato del día con sopa, seco y bebida en la zona',
       unitDescriptionEn: 'Daily lunch menu with soup, main dish, and drink in the zone',
-      sortOrder: 2,
+      sortOrder: 3,
+    ),
+    PriceCategory(
+      id: 'food_breakfast',
+      groupKey: 'food',
+      nameEs: 'Desayuno típico',
+      nameEn: 'Local breakfast',
+      unitDescriptionEs: 'Arepa o bollo con proteína y bebida caliente',
+      unitDescriptionEn: 'Local breakfast plate with hot drink',
+      sortOrder: 4,
     ),
     PriceCategory(
       id: 'lodging_standard_night',
@@ -173,7 +191,34 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
       nameEn: 'Standard room (1 night)',
       unitDescriptionEs: 'Habitación sencilla o doble con ventilador/A.C. en la zona',
       unitDescriptionEn: 'Single or double room with fan/A.C. in the zone',
-      sortOrder: 3,
+      sortOrder: 5,
+    ),
+    PriceCategory(
+      id: 'housing_room_monthly',
+      groupKey: 'housing',
+      nameEs: 'Arriendo habitación (mes)',
+      nameEn: 'Monthly room rent',
+      unitDescriptionEs: 'Habitación amoblada con servicios básicos incluidos',
+      unitDescriptionEn: 'Furnished monthly room with basic utilities included',
+      sortOrder: 6,
+    ),
+    PriceCategory(
+      id: 'housing_studio_monthly',
+      groupKey: 'housing',
+      nameEs: 'Apartaestudio (mes)',
+      nameEn: 'Monthly studio apartment',
+      unitDescriptionEs: 'Canon mensual de apartaestudio sin amoblar en la zona',
+      unitDescriptionEn: 'Monthly unfurnished studio rent in the zone',
+      sortOrder: 7,
+    ),
+    PriceCategory(
+      id: 'groceries_basic_weekly',
+      groupKey: 'groceries',
+      nameEs: 'Mercado básico semanal',
+      nameEn: 'Basic weekly groceries',
+      unitDescriptionEs: 'Canasta esencial de 1 semana para una persona',
+      unitDescriptionEn: 'Essential 1-week grocery basket for one person',
+      sortOrder: 8,
     ),
     PriceCategory(
       id: 'services_laundry_load',
@@ -182,7 +227,7 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
       nameEn: 'Laundry per load',
       unitDescriptionEs: 'Lavado y secado básico hasta 5 kg',
       unitDescriptionEn: 'Basic wash and dry up to 5 kg',
-      sortOrder: 4,
+      sortOrder: 9,
     ),
   ];
 
@@ -197,15 +242,40 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
         n: 13,
         eventReferenceCop: 13500,
       ),
+      'transport_airport_transfer': (
+        referenceCop: 24000,
+        n: 8,
+        eventReferenceCop: 30000,
+      ),
       'food_corrientazo': (
         referenceCop: 16000,
         n: 15,
         eventReferenceCop: 20000,
       ),
+      'food_breakfast': (
+        referenceCop: 14000,
+        n: 9,
+        eventReferenceCop: 17000,
+      ),
       'lodging_standard_night': (
         referenceCop: 110000,
         n: 10,
         eventReferenceCop: 150000,
+      ),
+      'housing_room_monthly': (
+        referenceCop: 480000,
+        n: 7,
+        eventReferenceCop: 520000,
+      ),
+      'housing_studio_monthly': (
+        referenceCop: 900000,
+        n: 6,
+        eventReferenceCop: 950000,
+      ),
+      'groceries_basic_weekly': (
+        referenceCop: 145000,
+        n: 8,
+        eventReferenceCop: 155000,
       ),
       'services_laundry_load': (
         referenceCop: 22000,
@@ -219,15 +289,40 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
         n: 14,
         eventReferenceCop: 12000,
       ),
+      'transport_airport_transfer': (
+        referenceCop: 22000,
+        n: 10,
+        eventReferenceCop: 28000,
+      ),
       'food_corrientazo': (
         referenceCop: 12000,
         n: 19,
+        eventReferenceCop: 15000,
+      ),
+      'food_breakfast': (
+        referenceCop: 12000,
+        n: 11,
         eventReferenceCop: 15000,
       ),
       'lodging_standard_night': (
         referenceCop: 80000,
         n: 9,
         eventReferenceCop: 110000,
+      ),
+      'housing_room_monthly': (
+        referenceCop: 420000,
+        n: 8,
+        eventReferenceCop: 460000,
+      ),
+      'housing_studio_monthly': (
+        referenceCop: 780000,
+        n: 7,
+        eventReferenceCop: 840000,
+      ),
+      'groceries_basic_weekly': (
+        referenceCop: 135000,
+        n: 9,
+        eventReferenceCop: 145000,
       ),
       'services_laundry_load': (
         referenceCop: 18000,
@@ -241,15 +336,40 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
         n: 16,
         eventReferenceCop: 13000,
       ),
+      'transport_airport_transfer': (
+        referenceCop: 18000,
+        n: 9,
+        eventReferenceCop: 23000,
+      ),
       'food_corrientazo': (
         referenceCop: 11000,
         n: 12,
         eventReferenceCop: 14000,
       ),
+      'food_breakfast': (
+        referenceCop: 11000,
+        n: 8,
+        eventReferenceCop: 13500,
+      ),
       'lodging_standard_night': (
         referenceCop: 70000,
         n: 8,
         eventReferenceCop: 95000,
+      ),
+      'housing_room_monthly': (
+        referenceCop: 360000,
+        n: 7,
+        eventReferenceCop: 390000,
+      ),
+      'housing_studio_monthly': (
+        referenceCop: 650000,
+        n: 6,
+        eventReferenceCop: 700000,
+      ),
+      'groceries_basic_weekly': (
+        referenceCop: 125000,
+        n: 8,
+        eventReferenceCop: 135000,
       ),
       'services_laundry_load': (
         referenceCop: 16000,
@@ -263,15 +383,40 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
         n: 9,
         eventReferenceCop: 15000,
       ),
+      'transport_airport_transfer': (
+        referenceCop: 25000,
+        n: 6,
+        eventReferenceCop: 32000,
+      ),
       'food_corrientazo': (
         referenceCop: 15000,
         n: 11,
         eventReferenceCop: 19000,
       ),
+      'food_breakfast': (
+        referenceCop: 13000,
+        n: 6,
+        eventReferenceCop: 16000,
+      ),
       'lodging_standard_night': (
         referenceCop: 95000,
         n: 7,
         eventReferenceCop: 130000,
+      ),
+      'housing_room_monthly': (
+        referenceCop: 430000,
+        n: 5,
+        eventReferenceCop: 470000,
+      ),
+      'housing_studio_monthly': (
+        referenceCop: 800000,
+        n: 5,
+        eventReferenceCop: 860000,
+      ),
+      'groceries_basic_weekly': (
+        referenceCop: 135000,
+        n: 6,
+        eventReferenceCop: 145000,
       ),
       'services_laundry_load': (
         referenceCop: 19000,
@@ -285,15 +430,40 @@ class DemoPriceVerdictRepository implements PriceVerdictRepository {
         n: 11,
         eventReferenceCop: 11500,
       ),
+      'transport_airport_transfer': (
+        referenceCop: 20000,
+        n: 7,
+        eventReferenceCop: 25000,
+      ),
       'food_corrientazo': (
         referenceCop: 10000,
         n: 10,
         eventReferenceCop: 12500,
       ),
+      'food_breakfast': (
+        referenceCop: 10500,
+        n: 7,
+        eventReferenceCop: 13000,
+      ),
       'lodging_standard_night': (
         referenceCop: 65000,
         n: 6,
         eventReferenceCop: 85000,
+      ),
+      'housing_room_monthly': (
+        referenceCop: 340000,
+        n: 6,
+        eventReferenceCop: 370000,
+      ),
+      'housing_studio_monthly': (
+        referenceCop: 620000,
+        n: 5,
+        eventReferenceCop: 670000,
+      ),
+      'groceries_basic_weekly': (
+        referenceCop: 120000,
+        n: 7,
+        eventReferenceCop: 130000,
       ),
       'services_laundry_load': (
         referenceCop: 15000,

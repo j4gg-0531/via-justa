@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:via_justa/core/currency/currency_providers.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
@@ -49,6 +50,14 @@ class PriceResultPage extends ConsumerWidget {
     final municipality = ref.watch(selectedMunicipalityProvider);
     final textTheme = Theme.of(context).textTheme;
     final notifier = ref.read(priceScanProvider.notifier);
+    String langCode;
+    try {
+      langCode = context.locale.languageCode;
+    } catch (_) {
+      langCode = Localizations.maybeLocaleOf(context)?.languageCode ?? 'es';
+    }
+    final currencyMode = ref.watch(effectiveCurrencyModeProvider(langCode));
+    final copPerUsd = ref.watch(activeCopPerUsdRateProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -130,6 +139,8 @@ class PriceResultPage extends ConsumerWidget {
                         category: category,
                         zone: zone,
                         destinationZone: destinationZone,
+                        currencyMode: currencyMode,
+                        copPerUsd: copPerUsd,
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       VjButton(

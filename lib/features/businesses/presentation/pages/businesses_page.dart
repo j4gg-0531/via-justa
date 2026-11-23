@@ -2,6 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:via_justa/core/currency/currency_formatter.dart';
+import 'package:via_justa/core/currency/currency_providers.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
@@ -10,6 +12,7 @@ import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/core/widgets/vj_search_field.dart';
 import 'package:via_justa/core/widgets/vj_skeleton_box.dart';
+import 'package:via_justa/features/activity/presentation/state/user_activity_providers.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/presentation/pages/business_detail_page.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
@@ -56,7 +59,16 @@ class BusinessesPage extends ConsumerWidget {
     final ownerBusy = ref.watch(businessOwnerActionProvider);
     final canLoadMore = ref.watch(canLoadMoreBusinessesProvider);
     final isLoadingMore = ref.watch(isLoadingMoreBusinessesProvider);
+    final activityState = ref.watch(userActivityProvider);
     final textTheme = Theme.of(context).textTheme;
+    String langCode;
+    try {
+      langCode = context.locale.languageCode;
+    } catch (_) {
+      langCode = Localizations.maybeLocaleOf(context)?.languageCode ?? 'es';
+    }
+    final currencyMode = ref.watch(effectiveCurrencyModeProvider(langCode));
+    final copPerUsd = ref.watch(activeCopPerUsdRateProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -288,6 +300,14 @@ class BusinessesPage extends ConsumerWidget {
                                 business: business,
                                 isOwner: true,
                                 ownerBusy: ownerBusy,
+                                isFavorite: activityState.isFavorite(
+                                  business.id,
+                                ),
+                                currencyMode: currencyMode,
+                                copPerUsd: copPerUsd,
+                                onToggleFavorite: () => ref
+                                    .read(userActivityProvider.notifier)
+                                    .toggleFavoriteBusiness(business.id),
                                 onTap: () =>
                                     _openBusinessDetail(context, business.id),
                                 onEditTap: () => context.push(
@@ -353,6 +373,14 @@ class BusinessesPage extends ConsumerWidget {
                                 business: business,
                                 isOwner: false,
                                 ownerBusy: ownerBusy,
+                                isFavorite: activityState.isFavorite(
+                                  business.id,
+                                ),
+                                currencyMode: currencyMode,
+                                copPerUsd: copPerUsd,
+                                onToggleFavorite: () => ref
+                                    .read(userActivityProvider.notifier)
+                                    .toggleFavoriteBusiness(business.id),
                                 onTap: () =>
                                     _openBusinessDetail(context, business.id),
                               ),
@@ -446,6 +474,10 @@ class _BusinessCard extends StatelessWidget {
     required this.onTap,
     this.isOwner = false,
     this.ownerBusy = false,
+    this.isFavorite = false,
+    this.currencyMode = CurrencyDisplayMode.copOnly,
+    this.copPerUsd = kDefaultCopPerUsd,
+    this.onToggleFavorite,
     this.onEditTap,
     this.onWithdrawTap,
   });
@@ -454,6 +486,10 @@ class _BusinessCard extends StatelessWidget {
   final VoidCallback onTap;
   final bool isOwner;
   final bool ownerBusy;
+  final bool isFavorite;
+  final CurrencyDisplayMode currencyMode;
+  final int copPerUsd;
+  final VoidCallback? onToggleFavorite;
   final VoidCallback? onEditTap;
   final VoidCallback? onWithdrawTap;
 
@@ -499,9 +535,19 @@ class _BusinessCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final errorColor = Theme.of(context).colorScheme.error;
     final categoryLabel = _categoryLabel(business.category);
-    final metaLine = business.minDishPriceCop != null
-        ? '$categoryLabel · ${formatCop(business.minDishPriceCop!)}'
+    final priceLabel = business.minDishPriceCop == null
+        ? null
+        : (currencyMode == CurrencyDisplayMode.copOnly
+              ? formatCop(business.minDishPriceCop!)
+              : formatMoney(
+                  amountCop: business.minDishPriceCop!,
+                  mode: currencyMode,
+                  copPerUsd: copPerUsd,
+                ).inline);
+    final metaLine = priceLabel != null
+        ? '$categoryLabel · $priceLabel'
         : categoryLabel;
 
     return VjCard(
@@ -591,11 +637,29 @@ class _BusinessCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.xs),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.textMuted,
-                size: 20,
-              ),
+              if (onToggleFavorite != null)
+                IconButton(
+                  tooltip: isFavorite
+                      ? 'activity.favorite_remove_tooltip'.tr()
+                      : 'activity.favorite_add_tooltip'.tr(),
+                  onPressed: onToggleFavorite,
+                  icon: Icon(
+                    isFavorite
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    color: isFavorite ? errorColor : AppColors.textMuted,
+                    size: 20,
+                  ),
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                  ),
+                )
+              else
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textMuted,
+                  size: 20,
+                ),
             ],
           ),
           if (isOwner) ...[

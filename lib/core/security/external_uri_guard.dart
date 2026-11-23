@@ -15,6 +15,19 @@ class ExternalUriGuard {
   static final RegExp _e164OrNationalPhonePattern = RegExp(r'^\+?[0-9]{7,15}$');
   static final RegExp _formattingSeparators = RegExp(r'[\s\-\(\)\.]');
 
+  /// Líneas cortas oficiales de emergencia en Colombia permitidas explícitamente.
+  static const Set<String> allowedEmergencyShortCodes = <String>{
+    '123',
+    '119',
+    '125',
+    '132',
+  };
+
+  static bool _isAllowedPhoneNumber(String compact) {
+    return allowedEmergencyShortCodes.contains(compact) ||
+        _e164OrNationalPhonePattern.hasMatch(compact);
+  }
+
   /// Verifica si las coordenadas están dentro de los límites continentales/insulares de Colombia.
   static bool isValidColombiaCoordinate({
     required double latitude,
@@ -46,7 +59,13 @@ class ExternalUriGuard {
   }
 
   /// Construye un URI `tel:` seguro rechazando caracteres de control o códigos USSD (`*`, `#`).
-  static Uri? buildSafeTelUri(String? rawPhone) {
+  ///
+  /// Por defecto exige rango E.164 / nacional (7–15 dígitos) para teléfonos de comercios.
+  /// Para líneas oficiales curadas (123, 119, 125, 132), usa [buildSafeEmergencyTelUri].
+  static Uri? buildSafeTelUri(
+    String? rawPhone, {
+    bool allowEmergencyShortCodes = false,
+  }) {
     if (rawPhone == null) return null;
     final trimmed = rawPhone.trim();
     if (trimmed.isEmpty) return null;
@@ -54,10 +73,18 @@ class ExternalUriGuard {
     // Si contiene caracteres distintos a dígitos, '+' inicial o separadores comunes,
     // se rechaza en vez de recortar silenciosamente (evita inyección USSD como *#06#).
     final compact = trimmed.replaceAll(_formattingSeparators, '');
-    if (!_e164OrNationalPhonePattern.hasMatch(compact)) {
+    final isAllowed = allowEmergencyShortCodes
+        ? _isAllowedPhoneNumber(compact)
+        : _e164OrNationalPhonePattern.hasMatch(compact);
+    if (!isAllowed) {
       return null;
     }
     return Uri(scheme: 'tel', path: compact);
+  }
+
+  /// Construye un URI `tel:` seguro permitiendo además las líneas oficiales de emergencia en Colombia.
+  static Uri? buildSafeEmergencyTelUri(String? rawPhone) {
+    return buildSafeTelUri(rawPhone, allowEmergencyShortCodes: true);
   }
 
   /// Valida cualquier URI externo antes de invocar `launchUrl`.
@@ -69,7 +96,7 @@ class ExternalUriGuard {
             !uri.host.contains(' ') &&
             uri.userInfo.isEmpty;
       case 'tel':
-        return _e164OrNationalPhonePattern.hasMatch(uri.path);
+        return _isAllowedPhoneNumber(uri.path);
       case 'geo':
         return uri.path.isNotEmpty || uri.query.isNotEmpty;
       default:

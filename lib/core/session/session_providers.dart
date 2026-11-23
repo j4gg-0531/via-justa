@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:via_justa/core/demo/demo_data.dart';
+import 'package:via_justa/features/activity/presentation/state/user_activity_providers.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 import 'package:via_justa/features/contracts/presentation/state/contract_analysis_provider.dart';
@@ -81,11 +82,13 @@ class SessionController {
     _ref.read(priceMapSearchQueryProvider.notifier).clear();
     _ref.read(priceMapCategoryProvider.notifier).clear();
     _ref.read(priceScanProvider.notifier).reset();
+    _ref.read(priceCategoryAudienceProvider.notifier).reset();
     _ref.read(priceContributionProvider.notifier).resetSession();
     _ref.read(contractCaptureProvider.notifier).discardDocument();
     _ref.read(contractAnalysisProvider.notifier).reset(clearConsent: true);
     _ref.read(scanModeProvider.notifier).reset();
     _ref.read(settlerChecklistProvider.notifier).clear();
+    unawaited(_ref.read(userActivityProvider.notifier).clearAll());
   }
 }
 

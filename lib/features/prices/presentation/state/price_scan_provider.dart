@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:via_justa/core/supabase/supabase_providers.dart';
+import 'package:via_justa/features/activity/domain/user_activity.dart';
+import 'package:via_justa/features/activity/presentation/state/user_activity_providers.dart';
 import 'package:via_justa/features/contracts/domain/contract_analysis.dart';
 import 'package:via_justa/features/contracts/presentation/state/contract_analysis_provider.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
@@ -9,6 +13,7 @@ import 'package:via_justa/features/prices/data/supabase_price_verdict_repository
 import 'package:via_justa/features/prices/domain/device_location.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_category.dart';
+import 'package:via_justa/features/prices/domain/price_category_filter.dart';
 import 'package:via_justa/features/prices/domain/price_contribution.dart';
 import 'package:via_justa/features/prices/domain/price_verdict.dart';
 import 'package:via_justa/features/prices/domain/price_verdict_repository.dart';
@@ -433,6 +438,7 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
       state = state.copyWith(
         verdictAsync: AsyncData<PriceVerdict?>(verdict),
       );
+      _recordCheckInActivity(verdict);
       return true;
     } catch (error, stackTrace) {
       if (currentToken != _requestToken) return false;
@@ -504,6 +510,7 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
       state = state.copyWith(
         verdictAsync: AsyncData<PriceVerdict?>(verdict),
       );
+      _recordCheckInActivity(verdict);
       return true;
     } catch (error, stackTrace) {
       if (currentToken != _requestToken) return false;
@@ -512,6 +519,46 @@ class PriceScanNotifier extends Notifier<PriceScanState> {
       );
       return false;
     }
+  }
+
+  void _recordCheckInActivity(PriceVerdict verdict) {
+    final categories =
+        ref.read(priceCategoriesProvider).asData?.value ??
+        const <PriceCategory>[];
+    final zones =
+        ref.read(municipalityZonesProvider).asData?.value ??
+        const <MunicipalityZone>[];
+
+    PriceCategory? matchedCategory;
+    for (final cat in categories) {
+      if (cat.id == verdict.categoryId) {
+        matchedCategory = cat;
+        break;
+      }
+    }
+
+    MunicipalityZone? matchedZone;
+    for (final z in zones) {
+      if (z.id == verdict.zoneId) {
+        matchedZone = z;
+        break;
+      }
+    }
+
+    final check = RecentPriceCheck(
+      id: '${DateTime.now().microsecondsSinceEpoch}_${verdict.categoryId}',
+      categoryId: verdict.categoryId,
+      categoryNameEs: matchedCategory?.nameEs ?? verdict.categoryId,
+      categoryNameEn: matchedCategory?.nameEn ?? verdict.categoryId,
+      zoneName: matchedZone?.nameEs ?? verdict.zoneId,
+      observedCop: verdict.submittedCop,
+      level: verdict.level,
+      checkedAt: DateTime.now(),
+      medianCop: verdict.referenceCop,
+      recommendedCapCop: verdict.recommendedCapCop,
+      deviationPct: verdict.deviationPct,
+    );
+    unawaited(ref.read(userActivityProvider.notifier).recordPriceCheck(check));
   }
 
   /// Limpia el veredicto activo al iniciar una nueva consulta.
@@ -574,4 +621,41 @@ final activeVerdictDestinationZoneProvider = Provider<MunicipalityZone?>((ref) {
     if (zone.id == targetZoneId) return zone;
   }
   return null;
+});
+
+/// Filtro de audiencia activo para el selector de categorías de precio (`Todas / Turismo / Vivir aquí`).
+class PriceCategoryAudienceNotifier extends Notifier<PriceCategoryAudience> {
+  @override
+  PriceCategoryAudience build() => PriceCategoryAudience.all;
+
+  void select(PriceCategoryAudience audience) {
+    state = audience;
+  }
+
+  void reset() {
+    state = PriceCategoryAudience.all;
+  }
+}
+
+final priceCategoryAudienceProvider =
+    NotifierProvider<PriceCategoryAudienceNotifier, PriceCategoryAudience>(
+      PriceCategoryAudienceNotifier.new,
+    );
+
+/// Categorías de precio filtradas por la audiencia activa.
+final filteredPriceCategoriesProvider = Provider<AsyncValue<List<PriceCategory>>>(
+  (ref) {
+    final categoriesAsync = ref.watch(priceCategoriesProvider);
+    final audience = ref.watch(priceCategoryAudienceProvider);
+    return categoriesAsync.whenData(
+      (categories) => filterPriceCategoriesByAudience(categories, audience),
+    );
+  },
+);
+
+/// Indica si el catálogo de precios tiene tanto categorías de turismo como de costo de vida.
+final showPriceAudienceFilterProvider = Provider<bool>((ref) {
+  final categories = ref.watch(priceCategoriesProvider).asData?.value;
+  if (categories == null) return false;
+  return hasMultiplePriceAudiences(categories);
 });

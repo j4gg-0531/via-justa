@@ -9,9 +9,12 @@ import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
+import 'package:via_justa/core/widgets/vj_confirm_dialog.dart';
+import 'package:via_justa/core/widgets/vj_modal_sheet.dart';
 import 'package:via_justa/core/widgets/vj_skeleton_box.dart';
 import 'package:via_justa/features/city/domain/city_overview.dart';
 import 'package:via_justa/features/city/domain/city_repository.dart';
+import 'package:via_justa/features/city/domain/emergency_contact.dart';
 import 'package:via_justa/features/city/presentation/state/city_providers.dart';
 import 'package:via_justa/features/city/presentation/widgets/city_editorial_photo_hero.dart';
 import 'package:via_justa/features/map_colombia/presentation/state/map_providers.dart';
@@ -50,6 +53,38 @@ class CityOverviewPage extends ConsumerWidget {
     if (!launched && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('city.source_open_error'.tr())),
+      );
+    }
+  }
+
+  Future<void> _confirmEmergencyCall(
+    BuildContext context,
+    WidgetRef ref,
+    EmergencyContact contact,
+  ) async {
+    final telUri = contact.safeTelUri;
+    if (telUri == null) return;
+    final confirmed = await showVjConfirmDialog(
+      context: context,
+      icon: Icons.call_rounded,
+      tone: contact.isUrgent ? VjModalTone.destructive : VjModalTone.primary,
+      title: 'city.emergency_call_dialog_title'.tr(
+        namedArgs: {'number': contact.displayNumber},
+      ),
+      body: 'city.emergency_call_dialog_body'.tr(
+        namedArgs: {'name': contact.titleKey.tr()},
+      ),
+      cancelLabel: 'common.close'.tr(),
+      confirmLabel: 'city.emergency_call_confirm'.tr(),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final launched = await ref
+        .read(cityExternalLauncherProvider)
+        .launchExternalUri(telUri);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('city.emergency_call_error'.tr())),
       );
     }
   }
@@ -268,6 +303,15 @@ class CityOverviewPage extends ConsumerWidget {
                             ],
                           ],
                         ),
+                      ),
+                    ],
+                    if (selectedSection == null ||
+                        selectedSection == CityContentSection.emergency) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      _EmergencyDialerStrip(
+                        contacts: kValleduparEmergencyContacts,
+                        onCallTap: (contact) =>
+                            _confirmEmergencyCall(context, ref, contact),
                       ),
                     ],
                     const SizedBox(height: AppSpacing.md),
@@ -743,5 +787,119 @@ String _sectionLabelKey(CityContentSection section) {
       return 'city.section_gastronomy';
     case CityContentSection.emergency:
       return 'city.section_emergency';
+  }
+}
+
+/// Bloque de marcación directa en 1 toque para líneas de emergencia oficiales (`tel:`).
+class _EmergencyDialerStrip extends StatelessWidget {
+  const _EmergencyDialerStrip({
+    required this.contacts,
+    required this.onCallTap,
+  });
+
+  final List<EmergencyContact> contacts;
+  final ValueChanged<EmergencyContact> onCallTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final errorColor = Theme.of(context).colorScheme.error;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'city.emergency_call_section_title'.tr(),
+          style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        for (var i = 0; i < contacts.length; i++) ...[
+          VjCard(
+            borderRadius: AppRadius.xl,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: contacts[i].isUrgent
+                        ? errorColor.withValues(alpha: 0.10)
+                        : AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: Border.all(
+                      color: contacts[i].isUrgent
+                          ? errorColor.withValues(alpha: 0.25)
+                          : AppColors.primaryBorder,
+                    ),
+                  ),
+                  child: Icon(
+                    contacts[i].isUrgent
+                        ? Icons.emergency_outlined
+                        : Icons.call_outlined,
+                    size: 20,
+                    color: contacts[i].isUrgent
+                        ? errorColor
+                        : AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        contacts[i].titleKey.tr(),
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        contacts[i].descriptionKey.tr(),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        contacts[i].displayNumber,
+                        style: textTheme.labelMedium?.copyWith(
+                          color: contacts[i].isUrgent
+                              ? errorColor
+                              : AppColors.primary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                FilledButton.icon(
+                  onPressed: () => onCallTap(contacts[i]),
+                  icon: const Icon(Icons.call_rounded, size: 16),
+                  label: Text('city.emergency_call_cta'.tr()),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: contacts[i].isUrgent
+                        ? errorColor
+                        : AppColors.brandNavy,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(48, 48),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (i < contacts.length - 1) const SizedBox(height: AppSpacing.sm),
+        ],
+      ],
+    );
   }
 }

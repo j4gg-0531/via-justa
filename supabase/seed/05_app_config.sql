@@ -19,7 +19,8 @@ insert into public.app_config (key, value) values
       "daily_report_limit_per_user": 10,
       "duplicate_cooldown_minutes": 15,
       "min_report_amount_cop": 500,
-      "max_report_amount_cop": 20000000
+      "max_report_amount_cop": 20000000,
+      "usd_exchange_rate_cop": 4100
     }'::jsonb
   )
 on conflict (key) do update
