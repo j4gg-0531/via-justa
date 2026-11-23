@@ -3,12 +3,44 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_theme.dart';
+import 'package:via_justa/features/auth/domain/consent_document.dart';
 
-class ViaJustaApp extends ConsumerWidget {
+class ViaJustaApp extends ConsumerStatefulWidget {
   const ViaJustaApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ViaJustaApp> createState() => _ViaJustaAppState();
+}
+
+class _ViaJustaAppState extends ConsumerState<ViaJustaApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeLocales(List<Locale>? locales) {
+    final rawCode = locales != null && locales.isNotEmpty
+        ? locales.first.languageCode
+        : null;
+    final code = resolveSupportedLocaleCode(rawCode);
+    try {
+      if (mounted && context.locale.languageCode != code) {
+        context.setLocale(Locale(code));
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Vía Justa',
       debugShowCheckedModeBanner: false,

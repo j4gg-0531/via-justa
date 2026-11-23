@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/features/auth/domain/consent_document.dart';
@@ -17,6 +18,7 @@ Future<void> showLegalDocumentDialog(
     context: context,
     builder: (dialogContext) {
       final textTheme = Theme.of(dialogContext).textTheme;
+      final clauses = splitLegalDocumentClauses(bodyKey.tr());
       return AlertDialog(
         scrollable: true,
         title: Text(titleKey.tr()),
@@ -30,7 +32,19 @@ Future<void> showLegalDocumentDialog(
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            Text(bodyKey.tr(), style: textTheme.bodyMedium),
+            for (var i = 0; i < clauses.length; i++) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Text(clauses[i], style: textTheme.bodyMedium),
+              ),
+              if (i < clauses.length - 1) const SizedBox(height: AppSpacing.sm),
+            ],
           ],
         ),
         actions: [

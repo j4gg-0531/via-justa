@@ -19,6 +19,8 @@ Future<void> main() async {
       supportedLocales: const [Locale('es'), Locale('en')],
       path: 'assets/translations',
       fallbackLocale: const Locale('es'),
+      useOnlyLangCode: true,
+      saveLocale: false,
       child: ProviderScope(
         overrides: [
           if (client != null) supabaseClientProvider.overrideWithValue(client),
