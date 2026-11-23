@@ -9,11 +9,14 @@ import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/core/widgets/vj_search_field.dart';
+import 'package:via_justa/core/widgets/vj_skeleton_box.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/presentation/pages/business_detail_page.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
+import 'package:via_justa/features/businesses/presentation/widgets/business_withdraw_dialog.dart';
+import 'package:via_justa/features/prices/domain/price_verdict.dart';
 
-/// Pantalla 21 (M21) · Directorio de comercios publicados en Valledupar con buscador y categorías.
+/// Pantalla 21 (M21) · Directorio compacto y escaneable de comercios locales.
 class BusinessesPage extends ConsumerWidget {
   const BusinessesPage({super.key});
 
@@ -34,23 +37,7 @@ class BusinessesPage extends ConsumerWidget {
     WidgetRef ref,
     Business business,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('businessRegistration.withdrawTitle'.tr()),
-        content: Text('businessRegistration.withdrawBody'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text('businessRegistration.stay'.tr()),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text('businessRegistration.withdrawConfirm'.tr()),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showWithdrawBusinessDialog(context);
     if (confirmed != true || !context.mounted) return;
     final ok = await ref
         .read(businessOwnerActionProvider.notifier)
@@ -64,15 +51,12 @@ class BusinessesPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final businessesAsync = ref.watch(filteredBusinessesProvider);
+    final partitionedAsync = ref.watch(partitionedBusinessesProvider);
     final selectedCategory = ref.watch(businessCategoryProvider);
-    final currentOwnerId = ref.watch(currentBusinessOwnerIdProvider);
     final ownerBusy = ref.watch(businessOwnerActionProvider);
     final canLoadMore = ref.watch(canLoadMoreBusinessesProvider);
     final isLoadingMore = ref.watch(isLoadingMoreBusinessesProvider);
     final textTheme = Theme.of(context).textTheme;
-    final localeCode =
-        EasyLocalization.of(context)?.locale.languageCode ?? 'es';
 
     return Scaffold(
       body: SafeArea(
@@ -81,24 +65,45 @@ class BusinessesPage extends ConsumerWidget {
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpacing.md),
 
-                    // Título y descripción
-                    Text(
-                      'businesses.title'.tr(),
-                      style: textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'businesses.subtitle'.tr(),
-                      style: textTheme.bodyMedium,
+                    // Cabecera limpia con acción directa de registro adaptable a 360dp @ 2.0x
+                    SizedBox(
+                      width: double.infinity,
+                      child: Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.xs,
+                        children: [
+                          Text(
+                            'businesses.title'.tr(),
+                            style: textTheme.headlineMedium?.copyWith(
+                              fontSize: 22,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () =>
+                                context.push(AppRoutes.businessRegister),
+                            icon: const Icon(Icons.add_rounded, size: 18),
+                            label: Text('businesses.register_action'.tr()),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              minimumSize: const Size(48, 48),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.sm,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
 
-                    const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpacing.sm),
 
                     // Campo de búsqueda
                     VjSearchField(
@@ -108,7 +113,7 @@ class BusinessesPage extends ConsumerWidget {
                           .updateQuery,
                     ),
 
-                    const SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: AppSpacing.sm + 4),
 
                     // Filtro de categorías horizontal
                     SingleChildScrollView(
@@ -166,91 +171,198 @@ class BusinessesPage extends ConsumerWidget {
                       ),
                     ),
 
-                    const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpacing.md),
                   ],
                 ),
               ),
             ),
 
-            // Lista de resultados
-            businessesAsync.when(
-              loading: () => const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (err, stack) => SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.xl),
-                  child: Column(
-                    children: [
-                      Text(
-                        'municipality.load_error'.tr(),
-                        style: textTheme.bodyLarge,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      VjButton(
-                        label: 'common.retry'.tr(),
-                        onPressed: () =>
-                            ref.invalidate(businessCatalogProvider),
-                      ),
-                    ],
+            // Lista compacta de resultados separando "Tus negocios" arriba del resto
+            ...partitionedAsync.when(
+              loading: () => const <Widget>[
+                SliverPadding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        VjSkeletonBox(height: 82, borderRadius: AppRadius.xl),
+                        SizedBox(height: AppSpacing.sm),
+                        VjSkeletonBox(height: 82, borderRadius: AppRadius.xl),
+                        SizedBox(height: AppSpacing.sm),
+                        VjSkeletonBox(height: 82, borderRadius: AppRadius.xl),
+                        SizedBox(height: AppSpacing.sm),
+                        VjSkeletonBox(height: 82, borderRadius: AppRadius.xl),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              data: (businesses) {
-                if (businesses.isEmpty) {
-                  return SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xxl),
-                      child: Center(
-                        child: Text(
-                          'businesses.no_results'.tr(),
+              ],
+              error: (err, stack) => <Widget>[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xl),
+                    child: Column(
+                      children: [
+                        Text(
+                          'municipality.load_error'.tr(),
                           style: textTheme.bodyLarge,
                           textAlign: TextAlign.center,
                         ),
+                        const SizedBox(height: AppSpacing.md),
+                        VjButton(
+                          label: 'common.retry'.tr(),
+                          onPressed: () {
+                            ref.invalidate(businessCatalogProvider);
+                            ref.invalidate(myBusinessesProvider);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              data: (partitioned) {
+                if (partitioned.isEmpty) {
+                  return <Widget>[
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.xxl),
+                        child: Center(
+                          child: Text(
+                            'businesses.no_results'.tr(),
+                            style: textTheme.bodyLarge,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                       ),
                     ),
-                  );
+                  ];
                 }
 
-                return SliverPadding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xl,
-                  ),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final business = businesses[index];
-                        final isOwner =
-                            currentOwnerId != null &&
-                            business.ownerId == currentOwnerId;
-                        final description = business.localizedDescription(
-                          localeCode,
-                        );
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                          child: _BusinessCard(
-                            business: business,
-                            description: description,
-                            isOwner: isOwner,
-                            ownerBusy: ownerBusy,
-                            onTap: () =>
-                                _openBusinessDetail(context, business.id),
-                            onEditTap: isOwner
-                                ? () => context.push(
-                                    AppRoutes.businessEditPath(business.id),
-                                  )
-                                : null,
-                            onWithdrawTap: isOwner
-                                ? () => _confirmWithdraw(context, ref, business)
-                                : null,
-                          ),
-                        );
-                      },
-                      childCount: businesses.length,
+                return <Widget>[
+                  if (partitioned.hasOwned) ...[
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.lg + AppSpacing.xs,
+                          0,
+                          AppSpacing.lg,
+                          AppSpacing.xs + 2,
+                        ),
+                        child: Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: AppSpacing.xs + 2,
+                          runSpacing: AppSpacing.xs,
+                          children: [
+                            Text(
+                              'businesses.your_businesses_section'
+                                  .tr()
+                                  .toUpperCase(),
+                              style: textTheme.labelSmall?.copyWith(
+                                color: AppColors.primary,
+                                letterSpacing: 0.6,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            VjBadge(
+                              label: '${partitioned.owned.length}',
+                              variant: VjBadgeVariant.tonal,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                );
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                      ),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final business = partitioned.owned[index];
+                            return Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: AppSpacing.sm,
+                              ),
+                              child: _BusinessCard(
+                                business: business,
+                                isOwner: true,
+                                ownerBusy: ownerBusy,
+                                onTap: () =>
+                                    _openBusinessDetail(context, business.id),
+                                onEditTap: () => context.push(
+                                  AppRoutes.businessEditPath(business.id),
+                                ),
+                                onWithdrawTap: () =>
+                                    _confirmWithdraw(context, ref, business),
+                              ),
+                            );
+                          },
+                          childCount: partitioned.owned.length,
+                        ),
+                      ),
+                    ),
+                    if (partitioned.hasOthers)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.lg,
+                            AppSpacing.xs,
+                            AppSpacing.lg,
+                            AppSpacing.sm,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Divider(height: AppSpacing.md),
+                              const SizedBox(height: AppSpacing.xs),
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  left: AppSpacing.xs,
+                                ),
+                                child: Text(
+                                  'businesses.other_businesses_section'
+                                      .tr()
+                                      .toUpperCase(),
+                                  style: textTheme.labelSmall?.copyWith(
+                                    color: AppColors.textMuted,
+                                    letterSpacing: 0.6,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                  if (partitioned.hasOthers)
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                      ),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final business = partitioned.others[index];
+                            return Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: AppSpacing.sm,
+                              ),
+                              child: _BusinessCard(
+                                business: business,
+                                isOwner: false,
+                                ownerBusy: ownerBusy,
+                                onTap: () =>
+                                    _openBusinessDetail(context, business.id),
+                              ),
+                            );
+                          },
+                          childCount: partitioned.others.length,
+                        ),
+                      ),
+                    ),
+                ];
               },
             ),
 
@@ -258,8 +370,11 @@ class BusinessesPage extends ConsumerWidget {
             if (canLoadMore)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xl,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.sm,
+                    AppSpacing.lg,
+                    AppSpacing.md,
                   ),
                   child: VjButton(
                     label: 'businesses.load_more'.tr(),
@@ -273,47 +388,7 @@ class BusinessesPage extends ConsumerWidget {
                 ),
               ),
 
-            // Registro de negocio (para dueños locales)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                child: VjCard(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.storefront,
-                            color: AppColors.primary,
-                            size: 24,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Text(
-                              'businesses.register_title'.tr(),
-                              style: textTheme.titleMedium,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'businesses.register_subtitle'.tr(),
-                        style: textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      VjButton(
-                        label: 'businesses.register_action'.tr(),
-                        onPressed: () =>
-                            context.push(AppRoutes.businessRegister),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
           ],
         ),
       ),
@@ -321,7 +396,7 @@ class BusinessesPage extends ConsumerWidget {
   }
 }
 
-/// Chip de categoría interactivo
+/// Chip de categoría interactivo en estilo píldora.
 class _CategoryChip extends StatelessWidget {
   const _CategoryChip({
     required this.label,
@@ -337,6 +412,8 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return ActionChip(
       avatar: icon != null
           ? Icon(
@@ -346,28 +423,26 @@ class _CategoryChip extends StatelessWidget {
             )
           : null,
       label: Text(label),
-      labelStyle: TextStyle(
+      labelStyle: textTheme.labelMedium?.copyWith(
         color: selected ? Colors.white : AppColors.textPrimary,
         fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-        fontSize: 13,
       ),
-      backgroundColor: selected ? AppColors.primary : AppColors.surface,
+      backgroundColor: selected ? AppColors.brandNavy : AppColors.surface,
       side: BorderSide(
-        color: selected ? AppColors.primary : AppColors.border,
+        color: selected ? AppColors.brandNavy : AppColors.border,
       ),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       onPressed: onTap,
     );
   }
 }
 
-/// Tarjeta de negocio individual
+/// Tarjeta compacta de directorio (la descripción detallada vive en BusinessDetailPage).
 class _BusinessCard extends StatelessWidget {
   const _BusinessCard({
     required this.business,
-    required this.description,
     required this.onTap,
     this.isOwner = false,
     this.ownerBusy = false,
@@ -376,63 +451,157 @@ class _BusinessCard extends StatelessWidget {
   });
 
   final Business business;
-  final String description;
   final VoidCallback onTap;
   final bool isOwner;
   final bool ownerBusy;
   final VoidCallback? onEditTap;
   final VoidCallback? onWithdrawTap;
 
+  IconData _iconForCategory(BusinessCategory category) {
+    switch (category) {
+      case BusinessCategory.food:
+        return Icons.restaurant_rounded;
+      case BusinessCategory.transport:
+        return Icons.local_taxi_rounded;
+      case BusinessCategory.lodging:
+        return Icons.hotel_rounded;
+      case BusinessCategory.services:
+        return Icons.storefront_rounded;
+    }
+  }
+
+  List<Color> _gradientForCategory(BusinessCategory category) {
+    switch (category) {
+      case BusinessCategory.food:
+        return const [AppColors.brandNavy, AppColors.primary];
+      case BusinessCategory.transport:
+        return const [AppColors.brandNavy, AppColors.brandNavySurface];
+      case BusinessCategory.lodging:
+        return const [AppColors.primary, AppColors.brandNavy];
+      case BusinessCategory.services:
+        return const [AppColors.brandNavySurface, AppColors.brandNavyMuted];
+    }
+  }
+
+  String _categoryLabel(BusinessCategory category) {
+    switch (category) {
+      case BusinessCategory.food:
+        return 'businesses.category_food'.tr();
+      case BusinessCategory.transport:
+        return 'businesses.category_transport'.tr();
+      case BusinessCategory.lodging:
+        return 'businesses.category_lodging'.tr();
+      case BusinessCategory.services:
+        return 'businesses.category_services'.tr();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final categoryLabel = _categoryLabel(business.category);
+    final metaLine = business.minDishPriceCop != null
+        ? '$categoryLabel · ${formatCop(business.minDishPriceCop!)}'
+        : categoryLabel;
 
     return VjCard(
+      borderRadius: AppRadius.xl,
+      elevated: true,
+      backgroundColor: isOwner
+          ? AppColors.primarySoft.withValues(alpha: 0.22)
+          : AppColors.surface,
+      borderColor: isOwner ? AppColors.primaryBorder : null,
       padding: const EdgeInsets.all(AppSpacing.md),
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Text(
-                  business.name,
-                  style: textTheme.titleMedium,
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: _gradientForCategory(business.category),
+                  ),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                ),
+                child: Icon(
+                  _iconForCategory(business.category),
+                  color: Colors.white,
+                  size: 24,
                 ),
               ),
-              VjBadge(
-                label: 'businesses.published_badge'.tr(),
-              ),
-            ],
-          ),
-          if (description.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              description,
-              style: textTheme.bodyMedium,
-            ),
-          ],
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              const Icon(
-                Icons.location_on_outlined,
-                size: 14,
-                color: AppColors.textMuted,
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      business.name,
+                      style: textTheme.titleSmall?.copyWith(fontSize: 15),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Wrap(
+                      spacing: AppSpacing.xs + 2,
+                      runSpacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        if (isOwner)
+                          VjBadge(
+                            label: 'businesses.owner_badge'.tr(),
+                            variant: VjBadgeVariant.navy,
+                          ),
+                        Text(
+                          metaLine,
+                          style: textTheme.labelSmall?.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 14,
+                          color: AppColors.textMuted,
+                        ),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            business.address,
+                            style: textTheme.bodySmall,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Text(
-                  business.address,
-                  style: textTheme.bodySmall,
-                ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textMuted,
+                size: 20,
               ),
             ],
           ),
           if (isOwner) ...[
             const SizedBox(height: AppSpacing.sm),
+            const Divider(height: 1),
+            const SizedBox(height: 4),
             Wrap(
               alignment: WrapAlignment.end,
               spacing: AppSpacing.xs,
@@ -452,7 +621,7 @@ class _BusinessCard extends StatelessWidget {
                   icon: const Icon(Icons.delete_outline, size: 16),
                   label: Text('businesses.action_withdraw'.tr()),
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
+                    foregroundColor: AppColors.textSecondary,
                     minimumSize: const Size(48, 48),
                   ),
                 ),

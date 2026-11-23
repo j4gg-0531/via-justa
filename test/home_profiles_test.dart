@@ -323,7 +323,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('city.event_status_upcoming'), findsOneWidget);
-    expect(find.text('city.event_not_active_note'), findsOneWidget);
+    expect(find.text('Festival de la Leyenda Vallenata 2027'), findsOneWidget);
 
     await tester.pumpWidget(
       ProviderScope(

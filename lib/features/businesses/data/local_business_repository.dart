@@ -34,4 +34,7 @@ class LocalBusinessRepository implements BusinessRepository {
   }) async {
     throw StateError('Rating requires Supabase connection: $businessId');
   }
+
+  @override
+  Future<List<Business>> getMyBusinesses() async => const <Business>[];
 }

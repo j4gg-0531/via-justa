@@ -12,11 +12,16 @@ import 'package:via_justa/features/businesses/presentation/pages/businesses_page
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 
 class _SeededBusinessRepository implements BusinessRepository {
-  _SeededBusinessRepository({this.fail = false, this.customItems});
+  _SeededBusinessRepository({
+    this.fail = false,
+    this.customItems,
+    this.ownedItems = const <Business>[],
+  });
 
   bool fail;
   int calls = 0;
   final List<Business>? customItems;
+  final List<Business> ownedItems;
 
   static const items = <Business>[
     Business(
@@ -87,6 +92,9 @@ class _SeededBusinessRepository implements BusinessRepository {
       ratingCount: 1,
     );
   }
+
+  @override
+  Future<List<Business>> getMyBusinesses() async => ownedItems;
 }
 
 void main() {
@@ -99,7 +107,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('businesses.title'), findsOneWidget);
-      expect(find.text('businesses.subtitle'), findsOneWidget);
+      expect(find.text('businesses.register_action'), findsOneWidget);
       expect(find.text('businesses.demo_banner'), findsNothing);
       expect(find.text('businesses.demo_badge'), findsNothing);
       expect(find.textContaining('[DEMO]'), findsNothing);
@@ -130,7 +138,7 @@ void main() {
 
       expect(repo.calls, greaterThan(callsBeforeRetry));
       expect(find.text('Cocina del Patio'), findsOneWidget);
-      expect(find.text('businesses.published_badge'), findsWidgets);
+      expect(find.text('Sector Centro, Valledupar'), findsOneWidget);
       expect(find.text('businesses.verified_badge'), findsNothing);
     },
   );
@@ -270,4 +278,76 @@ void main() {
 
     expect(find.text('registration-destination'), findsOneWidget);
   });
+
+  testWidgets(
+    'muestra sección Tus negocios arriba con separador y sin duplicados ni overflow a 360dp @ 2.0x',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 780);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      const ownedPage2 = Business(
+        id: 'biz-owned-z',
+        ownerId: 'owner-1',
+        name: 'Zapatería Propia del Valle',
+        category: BusinessCategory.services,
+        address: 'Carrera 9 #15-22, Valledupar',
+        phone: '',
+        municipalityCode: '20001',
+      );
+      final repo = _SeededBusinessRepository(
+        customItems: const [
+          Business(
+            id: 'biz-other-1',
+            ownerId: 'owner-2',
+            name: 'Asadero Central',
+            category: BusinessCategory.food,
+            address: 'Calle 10 #4-10, Valledupar',
+            phone: '111',
+            municipalityCode: '20001',
+          ),
+        ],
+        ownedItems: const [ownedPage2],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            businessRepositoryProvider.overrideWithValue(repo),
+            currentBusinessOwnerIdProvider.overrideWithValue('owner-1'),
+          ],
+          child: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(360, 780),
+              textScaler: TextScaler.linear(2.0),
+            ),
+            child: const MaterialApp(home: BusinessesPage()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('businesses.your_businesses_section'.toUpperCase()),
+        findsOneWidget,
+      );
+      expect(find.text('Zapatería Propia del Valle'), findsOneWidget);
+      expect(find.text('businesses.owner_badge'), findsOneWidget);
+      // A escala 2.0x el bloque inferior requiere scroll para entrar en el viewport
+      await tester.scrollUntilVisible(
+        find.text('Asadero Central'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('businesses.other_businesses_section'.toUpperCase()),
+        findsOneWidget,
+      );
+      expect(find.text('Asadero Central'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

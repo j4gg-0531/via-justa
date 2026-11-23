@@ -55,6 +55,8 @@ class Business {
     this.photosCount = 0,
     this.dishesCount = 0,
     this.minDishPriceCop,
+    this.status = 'approved',
+    this.rejectionReason,
   });
 
   final String id;
@@ -82,6 +84,12 @@ class Business {
   final int photosCount;
   final int dishesCount;
   final int? minDishPriceCop;
+  final String status;
+  final String? rejectionReason;
+
+  bool get isApproved => status == 'approved';
+  bool get isPending => status == 'pending';
+  bool get isRejected => status == 'rejected';
 
   /// Devuelve la descripción según el idioma activo, con respaldo a español.
   String localizedDescription(String localeCode) {

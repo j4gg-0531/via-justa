@@ -152,7 +152,7 @@ void main() {
     expect(find.text('Sancocho de gallina criolla'), findsOneWidget);
 
     // Filtrar por Gastronomía oculta el ítem de Cultura.
-    final gastroChip = find.widgetWithText(ChoiceChip, 'city.section_gastronomy');
+    final gastroChip = find.text('city.section_gastronomy').first;
     await tester.ensureVisible(gastroChip);
     await tester.tap(gastroChip);
     await tester.pumpAndSettle();
@@ -161,7 +161,7 @@ void main() {
     expect(find.text('Música Vallenata Tradicional'), findsNothing);
 
     // Volver a Todas restaura ambas fichas.
-    final allChip = find.widgetWithText(ChoiceChip, 'city.section_all');
+    final allChip = find.text('city.section_all');
     await tester.ensureVisible(allChip);
     await tester.tap(allChip);
     await tester.pumpAndSettle();

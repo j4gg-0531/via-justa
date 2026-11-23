@@ -4,13 +4,13 @@ import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/theme/semantic_status_colors.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
+import 'package:via_justa/core/widgets/vj_semaphore_panel.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_category.dart';
 import 'package:via_justa/features/prices/domain/price_verdict.dart';
 
 /// Tarjeta accesible del resultado del semáforo de precios (M07 y M20).
-/// Inspirada en el mockup limpio: cabecera de contexto, tarjeta de semáforo en lenguaje humano,
-/// bloque "Sugerencia" por reglas deterministas (nunca IA) y descargo orientativo.
+/// Comparte la identidad visual "Semáforo Vertical Puro" con el análisis de contratos.
 class PriceVerdictCard extends StatelessWidget {
   const PriceVerdictCard({
     super.key,
@@ -25,20 +25,17 @@ class PriceVerdictCard extends StatelessWidget {
   final MunicipalityZone? zone;
   final MunicipalityZone? destinationZone;
 
-  IconData _iconForCategory() {
-    final groupKey = category?.groupKey;
-    if (groupKey == 'transport' ||
-        verdict.categoryId == 'transport_taxi_minimal') {
-      return Icons.local_taxi_outlined;
+  VjSemaphoreLight _lightForLevel(PriceVerdictLevel level) {
+    switch (level) {
+      case PriceVerdictLevel.green:
+        return VjSemaphoreLight.green;
+      case PriceVerdictLevel.yellow:
+        return VjSemaphoreLight.amber;
+      case PriceVerdictLevel.red:
+        return VjSemaphoreLight.red;
+      case PriceVerdictLevel.insufficient:
+        return VjSemaphoreLight.neutral;
     }
-    if (groupKey == 'food' || verdict.categoryId == 'food_corrientazo') {
-      return Icons.restaurant_outlined;
-    }
-    if (groupKey == 'lodging' ||
-        verdict.categoryId == 'lodging_standard_night') {
-      return Icons.hotel_outlined;
-    }
-    return Icons.local_laundry_service_outlined;
   }
 
   String _titleKeyForLevel(PriceVerdictLevel level) {
@@ -72,7 +69,7 @@ class PriceVerdictCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final semanticColors =
         Theme.of(context).extension<SemanticStatusColors>() ??
-            SemanticStatusColors.light();
+        SemanticStatusColors.light();
     final style = semanticColors.styleForVerdict(verdict.level);
 
     String languageCode;
@@ -84,9 +81,9 @@ class PriceVerdictCard extends StatelessWidget {
 
     final categoryTitle =
         category?.localizedName(languageCode) ?? verdict.categoryId;
-    final originZoneName =
-        zone?.localizedName(languageCode) ?? verdict.zoneId;
-    final destinationZoneName = destinationZone?.localizedName(languageCode) ??
+    final originZoneName = zone?.localizedName(languageCode) ?? verdict.zoneId;
+    final destinationZoneName =
+        destinationZone?.localizedName(languageCode) ??
         verdict.destinationZoneId;
     final headerTitle = buildVerdictHeaderTitle(
       categoryId: verdict.categoryId,
@@ -98,49 +95,33 @@ class PriceVerdictCard extends StatelessWidget {
 
     return Semantics(
       container: true,
-      label: '${_titleKeyForLevel(verdict.level).tr()}. '
+      label:
+          '${_titleKeyForLevel(verdict.level).tr()}. '
           '${_subtitleKeyForLevel(verdict.level).tr()}',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. Cabecera limpia de contexto ("Taxi: Origen → Destino" o "Categoría · Zona" + "Evaluado ahora")
-          VjCard(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Row(
+          // 1. Semáforo Vertical Puro (S3) unificado
+          VjSemaphorePanel(
+            activeLight: _lightForLevel(verdict.level),
+            categoryTag: headerTitle,
+            statusLabel: _titleKeyForLevel(verdict.level).tr(),
+            statusIcon: style.icon,
+            headline: formatCop(verdict.submittedCop),
+            subMetric: 'price_verdict.evaluated_now'.tr(),
+            accentColor: style.foreground,
+            badgeBackground: style.background,
+            badgeForeground: style.foreground,
+            trailingDetail: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySoft,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: Icon(
-                    _iconForCategory(),
-                    color: AppColors.primary,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        headerTitle,
-                        style: textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'price_verdict.evaluated_now'.tr(),
-                        style: textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
+                const Divider(),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  _subtitleKeyForLevel(verdict.level).tr(),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -149,95 +130,38 @@ class PriceVerdictCard extends StatelessWidget {
 
           const SizedBox(height: AppSpacing.md),
 
-          // 2. Tarjeta principal del semáforo (Color + Ícono + Monto consultado + Explicación humana)
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              color: style.background,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(color: style.border, width: 1.8),
+          // 2. Métricas comparativas o estado neutro M20
+          if (verdict.isInsufficient)
+            _InsufficientSampleSection(verdict: verdict)
+          else
+            _QuantifiedMetricsSection(
+              verdict: verdict,
+              accentColor: style.foreground,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(style.icon, color: style.foreground, size: 28),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _titleKeyForLevel(verdict.level).tr(),
-                            style: textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: style.foreground,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            formatCop(verdict.submittedCop),
-                            style: textTheme.headlineMedium?.copyWith(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  _subtitleKeyForLevel(verdict.level).tr(),
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w500,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
 
-                if (verdict.isInsufficient)
-                  _InsufficientSampleSection(verdict: verdict)
-                else
-                  _QuantifiedMetricsSection(
-                    verdict: verdict,
-                    accentColor: style.foreground,
-                  ),
-
-                // Contexto de evento activo real (solo cuando eventContext != null)
-                if (verdict.eventContext != null) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  _EventContextBanner(
-                    eventContext: verdict.eventContext!,
-                    palette: semanticColors.eventContext,
-                  ),
-                ],
-              ],
+          // 3. Contexto de evento activo real en azul institucional independiente
+          if (verdict.eventContext != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            _EventContextBanner(
+              eventContext: verdict.eventContext!,
+              palette: semanticColors.eventContext,
             ),
-          ),
+          ],
 
-          // 3. Alerta de precio sospechosamente bajo (desviación < -40%)
+          // 4. Alerta de precio sospechosamente bajo (desviación < -40%)
           if (verdict.lowPriceWarning && !verdict.isInsufficient) ...[
             const SizedBox(height: AppSpacing.md),
-            Container(
+            VjCard(
+              borderColor: AppColors.primaryBorder,
+              backgroundColor: AppColors.primarySoft,
               padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(color: AppColors.primary),
-              ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Icon(
                     Icons.info_outline,
                     color: AppColors.primary,
-                    size: 22,
+                    size: 20,
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
@@ -246,8 +170,7 @@ class PriceVerdictCard extends StatelessWidget {
                       children: [
                         Text(
                           'price_verdict.low_price_warning_title'.tr(),
-                          style: textTheme.titleMedium?.copyWith(
-                            fontSize: 14,
+                          style: textTheme.titleSmall?.copyWith(
                             color: AppColors.primary,
                           ),
                         ),
@@ -266,15 +189,12 @@ class PriceVerdictCard extends StatelessWidget {
             ),
           ],
 
-          // 4. Bloque "Sugerencia" por reglas fijas (nunca "Sugerencia de la IA")
+          // 5. Bloque "Sugerencia" por reglas deterministas
           if (suggestion != null) ...[
             const SizedBox(height: AppSpacing.lg),
             Text(
               suggestion.titleKey.tr(),
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-              ),
+              style: textTheme.titleMedium,
             ),
             const SizedBox(height: AppSpacing.xs),
             VjCard(
@@ -282,12 +202,20 @@ class PriceVerdictCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.lightbulb_outline,
-                    color: AppColors.primary,
-                    size: 22,
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySoft,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: const Icon(
+                      Icons.lightbulb_outline_rounded,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
                   ),
-                  const SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Text(
                       suggestion.bodyKey.tr(
@@ -298,7 +226,6 @@ class PriceVerdictCard extends StatelessWidget {
                       ),
                       style: textTheme.bodyMedium?.copyWith(
                         color: AppColors.textPrimary,
-                        height: 1.4,
                       ),
                     ),
                   ),
@@ -307,9 +234,11 @@ class PriceVerdictCard extends StatelessWidget {
             ),
           ],
 
-          // 5. Aviso orientativo obligatorio (nunca alega IA ni tarifa vinculante)
+          // 6. Aviso orientativo obligatorio
           const SizedBox(height: AppSpacing.md),
           VjCard(
+            elevated: false,
+            backgroundColor: AppColors.surfaceSubtle,
             padding: const EdgeInsets.all(AppSpacing.md),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,7 +246,7 @@ class PriceVerdictCard extends StatelessWidget {
                 const Icon(
                   Icons.balance_outlined,
                   color: AppColors.textSecondary,
-                  size: 20,
+                  size: 18,
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
@@ -337,8 +266,7 @@ class PriceVerdictCard extends StatelessWidget {
   }
 }
 
-/// Métricas claras cuando la muestra de la zona o rango es suficiente (N >= 3):
-/// Precio de referencia, diferencia porcentual y tamaño de muestra discreto.
+/// Métricas claras cuando la muestra es suficiente (`N >= 3`).
 class _QuantifiedMetricsSection extends StatelessWidget {
   const _QuantifiedMetricsSection({
     required this.verdict,
@@ -352,19 +280,14 @@ class _QuantifiedMetricsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Wrap(
-            spacing: AppSpacing.lg,
+    return VjCard(
+      borderRadius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: AppSpacing.xl,
             runSpacing: AppSpacing.sm,
             children: [
               if (verdict.referenceCop != null)
@@ -381,38 +304,40 @@ class _QuantifiedMetricsSection extends StatelessWidget {
                 ),
             ],
           ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Row(
-          children: [
-            const Icon(
-              Icons.groups_outlined,
-              size: 16,
-              color: AppColors.textSecondary,
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Expanded(
-              child: Text(
-                'price_verdict.sample_size_label'.tr(
-                  namedArgs: {
-                    'n': verdict.n.toString(),
-                    'days': verdict.windowDays.toString(),
-                  },
-                ),
-                style: textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
+          const SizedBox(height: AppSpacing.md),
+          const Divider(),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              const Icon(
+                Icons.groups_outlined,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  'price_verdict.sample_size_label'.tr(
+                    namedArgs: {
+                      'n': verdict.n.toString(),
+                      'days': verdict.windowDays.toString(),
+                    },
+                  ),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// Estado neutro M20 cuando N < 3: sin color de semáforo ni umbral artificial.
+/// Estado neutro M20 cuando `N < 3`.
 class _InsufficientSampleSection extends StatelessWidget {
   const _InsufficientSampleSection({required this.verdict});
 
@@ -422,14 +347,9 @@ class _InsufficientSampleSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.border),
-      ),
+    return VjCard(
+      borderRadius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -452,7 +372,7 @@ class _InsufficientSampleSection extends StatelessWidget {
   }
 }
 
-/// Banner azul independiente para contexto de evento real activo (nunca usa verde/ámbar/rojo).
+/// Banner azul independiente para contexto de evento real activo.
 class _EventContextBanner extends StatelessWidget {
   const _EventContextBanner({
     required this.eventContext,
@@ -466,13 +386,10 @@ class _EventContextBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
+    return VjCard(
+      backgroundColor: palette.background,
+      borderColor: palette.border.withValues(alpha: 0.4),
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: palette.background,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: palette.border.withValues(alpha: 0.4)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -483,8 +400,7 @@ class _EventContextBanner extends StatelessWidget {
               Expanded(
                 child: Text(
                   eventContext.eventName,
-                  style: textTheme.titleMedium?.copyWith(
-                    fontSize: 14,
+                  style: textTheme.titleSmall?.copyWith(
                     color: palette.foreground,
                   ),
                 ),
@@ -537,8 +453,8 @@ class _MetricColumn extends StatelessWidget {
         Text(
           value,
           style: textTheme.titleMedium?.copyWith(
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
             color: valueColor,
           ),
         ),

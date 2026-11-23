@@ -9,6 +9,7 @@ import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
+import 'package:via_justa/core/widgets/vj_skeleton_box.dart';
 import 'package:via_justa/features/city/domain/city_overview.dart';
 import 'package:via_justa/features/city/domain/city_repository.dart';
 import 'package:via_justa/features/city/presentation/state/city_providers.dart';
@@ -82,20 +83,26 @@ class CityOverviewPage extends ConsumerWidget {
       ),
       body: SafeArea(
         child: overviewAsync.when(
-          loading: () => Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'city.loading'.tr(),
-                    textAlign: TextAlign.center,
+          loading: () => SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const VjSkeletonBox(height: 190, borderRadius: AppRadius.xl),
+                const SizedBox(height: AppSpacing.lg),
+                const VjSkeletonBox(height: 28, width: 200),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'city.loading'.tr(),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                const VjSkeletonBox(height: 112, borderRadius: AppRadius.xl),
+                const SizedBox(height: AppSpacing.md),
+                const VjSkeletonBox(height: 112, borderRadius: AppRadius.xl),
+              ],
             ),
           ),
           error: (error, stackTrace) => _CityErrorView(
@@ -163,6 +170,9 @@ class CityOverviewPage extends ConsumerWidget {
                           icon: isDemoMode
                               ? Icons.science_outlined
                               : Icons.verified_outlined,
+                          variant: isDemoMode
+                              ? VjBadgeVariant.neutral
+                              : VjBadgeVariant.tonal,
                         ),
                       ],
                     ),
@@ -172,11 +182,10 @@ class CityOverviewPage extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
-                          color: AppColors.primarySoft,
+                          color:
+                              AppColors.primarySoft.withValues(alpha: 0.65),
                           borderRadius: BorderRadius.circular(AppRadius.md),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                          ),
+                          border: Border.all(color: AppColors.primaryBorder),
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,6 +217,8 @@ class CityOverviewPage extends ConsumerWidget {
                     const SizedBox(height: AppSpacing.md),
                     if (overview.events.isEmpty)
                       VjCard(
+                        borderRadius: AppRadius.xl,
+                        backgroundColor: AppColors.surfaceSubtle,
                         padding: const EdgeInsets.all(AppSpacing.lg),
                         child: Text(
                           'city.events_empty'.tr(),
@@ -229,32 +240,41 @@ class CityOverviewPage extends ConsumerWidget {
                       style: textTheme.titleMedium,
                     ),
                     if (availableSections.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.md),
-                      Wrap(
-                        spacing: AppSpacing.sm,
-                        runSpacing: AppSpacing.sm,
-                        children: [
-                          ChoiceChip(
-                            label: Text('city.section_all'.tr()),
-                            selected: selectedSection == null,
-                            onSelected: (_) => ref
-                                .read(selectedCitySectionProvider.notifier)
-                                .select(null),
-                          ),
-                          for (final section in availableSections)
-                            ChoiceChip(
-                              label: Text(_sectionLabelKey(section).tr()),
-                              selected: selectedSection == section,
-                              onSelected: (isSelected) => ref
+                      const SizedBox(height: AppSpacing.sm),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _CitySectionFilterPill(
+                              label: 'city.section_all'.tr(),
+                              selected: selectedSection == null,
+                              onTap: () => ref
                                   .read(selectedCitySectionProvider.notifier)
-                                  .select(isSelected ? section : null),
+                                  .select(null),
                             ),
-                        ],
+                            for (final section in availableSections) ...[
+                              const SizedBox(width: AppSpacing.xs + 2),
+                              _CitySectionFilterPill(
+                                label: _sectionLabelKey(section).tr(),
+                                selected: selectedSection == section,
+                                onTap: () => ref
+                                    .read(selectedCitySectionProvider.notifier)
+                                    .select(
+                                      selectedSection == section
+                                          ? null
+                                          : section,
+                                    ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ],
                     const SizedBox(height: AppSpacing.md),
                     if (contentItems.isEmpty)
                       VjCard(
+                        borderRadius: AppRadius.xl,
+                        backgroundColor: AppColors.surfaceSubtle,
                         padding: const EdgeInsets.all(AppSpacing.lg),
                         child: Text(
                           'city.content_empty'.tr(),
@@ -320,26 +340,73 @@ class _CityEventCard extends StatelessWidget {
     final inner = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            VjBadge(label: statusKey.tr(), icon: statusIcon),
-            if (event.isDemo)
-              VjBadge(
-                label: 'city.demo_badge'.tr(),
-                icon: Icons.science_outlined,
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: isActive
+                      ? const [AppColors.brandNavy, AppColors.primary]
+                      : [AppColors.primarySoft, AppColors.surfaceSubtle],
+                ),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: isActive
+                    ? null
+                    : Border.all(color: AppColors.primaryBorder),
               ),
-            if (isDescriptionFallback)
-              VjBadge(
-                label: 'city.item_fallback_badge'.tr(),
-                icon: Icons.translate_outlined,
+              child: Icon(
+                Icons.festival_outlined,
+                size: 22,
+                color: isActive ? Colors.white : AppColors.primary,
               ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xs,
+                    children: [
+                      VjBadge(
+                        label: statusKey.tr(),
+                        icon: statusIcon,
+                        variant:
+                            isActive ? VjBadgeVariant.navy : VjBadgeVariant.tonal,
+                      ),
+                      if (event.isDemo)
+                        VjBadge(
+                          label: 'city.demo_badge'.tr(),
+                          icon: Icons.science_outlined,
+                          variant: VjBadgeVariant.neutral,
+                        ),
+                      if (isDescriptionFallback)
+                        VjBadge(
+                          label: 'city.item_fallback_badge'.tr(),
+                          icon: Icons.translate_outlined,
+                          variant: VjBadgeVariant.neutral,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xs + 2),
+                  Text(
+                    event.name,
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
-        Text(event.name, style: textTheme.titleMedium),
-        const SizedBox(height: AppSpacing.xs),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -407,20 +474,22 @@ class _CityEventCard extends StatelessWidget {
     );
 
     if (isActive) {
-      return Container(
+      return VjCard(
+        borderRadius: AppRadius.xl,
+        elevated: true,
+        backgroundColor: AppColors.primarySoft.withValues(alpha: 0.55),
+        borderColor: AppColors.primaryBorder,
         padding: const EdgeInsets.all(AppSpacing.lg),
-        decoration: BoxDecoration(
-          color: AppColors.primarySoft,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.35),
-          ),
-        ),
         child: inner,
       );
     }
 
-    return VjCard(padding: const EdgeInsets.all(AppSpacing.lg), child: inner);
+    return VjCard(
+      borderRadius: AppRadius.xl,
+      elevated: true,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: inner,
+    );
   }
 }
 
@@ -441,6 +510,8 @@ class _CityContentCard extends StatelessWidget {
     final safeImageUri = item.safeLicensedImageUri;
 
     return VjCard(
+      borderRadius: AppRadius.xl,
+      elevated: true,
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -449,16 +520,21 @@ class _CityContentCard extends StatelessWidget {
             spacing: AppSpacing.xs,
             runSpacing: AppSpacing.xs,
             children: [
-              VjBadge(label: _sectionLabelKey(item.section).tr()),
+              VjBadge(
+                label: _sectionLabelKey(item.section).tr(),
+                variant: VjBadgeVariant.tonal,
+              ),
               if (item.isLocaleFallback)
                 VjBadge(
                   label: 'city.item_fallback_badge'.tr(),
                   icon: Icons.translate_outlined,
+                  variant: VjBadgeVariant.neutral,
                 ),
               if (item.isDemo)
                 VjBadge(
                   label: 'city.demo_badge'.tr(),
                   icon: Icons.science_outlined,
+                  variant: VjBadgeVariant.neutral,
                 ),
             ],
           ),
@@ -590,6 +666,63 @@ class _CityErrorView extends StatelessWidget {
                 onPressed: onBack,
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CitySectionFilterPill extends StatelessWidget {
+  const _CitySectionFilterPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+            child: Center(
+              widthFactor: 1.0,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md + 2,
+                  vertical: AppSpacing.xs + 5,
+                ),
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.brandNavy : AppColors.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  border: Border.all(
+                    color: selected ? AppColors.brandNavy : AppColors.border,
+                  ),
+                ),
+                child: Text(
+                  label,
+                  style: textTheme.labelMedium?.copyWith(
+                    color: selected ? Colors.white : AppColors.textPrimary,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

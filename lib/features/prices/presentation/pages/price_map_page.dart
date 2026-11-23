@@ -12,7 +12,9 @@ import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
+import 'package:via_justa/core/widgets/vj_confirm_dialog.dart';
 import 'package:via_justa/core/widgets/vj_search_field.dart';
+import 'package:via_justa/core/widgets/vj_skeleton_box.dart';
 import 'package:via_justa/features/businesses/presentation/pages/business_detail_page.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/domain/price_map_item.dart';
@@ -59,18 +61,12 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
     required String title,
     required String body,
   }) {
-    showDialog<void>(
+    showVjConfirmDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text('common.close'.tr()),
-          ),
-        ],
-      ),
+      icon: Icons.info_outline_rounded,
+      title: title,
+      body: body,
+      confirmLabel: 'common.close'.tr(),
     );
   }
 
@@ -503,11 +499,38 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        if (isDemoMode) ...[
-                          Flexible(child: _DemoMapBadge(cityName: cityName)),
-                          const SizedBox(width: AppSpacing.sm),
-                        ],
-                        const Spacer(),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.bottomLeft,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (isDemoMode) ...[
+                                  _DemoMapBadge(cityName: cityName),
+                                  const SizedBox(height: AppSpacing.xs),
+                                ],
+                                _ContributeMapButton(
+                                  label: 'price_map.contribute_cta'.tr(),
+                                  onTap: () {
+                                    if (GoRouter.maybeOf(context) != null) {
+                                      context.push(AppRoutes.priceContribute);
+                                    } else {
+                                      _showInfoDialog(
+                                        context,
+                                        title: 'home.contribute_dialog_title'
+                                            .tr(),
+                                        body:
+                                            'home.contribute_dialog_body'.tr(),
+                                      );
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
                         _MapFloatingActionsColumn(
                           isRequestingLocation: userLocation.isRequesting,
                           onResetTap: () {
@@ -615,7 +638,7 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
               ),
             ),
 
-                // 6. Controles superiores flotantes: buscador, filtros y "+ Aportar un precio al mapa"
+                // 6. Controles superiores flotantes limpios: buscador y filtros
                 Positioned(
                   top: AppSpacing.md,
                   left: AppSpacing.lg,
@@ -632,9 +655,15 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
                                 context.push(AppRoutes.departmentMap),
                             style: IconButton.styleFrom(
                               backgroundColor: AppColors.surface,
-                              foregroundColor: AppColors.textPrimary,
+                              foregroundColor: AppColors.brandNavy,
                               minimumSize: const Size(48, 48),
-                              elevation: 2,
+                              elevation: 3,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.md,
+                                ),
+                                side: const BorderSide(color: AppColors.border),
+                              ),
                             ),
                           ),
                           const SizedBox(width: AppSpacing.sm),
@@ -683,26 +712,6 @@ class _PriceMapPageState extends ConsumerState<PriceMapPage> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 280),
-                          child: _ContributeMapButton(
-                            label: 'price_map.contribute_cta'.tr(),
-                            onTap: () {
-                              if (GoRouter.maybeOf(context) != null) {
-                                context.push(AppRoutes.priceContribute);
-                              } else {
-                                _showInfoDialog(
-                                  context,
-                                  title: 'home.contribute_dialog_title'.tr(),
-                                  body: 'home.contribute_dialog_body'.tr(),
-                                );
-                              }
-                            },
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -748,68 +757,57 @@ class _MapPlacesSheet extends StatelessWidget {
 
     return Material(
       color: AppColors.surface,
-      borderRadius: BorderRadius.circular(AppRadius.lg),
+      borderRadius: BorderRadius.circular(AppRadius.xl),
       elevation: 8,
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
           border: Border.all(color: AppColors.border),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: maxHeight),
             child: CustomScrollView(
               shrinkWrap: true,
               slivers: [
                 SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: AppSpacing.sm),
+                      Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.border,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.lg,
-                      AppSpacing.md,
-                      AppSpacing.sm,
+                      AppSpacing.xs,
+                      AppSpacing.xs,
                       AppSpacing.sm,
                     ),
-                    child: Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.xs,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              sectionTitleKey.tr(),
-                              style: textTheme.titleMedium?.copyWith(
-                                fontSize: 16,
-                              ),
-                            ),
-                            if (count != null)
-                              Text(
-                                'price_map.places_count'.tr(
-                                  args: [count.toString()],
-                                ),
-                                style: textTheme.bodySmall?.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                          ],
-                        ),
                         Row(
-                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Flexible(
-                              child: TextButton(
-                                onPressed: onResetFilters,
-                                style: TextButton.styleFrom(
-                                  foregroundColor: AppColors.primary,
-                                  minimumSize: const Size(48, 48),
+                            Expanded(
+                              child: Text(
+                                sectionTitleKey.tr(),
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontSize: 16,
                                 ),
-                                child: Text(
-                                  'price_map.see_all'.tr(),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             IconButton(
@@ -823,6 +821,42 @@ class _MapPlacesSheet extends StatelessWidget {
                             ),
                           ],
                         ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: AppSpacing.sm),
+                          child: Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: AppSpacing.sm,
+                            runSpacing: AppSpacing.xs,
+                            children: [
+                              if (count != null)
+                                Text(
+                                  'price_map.places_count'.tr(
+                                    args: [count.toString()],
+                                  ),
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              TextButton(
+                                onPressed: onResetFilters,
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.primary,
+                                  minimumSize: const Size(48, 48),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.xs,
+                                  ),
+                                ),
+                                child: Text(
+                                  'price_map.see_all'.tr(),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -831,7 +865,13 @@ class _MapPlacesSheet extends StatelessWidget {
                   loading: () => const SliverToBoxAdapter(
                     child: Padding(
                       padding: EdgeInsets.all(AppSpacing.lg),
-                      child: Center(child: CircularProgressIndicator()),
+                      child: Column(
+                        children: [
+                          VjSkeletonBox(height: 76, borderRadius: AppRadius.lg),
+                          SizedBox(height: AppSpacing.sm),
+                          VjSkeletonBox(height: 76, borderRadius: AppRadius.lg),
+                        ],
+                      ),
                     ),
                   ),
                   error: (_, _) => SliverToBoxAdapter(
@@ -933,28 +973,33 @@ class _MapFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Material(
-      color: selected ? AppColors.primary : AppColors.surface,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      elevation: 2,
+      color: selected ? AppColors.brandNavy : AppColors.surface,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      elevation: selected ? 4 : 2,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: ConstrainedBox(
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: Container(
           constraints: const BoxConstraints(minHeight: 48, minWidth: 88),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.sm,
-            ),
-            child: Center(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: selected ? Colors.white : AppColors.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            border: selected
+                ? null
+                : Border.all(color: AppColors.border),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: textTheme.labelMedium?.copyWith(
+                color: selected ? Colors.white : AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -964,7 +1009,7 @@ class _MapFilterChip extends StatelessWidget {
   }
 }
 
-/// Botón con borde punteado "+ Aportar un precio al mapa" (M08).
+/// Píldora flotante inferior "+ Aportar un precio al mapa" (M08).
 class _ContributeMapButton extends StatelessWidget {
   const _ContributeMapButton({
     required this.label,
@@ -976,49 +1021,45 @@ class _ContributeMapButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Material(
-      color: AppColors.surface.withValues(alpha: 0.96),
-      borderRadius: BorderRadius.circular(AppRadius.lg),
-      elevation: 2,
+      color: AppColors.brandNavy,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      elevation: 4,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: CustomPaint(
-          painter: _DashedBorderPainter(
-            color: AppColors.textMuted,
-            radius: AppRadius.lg,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md + 2,
+            vertical: AppSpacing.sm,
           ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 48),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
-                vertical: AppSpacing.sm,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.add_circle_outline_rounded,
+                size: 18,
+                color: Colors.white,
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.add,
-                    size: 18,
-                    color: AppColors.textPrimary,
+              const SizedBox(width: AppSpacing.xs),
+              Flexible(
+                child: Text(
+                  label,
+                  style: textTheme.labelMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Flexible(
-                    child: Text(
-                      label,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -1138,158 +1179,190 @@ class _PriceMapItemCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Material(
-      color: AppColors.background,
-      borderRadius: BorderRadius.circular(AppRadius.lg),
+      color: isSelected
+          ? AppColors.primarySoft.withValues(alpha: 0.35)
+          : AppColors.surface,
+      borderRadius: BorderRadius.circular(AppRadius.xl),
       child: InkWell(
         onTap: onCardTap,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         child: Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
             border: Border.all(
-              color: isSelected ? AppColors.primary : AppColors.border,
-              width: isSelected ? 1.8 : 1,
+              color: isSelected ? AppColors.primaryBorder : AppColors.border,
+              width: isSelected ? 1.5 : 1,
             ),
           ),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Icon(
-                  mapPinIconForKind(item.pinKind),
-                  color: AppColors.primary,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySoft,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      border: Border.all(color: AppColors.primaryBorder),
+                    ),
+                    child: Icon(
+                      mapPinIconForKind(item.pinKind),
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            item.name,
-                            style: textTheme.titleMedium?.copyWith(
-                              fontSize: 15,
-                            ),
+                        Text(
+                          item.name,
+                          style: textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm,
-                            vertical: 4,
+                        if (item.badgeText.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on_outlined,
+                                size: 13,
+                                color: AppColors.primary,
+                              ),
+                              const SizedBox(width: 3),
+                              Expanded(
+                                child: Text(
+                                  item.badgeText,
+                                  style: textTheme.labelSmall?.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
-                          decoration: BoxDecoration(
-                            color: AppColors.border,
-                            borderRadius: BorderRadius.circular(AppRadius.sm),
-                          ),
-                          child: Text(
-                            item.badgeText,
+                        ],
+                        if (item.description.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            item.description,
                             style: textTheme.bodySmall?.copyWith(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
                             ),
-                          ),
-                        ),
-                        if (onClose != null) ...[
-                          const SizedBox(width: AppSpacing.xs),
-                          IconButton(
-                            tooltip: 'common.close'.tr(),
-                            onPressed: onClose,
-                            icon: const Icon(Icons.close, size: 18),
-                            style: IconButton.styleFrom(
-                              minimumSize: const Size(48, 48),
-                              foregroundColor: AppColors.textSecondary,
-                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.description,
-                      style: textTheme.bodyMedium?.copyWith(fontSize: 13),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    _SemaphoreStatusBadge(
-                      status: item.status,
-                      isDemo: item.isDemo,
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.xs,
-                      children: [
-                        if (item.sourceType == 'business')
-                          OutlinedButton.icon(
-                            onPressed: onCardTap,
-                            icon: const Icon(Icons.storefront_outlined, size: 16),
-                            label: Text('price_map.action_details'.tr()),
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: AppColors.primarySoft,
-                              foregroundColor: AppColors.primary,
-                              side: BorderSide.none,
-                              minimumSize: const Size(48, 48),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.md,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  AppRadius.sm,
-                                ),
-                              ),
-                            ),
-                          ),
-                        OutlinedButton.icon(
-                          onPressed: onRouteTap,
-                          icon: const Icon(Icons.route_outlined, size: 16),
-                          label: Text('price_map.action_route'.tr()),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: AppColors.primarySoft,
-                            foregroundColor: AppColors.primary,
-                            side: BorderSide.none,
-                            minimumSize: const Size(48, 48),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadius.sm),
-                            ),
-                          ),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: onEstimateTaxiTap,
-                          icon: const Icon(Icons.local_taxi_outlined, size: 16),
-                          label: Text('price_map.action_estimate_taxi'.tr()),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: AppColors.surface,
-                            foregroundColor: AppColors.textPrimary,
-                            side: const BorderSide(color: AppColors.border),
-                            minimumSize: const Size(48, 48),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadius.sm),
-                            ),
-                          ),
-                        ),
-                      ],
+                  ),
+                  if (onClose != null) ...[
+                    const SizedBox(width: AppSpacing.xs),
+                    IconButton(
+                      tooltip: 'common.close'.tr(),
+                      onPressed: onClose,
+                      icon: const Icon(Icons.close, size: 18),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        foregroundColor: AppColors.textSecondary,
+                      ),
                     ),
                   ],
+                ],
+              ),
+              if (item.status != PricePinStatus.info || item.isDemo) ...[
+                const SizedBox(height: AppSpacing.xs),
+                _SemaphoreStatusBadge(
+                  status: item.status,
+                  isDemo: item.isDemo,
                 ),
+              ],
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: AppSpacing.xs + 2,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  if (item.sourceType == 'business')
+                    OutlinedButton.icon(
+                      onPressed: onCardTap,
+                      icon: const Icon(Icons.storefront_outlined, size: 15),
+                      label: Text(
+                        'price_map.action_details'.tr(),
+                        style: textTheme.labelMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: AppColors.brandNavy,
+                        foregroundColor: Colors.white,
+                        side: BorderSide.none,
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm + 4,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                        ),
+                      ),
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: onRouteTap,
+                    icon: const Icon(Icons.route_outlined, size: 15),
+                    label: Text(
+                      'price_map.action_route'.tr(),
+                      style: textTheme.labelMedium?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: AppColors.primarySoft,
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide.none,
+                      minimumSize: const Size(48, 48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm + 4,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onEstimateTaxiTap,
+                    icon: const Icon(Icons.local_taxi_outlined, size: 15),
+                    label: Text(
+                      'price_map.action_estimate_taxi'.tr(),
+                      style: textTheme.labelMedium?.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: AppColors.surfaceSubtle,
+                      foregroundColor: AppColors.textPrimary,
+                      side: const BorderSide(color: AppColors.border),
+                      minimumSize: const Size(48, 48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm + 4,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1482,46 +1555,6 @@ class _UrbanMapCanvasPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Dibuja un borde punteado redondeado alrededor del botón "+ Aportar un precio al mapa".
-class _DashedBorderPainter extends CustomPainter {
-  const _DashedBorderPainter({
-    required this.color,
-    required this.radius,
-  });
-
-  final Color color;
-  final double radius;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.4
-      ..style = PaintingStyle.stroke;
-
-    final rrect = RRect.fromRectAndRadius(
-      Offset.zero & size,
-      Radius.circular(radius),
-    );
-    final path = Path()..addRRect(rrect);
-
-    const dashWidth = 5.0;
-    const dashSpace = 4.0;
-    for (final metric in path.computeMetrics()) {
-      var distance = 0.0;
-      while (distance < metric.length) {
-        final next = (distance + dashWidth).clamp(0.0, metric.length);
-        canvas.drawPath(metric.extractPath(distance, next), paint);
-        distance += dashWidth + dashSpace;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.radius != radius;
-}
-
 /// Etiqueta compacta mostrada solo cuando el mapa opera en modo demostración local.
 class _DemoMapBadge extends StatelessWidget {
   const _DemoMapBadge({required this.cityName});
@@ -1634,33 +1667,33 @@ class _MapExplorePill extends StatelessWidget {
 
     return Material(
       color: AppColors.surface,
-      borderRadius: BorderRadius.circular(AppRadius.lg),
+      borderRadius: BorderRadius.circular(AppRadius.xl),
       elevation: 6,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 56),
+          constraints: const BoxConstraints(minHeight: 58),
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.lg,
             vertical: AppSpacing.sm,
           ),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
             border: Border.all(color: AppColors.border),
           ),
           child: Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
+                  color: AppColors.brandNavy,
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: const Icon(
                   Icons.place_outlined,
-                  color: AppColors.primary,
+                  color: Colors.white,
                   size: 20,
                 ),
               ),
@@ -1679,7 +1712,6 @@ class _MapExplorePill extends StatelessWidget {
                         Text(
                           headline,
                           style: textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
                           ),
                         ),
@@ -1694,11 +1726,7 @@ class _MapExplorePill extends StatelessWidget {
                       ],
                     ),
                     if (itemsAsync.isLoading && items == null)
-                      const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                      const VjSkeletonBox(width: 56, height: 14)
                     else
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1820,7 +1848,7 @@ class _DestinationEstimatorCard extends StatelessWidget {
 
     return Material(
       color: AppColors.surface,
-      borderRadius: BorderRadius.circular(AppRadius.lg),
+      borderRadius: BorderRadius.circular(AppRadius.xl),
       elevation: 8,
       child: Container(
         constraints: BoxConstraints(
@@ -1830,11 +1858,11 @@ class _DestinationEstimatorCard extends StatelessWidget {
           ),
         ),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.primary, width: 1.5),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          border: Border.all(color: AppColors.primaryBorder, width: 1.5),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1843,15 +1871,15 @@ class _DestinationEstimatorCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
-                    color: AppColors.textPrimary,
+                    color: AppColors.brandNavy,
                     borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: const Icon(
                     Icons.flag,
-                    color: AppColors.surface,
+                    color: Colors.white,
                     size: 20,
                   ),
                 ),

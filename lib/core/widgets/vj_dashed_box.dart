@@ -28,7 +28,7 @@ class VjDashedBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: _DashedBorderPainter(
+      foregroundPainter: _DashedBorderPainter(
         color: color,
         strokeWidth: strokeWidth,
         borderRadius: borderRadius,

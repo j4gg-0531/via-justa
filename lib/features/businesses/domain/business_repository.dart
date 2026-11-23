@@ -25,4 +25,7 @@ abstract interface class BusinessRepository {
     required String businessId,
     required int stars,
   });
+
+  /// Obtiene todos los comercios registrados por el usuario autenticado (todos los estados).
+  Future<List<Business>> getMyBusinesses();
 }

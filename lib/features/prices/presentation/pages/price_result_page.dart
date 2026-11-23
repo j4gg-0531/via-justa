@@ -6,6 +6,9 @@ import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
+import 'package:via_justa/core/widgets/vj_confirm_dialog.dart';
+import 'package:via_justa/core/widgets/vj_page_header.dart';
+import 'package:via_justa/core/widgets/vj_skeleton_box.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart';
 import 'package:via_justa/features/prices/presentation/widgets/price_verdict_card.dart';
@@ -19,18 +22,12 @@ class PriceResultPage extends ConsumerWidget {
       context.push(AppRoutes.priceContribute);
       return;
     }
-    showDialog<void>(
+    showVjConfirmDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('home.contribute_dialog_title'.tr()),
-        content: Text('home.contribute_dialog_body'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text('common.close'.tr()),
-          ),
-        ],
-      ),
+      icon: Icons.info_outline_rounded,
+      title: 'home.contribute_dialog_title'.tr(),
+      body: 'home.contribute_dialog_body'.tr(),
+      confirmLabel: 'common.close'.tr(),
     );
   }
 
@@ -61,37 +58,22 @@ class PriceResultPage extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: AppSpacing.sm),
-
-              // Barra superior con botón Atrás y título
-              Row(
-                children: [
-                  IconButton(
-                    tooltip: 'common.back'.tr(),
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: () => _goBackToScan(context, ref),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.surface,
-                      foregroundColor: AppColors.textPrimary,
-                      minimumSize: const Size(48, 48),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      'price_verdict.result_page_title'.tr(),
-                      style: textTheme.headlineMedium?.copyWith(fontSize: 22),
-                    ),
-                  ),
-                ],
+              VjPageHeader(
+                title: 'price_verdict.result_page_title'.tr(),
+                onBack: () => _goBackToScan(context, ref),
               ),
-
               const SizedBox(height: AppSpacing.lg),
 
               // Estado del veredicto: cargando, error o tarjeta de resultado
               scanState.verdictAsync.when(
-                loading: () => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
-                  child: Center(child: CircularProgressIndicator()),
+                loading: () => const Column(
+                  children: [
+                    VjSkeletonBox(height: 150, borderRadius: AppRadius.xl),
+                    SizedBox(height: AppSpacing.md),
+                    VjSkeletonBox(height: 110, borderRadius: AppRadius.xl),
+                    SizedBox(height: AppSpacing.md),
+                    VjSkeletonBox(height: 84, borderRadius: AppRadius.lg),
+                  ],
                 ),
                 error: (error, stack) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),

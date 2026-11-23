@@ -13,6 +13,8 @@ class SettlerChecklistState {
 
   int get totalCount => kSettlerInstallationSteps.length;
 
+  double get progress => settlerChecklistProgress(completedIds);
+
   bool isCompleted(String stepId) => completedIds.contains(stepId);
 }
 

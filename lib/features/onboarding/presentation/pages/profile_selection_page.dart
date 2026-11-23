@@ -6,6 +6,7 @@ import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/session/session_providers.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
+import 'package:via_justa/core/widgets/vj_brand_logo.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/auth/presentation/widgets/auth_failure_text.dart';
@@ -89,16 +90,34 @@ class ProfileSelectionPage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: AppSpacing.sm),
-                IconButton(
-                  tooltip: 'common.back'.tr(),
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: authState.isBusy ? null : handleBack,
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.surface,
-                    foregroundColor: AppColors.textPrimary,
-                    minimumSize: const Size(48, 48),
-                  ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: authState.isBusy ? null : handleBack,
+                      tooltip: 'common.back'.tr(),
+                      icon: const Icon(Icons.arrow_back_rounded, size: 22),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        backgroundColor: AppColors.surface,
+                        foregroundColor: AppColors.textPrimary,
+                        side: const BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                      ),
+                    ),
+                    const Expanded(
+                      child: Center(
+                        child: VjBrandLogo(
+                          size: 40,
+                          borderRadius: AppRadius.md,
+                          padding: 6,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
                 ),
                 if (authState.needsLegalConsent)
                   Expanded(
@@ -123,12 +142,14 @@ class ProfileSelectionPage extends ConsumerWidget {
                             ),
                             style: textTheme.headlineMedium,
                           ),
-                          const SizedBox(height: AppSpacing.md),
+                          const SizedBox(height: AppSpacing.xs),
                           Text(
                             'onboarding.subtitle'.tr(),
-                            style: textTheme.bodyLarge,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                          const SizedBox(height: AppSpacing.xl),
+                          const SizedBox(height: AppSpacing.lg),
                           ProfileOptionCard(
                             icon: Icons.luggage_outlined,
                             title: 'onboarding.visitor.title'.tr(),
@@ -137,7 +158,7 @@ class ProfileSelectionPage extends ConsumerWidget {
                             onTap: () =>
                                 _selectProfile(context, ref, ProfileType.visitor),
                           ),
-                          const SizedBox(height: AppSpacing.lg),
+                          const SizedBox(height: AppSpacing.md),
                           ProfileOptionCard(
                             icon: Icons.home_work_outlined,
                             title: 'onboarding.settler.title'.tr(),
@@ -147,7 +168,7 @@ class ProfileSelectionPage extends ConsumerWidget {
                             onTap: () =>
                                 _selectProfile(context, ref, ProfileType.settler),
                           ),
-                          const SizedBox(height: AppSpacing.lg),
+                          const SizedBox(height: AppSpacing.md),
                           ProfileOptionCard(
                             icon: Icons.storefront_outlined,
                             title: 'onboarding.resident.title'.tr(),

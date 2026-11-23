@@ -120,6 +120,9 @@ class _DetailTestBusinessRepository implements BusinessRepository {
       ratingCount: 1,
     );
   }
+
+  @override
+  Future<List<Business>> getMyBusinesses() async => const <Business>[];
 }
 
 class _DetailTestMapRepository implements PriceMapRepository {
@@ -238,7 +241,7 @@ void main() {
 
       expect(find.text('Cocina del Patio'), findsWidgets);
       expect(find.text('business_detail.photo_placeholder'), findsOneWidget);
-      expect(find.text('business_detail.no_ratings'), findsNWidgets(2));
+      expect(find.text('business_detail.no_ratings'), findsOneWidget);
       expect(find.text('business_detail.action_order'), findsOneWidget);
       expect(find.text('business_detail.action_whatsapp'), findsOneWidget);
       expect(find.text('business_detail.section_info'), findsOneWidget);

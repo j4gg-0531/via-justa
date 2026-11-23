@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:via_justa/core/theme/app_theme.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
+import 'package:via_justa/core/widgets/vj_confirm_dialog.dart';
 import 'package:via_justa/features/contracts/data/local_contract_ocr_repository.dart';
 import 'package:via_justa/features/contracts/domain/contract_capture.dart';
 import 'package:via_justa/features/contracts/domain/contract_ocr_repository.dart';
@@ -476,21 +477,21 @@ void main() {
       await tester.tap(cameraBtnFinder);
       await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(VjConfirmDialog), findsOneWidget);
       expect(
         find.text('contract_capture.consent_dialog_title'),
         findsOneWidget,
       );
 
       final cancelBtnFinder = find.widgetWithText(
-        TextButton,
+        VjButton,
         'contract_capture.consent_cancel',
       );
       expect(cancelBtnFinder, findsOneWidget);
       await tester.tap(cancelBtnFinder);
       await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(VjConfirmDialog), findsNothing);
       expect(container.read(contractCaptureProvider).pendingConsentSource, isNull);
     });
   });

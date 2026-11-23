@@ -12,6 +12,8 @@ import 'package:via_justa/features/businesses/domain/business_rating.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 import 'package:via_justa/features/businesses/presentation/state/register_business_provider.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
+import 'package:via_justa/features/onboarding/domain/profile_type.dart';
+import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
 import 'package:via_justa/features/prices/presentation/state/price_map_providers.dart';
 
 /// Provider del repositorio de negocios (conecta a Supabase cuando está activo).
@@ -60,6 +62,7 @@ class BusinessOwnerActionNotifier extends Notifier<bool> {
       if (!ref.mounted) return true;
       state = false;
       ref.invalidate(businessCatalogProvider);
+      ref.invalidate(myBusinessesProvider);
       ref.invalidate(allPriceMapItemsProvider);
       return true;
     } catch (_) {
@@ -237,6 +240,53 @@ final filteredBusinessesProvider = Provider<AsyncValue<List<Business>>>((ref) {
       category: category,
     );
   });
+});
+
+/// Comercios registrados por el usuario autenticado (todos los estados y municipios).
+final myBusinessesProvider = FutureProvider<List<Business>>((ref) async {
+  final ownerId = ref.watch(currentBusinessOwnerIdProvider);
+  if (ownerId == null) return const <Business>[];
+  final repository = ref.watch(businessRepositoryProvider);
+  return repository.getMyBusinesses();
+});
+
+/// Directorio separado en dos bloques sin duplicados: `owned` (arriba) y `others` (abajo).
+final partitionedBusinessesProvider =
+    Provider<AsyncValue<PartitionedBusinesses>>((ref) {
+      final businessesAsync = ref.watch(allBusinessesProvider);
+      final myBusinesses =
+          ref.watch(myBusinessesProvider).asData?.value ?? const <Business>[];
+      final ownerId = ref.watch(currentBusinessOwnerIdProvider);
+      final municipalityCode =
+          ref.watch(selectedMunicipalityProvider)?.code ?? '20001';
+      final query = ref.watch(businessSearchQueryProvider);
+      final category = ref.watch(businessCategoryProvider);
+
+      return businessesAsync.whenData((businesses) {
+        return partitionOwnedBusinesses(
+          catalog: businesses,
+          ownedBusinesses: myBusinesses,
+          currentOwnerId: ownerId,
+          municipalityCode: municipalityCode,
+          query: query,
+          category: category,
+        );
+      });
+    });
+
+/// Cantidad total de negocios registrados por el usuario autenticado.
+final myBusinessesCountProvider = Provider<int>((ref) {
+  return ref.watch(myBusinessesProvider).asData?.value.length ?? 0;
+});
+
+/// Indica si Perfil debe mostrar la fila compacta "Mis negocios" (dueño o perfil Residente).
+final showMyBusinessesInProfileProvider = Provider<bool>((ref) {
+  final ownedCount = ref.watch(myBusinessesCountProvider);
+  final profile = ref.watch(profileTypeProvider);
+  return shouldShowMyBusinessesInProfile(
+    ownedCount: ownedCount,
+    isResidentProfile: profile == ProfileType.resident,
+  );
 });
 
 /// Indica si hay más páginas disponibles para cargar en el directorio.

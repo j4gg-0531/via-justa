@@ -4,6 +4,7 @@ import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
+import 'package:via_justa/core/widgets/vj_confirm_dialog.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 
 /// Selector híbrido de zona del municipio reutilizable (M06 y M10):
@@ -47,44 +48,17 @@ class ZoneMapPickerCard extends StatelessWidget {
   final void Function(double normalizedX, double normalizedY) onMapPointTapped;
 
   void _showPermissionDialog(BuildContext context) {
-    showDialog<void>(
+    showVjConfirmDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.my_location, color: AppColors.primary),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text('price_verdict.gps_permission_dialog_title'.tr()),
-            ),
-          ],
-        ),
-        content: Text(
-          'price_verdict.gps_permission_dialog_body'.tr(
-            namedArgs: {'city': cityName},
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              onDenyGpsPermission();
-            },
-            child: Text('price_verdict.gps_permission_deny_btn'.tr()),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              onRequestGpsPermission();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: Text('price_verdict.gps_permission_allow_btn'.tr()),
-          ),
-        ],
+      icon: Icons.my_location_rounded,
+      title: 'price_verdict.gps_permission_dialog_title'.tr(),
+      body: 'price_verdict.gps_permission_dialog_body'.tr(
+        namedArgs: {'city': cityName},
       ),
+      cancelLabel: 'price_verdict.gps_permission_deny_btn'.tr(),
+      confirmLabel: 'price_verdict.gps_permission_allow_btn'.tr(),
+      onCancel: onDenyGpsPermission,
+      onConfirm: onRequestGpsPermission,
     );
   }
 
