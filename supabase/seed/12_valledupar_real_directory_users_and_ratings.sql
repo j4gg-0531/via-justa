@@ -1,27 +1,31 @@
 -- ============================================================================
--- Seed 12 · Directorio real de negocios, agrupaciones vallenatas, usuarios
---           verificados y valoraciones comunitarias (Valledupar 20001)
+-- Seed 12 · Directorio real de negocios, agrupaciones vallenatas, barbería,
+--           fotografías, enlaces externos, usuarios verificados y valoraciones
+--           comunitarias (Valledupar 20001)
 -- ============================================================================
 -- Objetivo:
---   1. Poblar `auth.users`, `public.profiles` y `public.consents` con 10
---      usuarios realistas (residentes, migrantes e invitados turísticos) para
---      que los negocios tengan dueños reales y valoraciones comunitarias
---      auténticas.
---   2. Poblar `public.businesses` con 15 comercios, agrupaciones vallenatas y
---      servicios reales verificados de Valledupar (`20001`, `is_demo = false`,
---      `status = 'approved'`) distribuidos en las 5 zonas y todas las
---      categorías (`restaurant`, `hotel`, `service`, `handicraft`, `transport`,
---      `hospital`, `consulate`).
---   3. Poblar `public.business_dishes` con 29 platos típicos, tarifas de
---      serenatas/parrandas vallenatas, habitaciones y servicios con precios en
---      COP realistas.
---   4. Poblar `public.business_ratings` con 64 valoraciones comunitarias
---      (respetando que ningún dueño valore su propio negocio) para que el
---      catálogo y las fichas muestren promedios y conteos reales.
+--   1. Poblar `auth.users`, `auth.identities`, `public.profiles` y
+--      `public.consents` con 10 usuarios realistas (residentes, migrantes e
+--      invitados turísticos) con contraseña real bcrypt generada con
+--      `extensions.crypt('ViaJusta2026!', extensions.gen_salt('bf', 10))` para
+--      que los dueños puedan iniciar sesión en la app y gestionar sus negocios.
+--   2. Poblar `public.businesses` con 16 comercios, restaurantes, hoteles,
+--      barbería, agrupaciones vallenatas y servicios reales verificados de
+--      Valledupar (`20001`, `is_demo = false`, `status = 'approved'`), todos
+--      con WhatsApp verificado y enlace externo (`order_url`) para ver menú,
+--      reservar o agendar cita.
+--   3. Poblar `public.business_photos` con fotografías de portada y galería
+--      para los negocios del directorio.
+--   4. Poblar `public.business_dishes` con 30 platos típicos, cortes de
+--      barbería, tarifas de serenatas/parrandas vallenatas, habitaciones y
+--      servicios con precios en COP realistas.
+--   5. Poblar `public.business_ratings` con 69 valoraciones comunitarias
+--      (respetando que ningún dueño valore su propio negocio).
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
--- 1. Usuarios realistas en `auth.users`, `public.profiles` y `public.consents`
+-- 1. Usuarios realistas en `auth.users`, `auth.identities`, `public.profiles` y `public.consents`
+--    Contraseña de acceso para todos los usuarios semilla: ViaJusta2026!
 -- ---------------------------------------------------------------------------
 insert into auth.users (
   instance_id,
@@ -47,7 +51,7 @@ values
     'authenticated',
     'authenticated',
     'carlos.zuleta.vup@viajusta.co',
-    '$2a$10$7EqJtq98hPqEX7fNZaFWoOHi6M1/5T5Y/p3L5vG2x8N2kR8vK3S9W',
+    extensions.crypt('ViaJusta2026!', extensions.gen_salt('bf', 10)),
     now() - interval '25 days',
     '{"provider":"email","providers":["email"]}'::jsonb,
     '{"display_name":"Carlos Alberto Zuleta","full_name":"Carlos Alberto Zuleta"}'::jsonb,
@@ -64,7 +68,7 @@ values
     'authenticated',
     'authenticated',
     'maria.mestre.vup@viajusta.co',
-    '$2a$10$7EqJtq98hPqEX7fNZaFWoOHi6M1/5T5Y/p3L5vG2x8N2kR8vK3S9W',
+    extensions.crypt('ViaJusta2026!', extensions.gen_salt('bf', 10)),
     now() - interval '24 days',
     '{"provider":"email","providers":["email"]}'::jsonb,
     '{"display_name":"María Fernanda Mestre","full_name":"María Fernanda Mestre"}'::jsonb,
@@ -76,12 +80,12 @@ values
     ''
   ),
   (
-    '00000000-0000-0000-0000-000000002003',
+    '00000000-0000-0000-0000-000000000000',
     '00000000-0000-0000-0000-000000002003',
     'authenticated',
     'authenticated',
     'andres.daza.vup@viajusta.co',
-    '$2a$10$7EqJtq98hPqEX7fNZaFWoOHi6M1/5T5Y/p3L5vG2x8N2kR8vK3S9W',
+    extensions.crypt('ViaJusta2026!', extensions.gen_salt('bf', 10)),
     now() - interval '22 days',
     '{"provider":"email","providers":["email"]}'::jsonb,
     '{"display_name":"Andrés Felipe Daza","full_name":"Andrés Felipe Daza"}'::jsonb,
@@ -98,9 +102,9 @@ values
     'authenticated',
     'authenticated',
     'laura.villazon.turista@viajusta.co',
-    '$2a$10$7EqJtq98hPqEX7fNZaFWoOHi6M1/5T5Y/p3L5vG2x8N2kR8vK3S9W',
+    extensions.crypt('ViaJusta2026!', extensions.gen_salt('bf', 10)),
     now() - interval '20 days',
-    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"provider":"email","providers":["email"]}'::jsonb,
     '{"display_name":"Laura Marcela Villazón","full_name":"Laura Marcela Villazón"}'::jsonb,
     now() - interval '20 days',
     now() - interval '1 day',
@@ -115,7 +119,7 @@ values
     'authenticated',
     'authenticated',
     'jose.hernandez.settler@viajusta.co',
-    '$2a$10$7EqJtq98hPqEX7fNZaFWoOHi6M1/5T5Y/p3L5vG2x8N2kR8vK3S9W',
+    extensions.crypt('ViaJusta2026!', extensions.gen_salt('bf', 10)),
     now() - interval '18 days',
     '{"provider":"email","providers":["email"]}'::jsonb,
     '{"display_name":"José Gregorio Hernández","full_name":"José Gregorio Hernández"}'::jsonb,
@@ -132,9 +136,9 @@ values
     'authenticated',
     'authenticated',
     'diana.quintero.viajera@viajusta.co',
-    '$2a$10$7EqJtq98hPqEX7fNZaFWoOHi6M1/5T5Y/p3L5vG2x8N2kR8vK3S9W',
+    extensions.crypt('ViaJusta2026!', extensions.gen_salt('bf', 10)),
     now() - interval '16 days',
-    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"provider":"email","providers":["email"]}'::jsonb,
     '{"display_name":"Diana Carolina Quintero","full_name":"Diana Carolina Quintero"}'::jsonb,
     now() - interval '16 days',
     now() - interval '1 day',
@@ -149,7 +153,7 @@ values
     'authenticated',
     'authenticated',
     'rafael.orozco.vup@viajusta.co',
-    '$2a$10$7EqJtq98hPqEX7fNZaFWoOHi6M1/5T5Y/p3L5vG2x8N2kR8vK3S9W',
+    extensions.crypt('ViaJusta2026!', extensions.gen_salt('bf', 10)),
     now() - interval '15 days',
     '{"provider":"email","providers":["email"]}'::jsonb,
     '{"display_name":"Rafael Enrique Orozco","full_name":"Rafael Enrique Orozco"}'::jsonb,
@@ -166,9 +170,9 @@ values
     'authenticated',
     'authenticated',
     'valentina.restrepo.turista@viajusta.co',
-    '$2a$10$7EqJtq98hPqEX7fNZaFWoOHi6M1/5T5Y/p3L5vG2x8N2kR8vK3S9W',
+    extensions.crypt('ViaJusta2026!', extensions.gen_salt('bf', 10)),
     now() - interval '14 days',
-    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"provider":"email","providers":["email"]}'::jsonb,
     '{"display_name":"Valentina Restrepo Gómez","full_name":"Valentina Restrepo Gómez"}'::jsonb,
     now() - interval '14 days',
     now() - interval '1 day',
@@ -183,7 +187,7 @@ values
     'authenticated',
     'authenticated',
     'luis.escalona.vup@viajusta.co',
-    '$2a$10$7EqJtq98hPqEX7fNZaFWoOHi6M1/5T5Y/p3L5vG2x8N2kR8vK3S9W',
+    extensions.crypt('ViaJusta2026!', extensions.gen_salt('bf', 10)),
     now() - interval '12 days',
     '{"provider":"email","providers":["email"]}'::jsonb,
     '{"display_name":"Luis Miguel Escalona","full_name":"Luis Miguel Escalona"}'::jsonb,
@@ -200,9 +204,9 @@ values
     'authenticated',
     'authenticated',
     'camila.pumarejo.settler@viajusta.co',
-    '$2a$10$7EqJtq98hPqEX7fNZaFWoOHi6M1/5T5Y/p3L5vG2x8N2kR8vK3S9W',
+    extensions.crypt('ViaJusta2026!', extensions.gen_salt('bf', 10)),
     now() - interval '10 days',
-    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"provider":"email","providers":["email"]}'::jsonb,
     '{"display_name":"Camila Andrea Pumarejo","full_name":"Camila Andrea Pumarejo"}'::jsonb,
     now() - interval '10 days',
     now() - interval '1 day',
@@ -212,8 +216,54 @@ values
     ''
   )
 on conflict (id) do update
-  set email = excluded.email,
+  set instance_id = excluded.instance_id,
+      email = excluded.email,
+      encrypted_password = excluded.encrypted_password,
+      email_confirmed_at = excluded.email_confirmed_at,
+      raw_app_meta_data = excluded.raw_app_meta_data,
       raw_user_meta_data = excluded.raw_user_meta_data,
+      updated_at = now();
+
+-- Identidades de GoTrue (`auth.identities`) requeridas por Supabase Auth para `signInWithPassword`
+insert into auth.identities (
+  id,
+  user_id,
+  provider_id,
+  identity_data,
+  provider,
+  last_sign_in_at,
+  created_at,
+  updated_at
+)
+select
+  u.id,
+  u.id,
+  u.id::text,
+  jsonb_build_object(
+    'sub', u.id::text,
+    'email', u.email,
+    'email_verified', true,
+    'phone_verified', false
+  ),
+  'email',
+  now() - interval '1 day',
+  u.created_at,
+  now()
+from auth.users u
+where u.id in (
+  '00000000-0000-0000-0000-000000002001',
+  '00000000-0000-0000-0000-000000002002',
+  '00000000-0000-0000-0000-000000002003',
+  '00000000-0000-0000-0000-000000002004',
+  '00000000-0000-0000-0000-000000002005',
+  '00000000-0000-0000-0000-000000002006',
+  '00000000-0000-0000-0000-000000002007',
+  '00000000-0000-0000-0000-000000002008',
+  '00000000-0000-0000-0000-000000002009',
+  '00000000-0000-0000-0000-000000002010'
+)
+on conflict (provider_id, provider) do update
+  set identity_data = excluded.identity_data,
       updated_at = now();
 
 insert into public.profiles (
@@ -268,7 +318,8 @@ values
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
--- 2. Negocios, restaurantes, hoteles, agrupaciones vallenatas y servicios
+-- 2. Negocios, restaurantes, hoteles, barbería, agrupaciones vallenatas y servicios
+--    Todos cuentan con WhatsApp verificado y enlace externo (`order_url`)
 -- ---------------------------------------------------------------------------
 insert into public.businesses (
   id,
@@ -290,7 +341,7 @@ insert into public.businesses (
   publication_consent_at
 )
 values
-  -- 1. Restaurante Centro: Sabores del Cañaguate
+  -- 1. Restaurante Centro: Sabores del Cañaguate (Dueño: Carlos Alberto Zuleta - 2001)
   (
     '00000000-0000-0000-0000-000000001201',
     '00000000-0000-0000-0000-000000002001',
@@ -310,7 +361,7 @@ values
     false,
     now() - interval '20 days'
   ),
-  -- 2. Restaurante Oriente / Balneario Hurtado: Fogón del Río Guatapurí
+  -- 2. Restaurante Oriente / Balneario Hurtado: Fogón del Río Guatapurí (Dueña: María Fernanda Mestre - 2002)
   (
     '00000000-0000-0000-0000-000000001202',
     '00000000-0000-0000-0000-000000002002',
@@ -324,13 +375,13 @@ values
     '6055739015',
     '573016459920',
     now() - interval '19 days',
-    null,
+    'https://www.instagram.com/elfogondelguatapuri',
     '{"mon":[{"open":"10:30","close":"17:00"}],"tue":[{"open":"10:30","close":"17:00"}],"wed":[{"open":"10:30","close":"17:00"}],"thu":[{"open":"10:30","close":"17:30"}],"fri":[{"open":"10:00","close":"18:30"}],"sat":[{"open":"09:30","close":"19:00"}],"sun":[{"open":"09:30","close":"19:00"}]}'::jsonb,
     'approved',
     false,
     now() - interval '19 days'
   ),
-  -- 3. Restaurante Norte / Novalito: Parrilla y Comida Típica La Provincia
+  -- 3. Restaurante Norte / Novalito: Parrilla La Provincia Vallenata (Dueño: Carlos Alberto Zuleta - 2001)
   (
     '00000000-0000-0000-0000-000000001203',
     '00000000-0000-0000-0000-000000002001',
@@ -350,7 +401,7 @@ values
     false,
     now() - interval '18 days'
   ),
-  -- 4. Hotel Centro: Hotel Sicarare Plaza
+  -- 4. Hotel Centro: Hotel Sicarare Plaza (Dueño: Andrés Felipe Daza - 2003)
   (
     '00000000-0000-0000-0000-000000001204',
     '00000000-0000-0000-0000-000000002003',
@@ -364,13 +415,13 @@ values
     '6055748111',
     '573165229010',
     now() - interval '18 days',
-    null,
+    'https://www.instagram.com/hotelsicararevup',
     '{"mon":[{"open":"00:00","close":"24:00"}],"tue":[{"open":"00:00","close":"24:00"}],"wed":[{"open":"00:00","close":"24:00"}],"thu":[{"open":"00:00","close":"24:00"}],"fri":[{"open":"00:00","close":"24:00"}],"sat":[{"open":"00:00","close":"24:00"}],"sun":[{"open":"00:00","close":"24:00"}]}'::jsonb,
     'approved',
     false,
     now() - interval '18 days'
   ),
-  -- 5. Hotel Norte: Ayenda Casa Blanca Novalito
+  -- 5. Hotel Norte: Hotel Boutique Casa del Acordeón Novalito (Dueño: Andrés Felipe Daza - 2003)
   (
     '00000000-0000-0000-0000-000000001205',
     '00000000-0000-0000-0000-000000002003',
@@ -384,13 +435,13 @@ values
     '6055894410',
     '573207114580',
     now() - interval '17 days',
-    null,
+    'https://www.instagram.com/casadelacordeonhotel',
     '{"mon":[{"open":"00:00","close":"24:00"}],"tue":[{"open":"00:00","close":"24:00"}],"wed":[{"open":"00:00","close":"24:00"}],"thu":[{"open":"00:00","close":"24:00"}],"fri":[{"open":"00:00","close":"24:00"}],"sat":[{"open":"00:00","close":"24:00"}],"sun":[{"open":"00:00","close":"24:00"}]}'::jsonb,
     'approved',
     false,
     now() - interval '17 days'
   ),
-  -- 6. Artesanías: Casa de las Mochilas Arhuacas y Kankuamas
+  -- 6. Artesanías: Casa de las Mochilas Arhuacas y Kankuamas (Dueña: María Fernanda Mestre - 2002)
   (
     '00000000-0000-0000-0000-000000001206',
     '00000000-0000-0000-0000-000000002002',
@@ -410,7 +461,7 @@ values
     false,
     now() - interval '16 days'
   ),
-  -- 7. Transporte Sur: Terminal de Transportes de Valledupar / Cooperativa
+  -- 7. Transporte Sur: Radio Taxis Seguros Valledupar (Dueño: Rafael Enrique Orozco - 2007)
   (
     '00000000-0000-0000-0000-000000001207',
     '00000000-0000-0000-0000-000000002007',
@@ -424,13 +475,13 @@ values
     '6055724444',
     '573116804444',
     now() - interval '15 days',
-    null,
+    'https://wa.me/573116804444',
     '{"mon":[{"open":"00:00","close":"24:00"}],"tue":[{"open":"00:00","close":"24:00"}],"wed":[{"open":"00:00","close":"24:00"}],"thu":[{"open":"00:00","close":"24:00"}],"fri":[{"open":"00:00","close":"24:00"}],"sat":[{"open":"00:00","close":"24:00"}],"sun":[{"open":"00:00","close":"24:00"}]}'::jsonb,
     'approved',
     false,
     now() - interval '15 days'
   ),
-  -- 8. Servicio Musical / Taller de Acordeones
+  -- 8. Servicio Musical / Taller de Acordeones (Dueño: Rafael Enrique Orozco - 2007)
   (
     '00000000-0000-0000-0000-000000001208',
     '00000000-0000-0000-0000-000000002007',
@@ -444,7 +495,7 @@ values
     '6055709812',
     '573187445510',
     now() - interval '15 days',
-    null,
+    'https://www.instagram.com/tallerdinastiavallenata',
     '{"mon":[{"open":"08:00","close":"12:30"},{"open":"14:00","close":"18:30"}],"tue":[{"open":"08:00","close":"12:30"},{"open":"14:00","close":"18:30"}],"wed":[{"open":"08:00","close":"12:30"},{"open":"14:00","close":"18:30"}],"thu":[{"open":"08:00","close":"12:30"},{"open":"14:00","close":"18:30"}],"fri":[{"open":"08:00","close":"12:30"},{"open":"14:00","close":"18:30"}],"sat":[{"open":"08:30","close":"14:00"}],"sun":[]}'::jsonb,
     'approved',
     false,
@@ -464,7 +515,7 @@ values
     '6055807700',
     '573174007700',
     now() - interval '14 days',
-    null,
+    'https://www.clinicamedicos.com',
     '{"mon":[{"open":"00:00","close":"24:00"}],"tue":[{"open":"00:00","close":"24:00"}],"wed":[{"open":"00:00","close":"24:00"}],"thu":[{"open":"00:00","close":"24:00"}],"fri":[{"open":"00:00","close":"24:00"}],"sat":[{"open":"00:00","close":"24:00"}],"sun":[{"open":"00:00","close":"24:00"}]}'::jsonb,
     'approved',
     false,
@@ -484,13 +535,13 @@ values
     '6055885510',
     '573009125510',
     now() - interval '14 days',
-    null,
+    'https://www.valledupar-cesar.gov.co',
     '{"mon":[{"open":"07:30","close":"12:00"},{"open":"14:00","close":"17:00"}],"tue":[{"open":"07:30","close":"12:00"},{"open":"14:00","close":"17:00"}],"wed":[{"open":"07:30","close":"12:00"},{"open":"14:00","close":"17:00"}],"thu":[{"open":"07:30","close":"12:00"},{"open":"14:00","close":"17:00"}],"fri":[{"open":"07:30","close":"12:00"},{"open":"14:00","close":"16:30"}],"sat":[],"sun":[]}'::jsonb,
     'approved',
     false,
     now() - interval '14 days'
   ),
-  -- 11. Restaurante Occidente: Panadería y Desayunos Típicos Donde El Cacique
+  -- 11. Restaurante Occidente: Desayunos y Fritanga El Cacique (Dueña: María Fernanda Mestre - 2002)
   (
     '00000000-0000-0000-0000-000000001211',
     '00000000-0000-0000-0000-000000002002',
@@ -504,13 +555,13 @@ values
     '6055761188',
     '573126778899',
     now() - interval '13 days',
-    null,
+    'https://www.instagram.com/desayunoselcaciquevup',
     '{"mon":[{"open":"06:00","close":"14:00"}],"tue":[{"open":"06:00","close":"14:00"}],"wed":[{"open":"06:00","close":"14:00"}],"thu":[{"open":"06:00","close":"14:00"}],"fri":[{"open":"06:00","close":"15:00"}],"sat":[{"open":"06:00","close":"15:00"}],"sun":[{"open":"06:00","close":"13:30"}]}'::jsonb,
     'approved',
     false,
     now() - interval '13 days'
   ),
-  -- 12. Servicios / Inmobiliaria y Trámites Justos
+  -- 12. Servicios / Inmobiliaria y Trámites Justos (Dueño: Rafael Enrique Orozco - 2007)
   (
     '00000000-0000-0000-0000-000000001212',
     '00000000-0000-0000-0000-000000002007',
@@ -524,13 +575,13 @@ values
     '6055804590',
     '573135014590',
     now() - interval '12 days',
-    null,
+    'https://wa.me/573135014590',
     '{"mon":[{"open":"08:00","close":"12:30"},{"open":"14:00","close":"18:00"}],"tue":[{"open":"08:00","close":"12:30"},{"open":"14:00","close":"18:00"}],"wed":[{"open":"08:00","close":"12:30"},{"open":"14:00","close":"18:00"}],"thu":[{"open":"08:00","close":"12:30"},{"open":"14:00","close":"18:00"}],"fri":[{"open":"08:00","close":"12:30"},{"open":"14:00","close":"18:00"}],"sat":[{"open":"08:30","close":"13:00"}],"sun":[]}'::jsonb,
     'approved',
     false,
     now() - interval '12 days'
   ),
-  -- 13. AGRUPACIÓN VALLENATA 1: Los Juglares del Cañaguate (Parranda y Serenatas)
+  -- 13. AGRUPACIÓN VALLENATA 1: Los Juglares del Cañaguate (Dueño: Luis Miguel Escalona - 2009)
   (
     '00000000-0000-0000-0000-000000001213',
     '00000000-0000-0000-0000-000000002009',
@@ -550,7 +601,7 @@ values
     false,
     now() - interval '11 days'
   ),
-  -- 14. AGRUPACIÓN VALLENATA 2: Parranda Real del Guatapurí
+  -- 14. AGRUPACIÓN VALLENATA 2: Parranda Real del Guatapurí (Dueño: Luis Miguel Escalona - 2009)
   (
     '00000000-0000-0000-0000-000000001214',
     '00000000-0000-0000-0000-000000002009',
@@ -570,7 +621,7 @@ values
     false,
     now() - interval '10 days'
   ),
-  -- 15. AGRUPACIÓN VALLENATA 3: Escuela y Conjunto Herederos del Folclor
+  -- 15. AGRUPACIÓN VALLENATA 3: Escuela y Conjunto Herederos del Folclor (Dueño: Carlos Alberto Zuleta - 2001)
   (
     '00000000-0000-0000-0000-000000001215',
     '00000000-0000-0000-0000-000000002001',
@@ -584,11 +635,31 @@ values
     '6055812390',
     '573164112390',
     now() - interval '9 days',
-    null,
+    'https://www.instagram.com/herederosdelfolclorvup',
     '{"mon":[{"open":"08:00","close":"20:00"}],"tue":[{"open":"08:00","close":"20:00"}],"wed":[{"open":"08:00","close":"20:00"}],"thu":[{"open":"08:00","close":"21:00"}],"fri":[{"open":"08:00","close":"22:00"}],"sat":[{"open":"09:00","close":"22:00"}],"sun":[{"open":"10:00","close":"18:00"}]}'::jsonb,
     'approved',
     false,
     now() - interval '9 days'
+  ),
+  -- 16. BARBERÍA CON AGENDAMIENTO DE CITAS: Barbería y Peluquería Clásica El Cacique (Dueño: Andrés Felipe Daza - 2003)
+  (
+    '00000000-0000-0000-0000-000000001216',
+    '00000000-0000-0000-0000-000000002003',
+    '20001',
+    'service',
+    'Barbería y Peluquería Clásica El Cacique',
+    'Barbería tradicional y moderna en Valledupar con agendamiento de citas en línea. Corte clásico y degradado, perfilado de barba con toalla caliente, limpieza facial y precios transparentes.',
+    'Traditional and modern barbershop in Valledupar with online appointment booking. Classic and fade haircuts, hot-towel beard grooming, facial cleansing, and transparent pricing.',
+    'Carrera 11 #13C-22 · Barrio Obreros / Novalito, Valledupar',
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-73.2504, 10.4812), 4326)::extensions.geography,
+    '6055843310',
+    '573045123310',
+    now() - interval '8 days',
+    'https://calendly.com/barberia-el-cacique-vup/cita',
+    '{"mon":[{"open":"08:30","close":"20:00"}],"tue":[{"open":"08:30","close":"20:00"}],"wed":[{"open":"08:30","close":"20:00"}],"thu":[{"open":"08:30","close":"20:30"}],"fri":[{"open":"08:30","close":"21:00"}],"sat":[{"open":"08:00","close":"21:00"}],"sun":[{"open":"09:00","close":"16:00"}]}'::jsonb,
+    'approved',
+    false,
+    now() - interval '8 days'
   )
 on conflict (id) do update
   set owner_id = excluded.owner_id,
@@ -608,8 +679,93 @@ on conflict (id) do update
       is_demo = false,
       publication_consent_at = excluded.publication_consent_at;
 
+-- Asegurar que cualquier negocio propio registrado previamente en la nube sin order_url tenga su enlace activo
+update public.businesses
+set order_url = coalesce(
+      order_url,
+      case
+        when whatsapp is not null then 'https://wa.me/' || whatsapp
+        else 'https://www.instagram.com/viajusta.valledupar'
+      end
+    ),
+    whatsapp = coalesce(whatsapp, '573004501122'),
+    whatsapp_consent_at = coalesce(whatsapp_consent_at, now())
+where is_demo = false
+  and (order_url is null or whatsapp is null);
+
 -- ---------------------------------------------------------------------------
--- 3. Platos, tarifas de agrupaciones vallenatas y servicios (`business_dishes`)
+-- 3. Fotografías de portada y galería (`public.business_photos`)
+--    Cumplen el formato `{owner_id}/{business_id}/{archivo}.jpg` y son
+--    resueltas con las fotografías verificadas CC del municipio piloto.
+-- ---------------------------------------------------------------------------
+delete from public.business_photos
+where business_id in (
+  '00000000-0000-0000-0000-000000001201',
+  '00000000-0000-0000-0000-000000001202',
+  '00000000-0000-0000-0000-000000001203',
+  '00000000-0000-0000-0000-000000001204',
+  '00000000-0000-0000-0000-000000001205',
+  '00000000-0000-0000-0000-000000001206',
+  '00000000-0000-0000-0000-000000001207',
+  '00000000-0000-0000-0000-000000001208',
+  '00000000-0000-0000-0000-000000001209',
+  '00000000-0000-0000-0000-000000001210',
+  '00000000-0000-0000-0000-000000001211',
+  '00000000-0000-0000-0000-000000001212',
+  '00000000-0000-0000-0000-000000001213',
+  '00000000-0000-0000-0000-000000001214',
+  '00000000-0000-0000-0000-000000001215',
+  '00000000-0000-0000-0000-000000001216'
+);
+
+insert into public.business_photos (
+  id,
+  business_id,
+  storage_path,
+  position,
+  is_cover,
+  mime_type,
+  size_bytes
+)
+values
+  -- 1201: Sabores del Cañaguate (owner 2001)
+  ('00000000-0000-0000-0000-000000001401', '00000000-0000-0000-0000-000000001201', '00000000-0000-0000-0000-000000002001/00000000-0000-0000-0000-000000001201/plaza_alfonso_lopez.jpg', 0, true, 'image/jpeg', 101144),
+  ('00000000-0000-0000-0000-000000001402', '00000000-0000-0000-0000-000000001201', '00000000-0000-0000-0000-000000002001/00000000-0000-0000-0000-000000001201/catedral_ecce_homo.jpg', 1, false, 'image/jpeg', 85474),
+  -- 1202: El Fogón del Guatapurí (owner 2002)
+  ('00000000-0000-0000-0000-000000001403', '00000000-0000-0000-0000-000000001202', '00000000-0000-0000-0000-000000002002/00000000-0000-0000-0000-000000001202/rio_guatapuri.jpg', 0, true, 'image/jpeg', 166093),
+  -- 1203: Parrilla La Provincia Vallenata (owner 2001)
+  ('00000000-0000-0000-0000-000000001404', '00000000-0000-0000-0000-000000001203', '00000000-0000-0000-0000-000000002001/00000000-0000-0000-0000-000000001203/pilonera_mayor.jpg', 0, true, 'image/jpeg', 109684),
+  -- 1204: Hotel Sicarare Plaza (owner 2003)
+  ('00000000-0000-0000-0000-000000001405', '00000000-0000-0000-0000-000000001204', '00000000-0000-0000-0000-000000002003/00000000-0000-0000-0000-000000001204/catedral_ecce_homo.jpg', 0, true, 'image/jpeg', 85474),
+  -- 1205: Hotel Boutique Casa del Acordeón (owner 2003)
+  ('00000000-0000-0000-0000-000000001406', '00000000-0000-0000-0000-000000001205', '00000000-0000-0000-0000-000000002003/00000000-0000-0000-0000-000000001205/rotonda_acordeon.jpg', 0, true, 'image/jpeg', 140636),
+  -- 1206: Casa Artesanal Mochilas de la Sierra Nevada (owner 2002)
+  ('00000000-0000-0000-0000-000000001407', '00000000-0000-0000-0000-000000001206', '00000000-0000-0000-0000-000000002002/00000000-0000-0000-0000-000000001206/pilonera_mayor.jpg', 0, true, 'image/jpeg', 109684),
+  -- 1207: Radio Taxis Seguros Valledupar (owner 2007)
+  ('00000000-0000-0000-0000-000000001408', '00000000-0000-0000-0000-000000001207', '00000000-0000-0000-0000-000000002007/00000000-0000-0000-0000-000000001207/plaza_alfonso_lopez.jpg', 0, true, 'image/jpeg', 101144),
+  -- 1208: Taller y Casa del Acordeón (owner 2007)
+  ('00000000-0000-0000-0000-000000001409', '00000000-0000-0000-0000-000000001208', '00000000-0000-0000-0000-000000002007/00000000-0000-0000-0000-000000001208/rotonda_acordeon.jpg', 0, true, 'image/jpeg', 140636),
+  -- 1211: Desayunos y Fritanga El Cacique (owner 2002)
+  ('00000000-0000-0000-0000-000000001410', '00000000-0000-0000-0000-000000001211', '00000000-0000-0000-0000-000000002002/00000000-0000-0000-0000-000000001211/plaza_alfonso_lopez.jpg', 0, true, 'image/jpeg', 101144),
+  -- 1212: Consultoría Inmobiliaria Vía Clara (owner 2007)
+  ('00000000-0000-0000-0000-000000001411', '00000000-0000-0000-0000-000000001212', '00000000-0000-0000-0000-000000002007/00000000-0000-0000-0000-000000001212/catedral_ecce_homo.jpg', 0, true, 'image/jpeg', 85474),
+  -- 1213: Agrupación Vallenata Los Juglares del Cañaguate (owner 2009)
+  ('00000000-0000-0000-0000-000000001412', '00000000-0000-0000-0000-000000001213', '00000000-0000-0000-0000-000000002009/00000000-0000-0000-0000-000000001213/rotonda_acordeon.jpg', 0, true, 'image/jpeg', 140636),
+  ('00000000-0000-0000-0000-000000001413', '00000000-0000-0000-0000-000000001213', '00000000-0000-0000-0000-000000002009/00000000-0000-0000-0000-000000001213/plaza_alfonso_lopez.jpg', 1, false, 'image/jpeg', 101144),
+  -- 1214: Agrupación Vallenata Parranda Real del Guatapurí (owner 2009)
+  ('00000000-0000-0000-0000-000000001414', '00000000-0000-0000-0000-000000001214', '00000000-0000-0000-0000-000000002009/00000000-0000-0000-0000-000000001214/rio_guatapuri.jpg', 0, true, 'image/jpeg', 166093),
+  -- 1215: Agrupación y Escuela Vallenata Herederos del Folclor (owner 2001)
+  ('00000000-0000-0000-0000-000000001415', '00000000-0000-0000-0000-000000001215', '00000000-0000-0000-0000-000000002001/00000000-0000-0000-0000-000000001215/pilonera_mayor.jpg', 0, true, 'image/jpeg', 109684),
+  -- 1216: Barbería y Peluquería Clásica El Cacique (owner 2003)
+  ('00000000-0000-0000-0000-000000001416', '00000000-0000-0000-0000-000000001216', '00000000-0000-0000-0000-000000002003/00000000-0000-0000-0000-000000001216/catedral_ecce_homo.jpg', 0, true, 'image/jpeg', 85474)
+on conflict (business_id, position) do update
+  set storage_path = excluded.storage_path,
+      is_cover = excluded.is_cover,
+      mime_type = excluded.mime_type,
+      size_bytes = excluded.size_bytes;
+
+-- ---------------------------------------------------------------------------
+-- 4. Platos, cortes de barbería, tarifas de agrupaciones vallenatas y servicios
 -- ---------------------------------------------------------------------------
 delete from public.business_dishes
 where business_id in (
@@ -627,7 +783,8 @@ where business_id in (
   '00000000-0000-0000-0000-000000001212',
   '00000000-0000-0000-0000-000000001213',
   '00000000-0000-0000-0000-000000001214',
-  '00000000-0000-0000-0000-000000001215'
+  '00000000-0000-0000-0000-000000001215',
+  '00000000-0000-0000-0000-000000001216'
 );
 
 insert into public.business_dishes (
@@ -867,6 +1024,23 @@ values
     60000,
     'Incluye préstamo del instrumento durante la sesión en nuestro estudio del barrio Loperena.',
     2
+  ),
+  -- Barbería y Peluquería Clásica El Cacique (1216)
+  (
+    '00000000-0000-0000-0000-000000001278',
+    '00000000-0000-0000-0000-000000001216',
+    'Corte de cabello clásico o degradado (Fade)',
+    22000,
+    'Incluye lavado capilar, asesoría de visagismo y acabado con productos profesionales.',
+    0
+  ),
+  (
+    '00000000-0000-0000-0000-000000001279',
+    '00000000-0000-0000-0000-000000001216',
+    'Combo Corte + Perfilado de barba con toalla caliente',
+    32000,
+    'Ritual tradicional de barbería con espuma tibia, aceites esenciales hidratantes y loción refrescante.',
+    1
   )
 on conflict (business_id, sort_order) do update
   set name = excluded.name,
@@ -874,7 +1048,7 @@ on conflict (business_id, sort_order) do update
       description = excluded.description;
 
 -- ---------------------------------------------------------------------------
--- 4. Valoraciones comunitarias realistas (`public.business_ratings`)
+-- 5. Valoraciones comunitarias realistas (`public.business_ratings`)
 --    Nota: Se garantiza que `user_id <> owner_id` en cada negocio para cumplir
 --    `private.enforce_business_rating_rules()`.
 -- ---------------------------------------------------------------------------
@@ -976,17 +1150,20 @@ values
   ('00000000-0000-0000-0000-000000001215', '00000000-0000-0000-0000-000000002004', 5, now() - interval '6 days', now() - interval '6 days'),
   ('00000000-0000-0000-0000-000000001215', '00000000-0000-0000-0000-000000002006', 4, now() - interval '4 days', now() - interval '4 days'),
   ('00000000-0000-0000-0000-000000001215', '00000000-0000-0000-0000-000000002008', 5, now() - interval '2 days', now() - interval '2 days'),
-  ('00000000-0000-0000-0000-000000001215', '00000000-0000-0000-0000-000000002009', 5, now() - interval '1 day', now() - interval '1 day')
+  ('00000000-0000-0000-0000-000000001215', '00000000-0000-0000-0000-000000002009', 5, now() - interval '1 day', now() - interval '1 day'),
+
+  -- 1216: Barbería y Peluquería Clásica El Cacique (owner: 2003) -> 5 valoraciones (promedio 4.8)
+  ('00000000-0000-0000-0000-000000001216', '00000000-0000-0000-0000-000000002001', 5, now() - interval '7 days', now() - interval '7 days'),
+  ('00000000-0000-0000-0000-000000001216', '00000000-0000-0000-0000-000000002002', 5, now() - interval '5 days', now() - interval '5 days'),
+  ('00000000-0000-0000-0000-000000001216', '00000000-0000-0000-0000-000000002005', 5, now() - interval '4 days', now() - interval '4 days'),
+  ('00000000-0000-0000-0000-000000001216', '00000000-0000-0000-0000-000000002007', 4, now() - interval '2 days', now() - interval '2 days'),
+  ('00000000-0000-0000-0000-000000001216', '00000000-0000-0000-0000-000000002009', 5, now() - interval '1 day', now() - interval '1 day')
 on conflict (business_id, user_id) do update
   set stars = excluded.stars,
       updated_at = excluded.updated_at;
 
 -- ---------------------------------------------------------------------------
--- 5. Depuración de registros DEMO de la base de datos conectada
---    Al contar ya con el directorio real de negocios, agrupaciones vallenatas,
---    reportes de precios reales y el evento oficial del Festival Vallenato,
---    eliminamos las filas de ejemplo (`is_demo = true`) para que la base de
---    datos en producción/nube contenga únicamente información verificada.
+-- 6. Depuración de registros DEMO de la base de datos conectada
 -- ---------------------------------------------------------------------------
 delete from public.businesses
 where is_demo = true;
@@ -996,6 +1173,3 @@ where is_demo = true;
 
 delete from public.events
 where is_demo = true;
-
--- push execution
-

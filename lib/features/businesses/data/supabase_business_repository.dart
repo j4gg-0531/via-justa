@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/domain/business_detail.dart';
@@ -7,16 +6,59 @@ import 'package:via_justa/features/businesses/domain/business_filter.dart';
 import 'package:via_justa/features/businesses/domain/business_rating.dart';
 import 'package:via_justa/features/businesses/domain/business_repository.dart';
 
+/// Cargador inyectable de bytes de imagen desde el paquete local (`assets/`).
+typedef BusinessAssetBytesLoader = Future<Uint8List?> Function(String assetPath);
+
 /// Repositorio conectado a Supabase que consulta `public.get_business_catalog` y
 /// `public.get_business_detail` (VJ-17), excluyendo comercios de demostración.
 class SupabaseBusinessRepository implements BusinessRepository {
   const SupabaseBusinessRepository({
     required this.client,
     this.municipalityCode = '20001',
+    this.assetBytesLoader = _defaultLoadAssetBytes,
   });
 
   final SupabaseClient client;
   final String municipalityCode;
+  final BusinessAssetBytesLoader assetBytesLoader;
+
+  /// Mapa determinístico de imágenes empaquetadas de respaldo por tipo o nombre
+  /// de archivo para semillas del catálogo de Valledupar.
+  static const Map<String, String> _bundledCoverAssetByToken = <String, String>{
+    'catedral_ecce_homo.jpg':
+        'assets/images/cities/valledupar/catedral_ecce_homo.jpg',
+    'plaza_alfonso_lopez.jpg':
+        'assets/images/cities/valledupar/plaza_alfonso_lopez.jpg',
+    'rio_guatapuri.jpg': 'assets/images/cities/valledupar/rio_guatapuri.jpg',
+    'rotonda_acordeon.jpg':
+        'assets/images/cities/valledupar/rotonda_acordeon.jpg',
+    'pilonera_mayor.jpg': 'assets/images/cities/valledupar/pilonera_mayor.jpg',
+    'cover_0.jpg': 'assets/images/cities/valledupar/plaza_alfonso_lopez.jpg',
+    'cover_1.jpg': 'assets/images/cities/valledupar/rio_guatapuri.jpg',
+    'cover_2.jpg': 'assets/images/cities/valledupar/rotonda_acordeon.jpg',
+    'cover_3.jpg': 'assets/images/cities/valledupar/pilonera_mayor.jpg',
+    'cover_4.jpg': 'assets/images/cities/valledupar/catedral_ecce_homo.jpg',
+  };
+
+  /// Resuelve una ruta `assets/images/...` si [storagePath] corresponde a una
+  /// fotografía empaquetada de semilla.
+  static String? resolveBundledAssetPath(String storagePath) {
+    final trimmed = storagePath.trim();
+    if (trimmed.isEmpty) return null;
+    if (trimmed.startsWith('assets/')) return trimmed;
+    final segments = trimmed.split('/');
+    final fileName = segments.isEmpty ? trimmed : segments.last;
+    return _bundledCoverAssetByToken[fileName];
+  }
+
+  static Future<Uint8List?> _defaultLoadAssetBytes(String assetPath) async {
+    try {
+      final data = await rootBundle.load(assetPath);
+      return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    } catch (_) {
+      return null;
+    }
+  }
 
   static BusinessCategory _mapTypeToCategory(
     String? type,
@@ -348,7 +390,14 @@ class SupabaseBusinessRepository implements BusinessRepository {
               .from('business-media')
               .download(storagePath);
         } catch (_) {
-          // Si una imagen no se descarga se muestra el marcador visual sin romper la ficha.
+          // Si el objeto proviene de un seed referenciado, intenta cargar el asset empaquetado.
+          final bundledPath = resolveBundledAssetPath(storagePath);
+          if (bundledPath != null) {
+            final fallbackBytes = await assetBytesLoader(bundledPath);
+            if (fallbackBytes != null && fallbackBytes.isNotEmpty) {
+              photoBytesByPath[storagePath] = fallbackBytes;
+            }
+          }
         }
       }
     }
