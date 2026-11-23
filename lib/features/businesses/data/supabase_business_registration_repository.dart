@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:via_justa/features/businesses/data/supabase_business_repository.dart';
 import 'package:via_justa/features/businesses/domain/business_draft.dart';
 import 'package:via_justa/features/businesses/domain/business_registration_repository.dart';
 import 'package:via_justa/features/businesses/domain/business_validator.dart';
@@ -393,9 +394,25 @@ class SupabaseBusinessRegistrationRepository
           final storagePath = (item['storage_path'] as String?) ?? '';
           if (storagePath.isEmpty) continue;
           _checkOwner(ownerId);
-          final Uint8List bytes = await _client.storage
-              .from('business-media')
-              .download(storagePath);
+          Uint8List? bytes;
+          try {
+            bytes = await _client.storage
+                .from('business-media')
+                .download(storagePath);
+          } catch (_) {
+            final bundledPath =
+                SupabaseBusinessRepository.resolveBundledAssetPath(storagePath);
+            if (bundledPath != null) {
+              try {
+                final data = await rootBundle.load(bundledPath);
+                bytes = data.buffer.asUint8List(
+                  data.offsetInBytes,
+                  data.lengthInBytes,
+                );
+              } catch (_) {}
+            }
+          }
+          if (bytes == null || bytes.isEmpty) continue;
           final extension = businessImageExtension(bytes) ?? 'jpg';
           photos.add(
             BusinessPhoto(
