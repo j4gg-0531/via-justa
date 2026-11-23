@@ -300,7 +300,7 @@ if (import.meta.main) {
     modelClient: new GeminiContractModelClient({
       apiKey: geminiApiKey,
       model: geminiModel,
-      timeoutMs: 25000,
+      timeoutMs: 45000,
     }),
   });
 

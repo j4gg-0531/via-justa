@@ -82,7 +82,8 @@ class _AuthSessionListenable extends ChangeNotifier {
       authControllerProvider,
       (previous, next) {
         if (previous?.isAuthenticated != next.isAuthenticated ||
-            previous?.isRestoring != next.isRestoring) {
+            previous?.isRestoring != next.isRestoring ||
+            previous?.needsLegalConsent != next.needsLegalConsent) {
           notifyListeners();
         }
       },
@@ -113,6 +114,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         status: status,
         hasSelectedProfile: hasProfile,
         hasSelectedPilotMunicipality: selectedMunicipality?.isPilot ?? false,
+        needsLegalConsent: authState.needsLegalConsent,
       );
     },
     routes: [

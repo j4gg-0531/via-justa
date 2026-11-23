@@ -52,6 +52,9 @@ class _ProfileFakeAuthRepository implements AuthRepository {
       _session!;
 
   @override
+  Future<bool> signInWithGoogle() async => true;
+
+  @override
   Future<SignUpResult> signUp({
     required String email,
     required String password,
@@ -72,6 +75,22 @@ class _ProfileFakeAuthRepository implements AuthRepository {
     }
     _session = null;
   }
+
+  @override
+  Future<void> updatePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {}
+
+  @override
+  Future<void> sendPasswordResetEmail(String email) async {}
+
+  @override
+  Future<void> verifyRecoveryOtpAndResetPassword({
+    required String email,
+    required String token,
+    required String newPassword,
+  }) async {}
 
   @override
   Future<UserProfile?> fetchProfile(String userId) async =>
@@ -98,6 +117,13 @@ class _ProfileFakeAuthRepository implements AuthRepository {
     required List<ConsentDocType> documents,
     required String version,
   }) async {}
+
+  @override
+  Future<bool> hasAcceptedConsents({
+    required String userId,
+    required List<ConsentDocType> documents,
+    required String version,
+  }) async => true;
 
   void dispose() => _sessions.close();
 }
@@ -148,20 +174,23 @@ void main() {
     expect(container.read(profileTypeProvider), isNull);
 
     // Tap change profile button
-    await tester.tap(find.text('home.change_city').first);
+    await tester.tap(find.text('profile.change_profile'));
     await tester.pumpAndSettle();
 
     expect(find.text('profile.dialog_profile_title'), findsOneWidget);
     expect(find.text('onboarding.settler.title'), findsOneWidget);
+    expect(find.text('onboarding.settler.description'), findsOneWidget);
 
-    // Select settler
+    // Select settler and confirm with Save
     await tester.tap(find.text('onboarding.settler.title'));
+    await tester.pump();
+    await tester.tap(find.text('common.save'));
     await tester.pumpAndSettle();
 
     expect(container.read(profileTypeProvider), ProfileType.settler);
   });
 
-  testWidgets('sign out clears complete user session state', (tester) async {
+  testWidgets('sign out requires confirmation dialog and clears complete user session state', (tester) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
@@ -194,6 +223,10 @@ void main() {
 
     await tester.ensureVisible(find.text('profile.sign_out'));
     await tester.tap(find.text('profile.sign_out'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('profile.sign_out_dialog_title'), findsOneWidget);
+    await tester.tap(find.text('profile.sign_out_confirm_cta'));
     await tester.pumpAndSettle();
 
     // Verify all session state was reset

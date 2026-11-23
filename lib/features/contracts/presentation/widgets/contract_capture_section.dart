@@ -280,12 +280,17 @@ class _ContractCaptureSectionState
                     ),
                   ),
                   OutlinedButton.icon(
-                    onPressed: captureNotifier.notifyPdfComingSoon,
+                    onPressed: captureState.status ==
+                            ContractCaptureStatus.readingDocument
+                        ? null
+                        : () => captureNotifier.requestFilePicker(
+                              languageCode: languageCode,
+                            ),
                     icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
                     label: Text('contract_capture.pdf_coming_soon_chip'.tr()),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.textSecondary,
-                      side: const BorderSide(color: AppColors.border),
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
                       minimumSize: const Size(48, 48),
                     ),
                   ),
@@ -366,24 +371,45 @@ class _ContractCaptureSectionState
               borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(color: AppColors.primary, width: 1.5),
             ),
-            child: Row(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
-                  Icons.warning_amber_rounded,
-                  color: AppColors.primary,
-                  size: 22,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        _resolveErrorMessage(captureState),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    _resolveErrorMessage(captureState),
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
+                if (captureState.error ==
+                    ContractCaptureError.exceedsMaxLength) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: captureNotifier.trimToMaxLength,
+                      icon: const Icon(Icons.content_cut, size: 16),
+                      label: Text('contract_capture.trim_to_limit_cta'.tr()),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        minimumSize: const Size(48, 48),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

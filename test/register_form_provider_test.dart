@@ -15,7 +15,7 @@ void main() {
       container.listen(registerFormProvider, (previous, next) {});
     });
 
-    test('submit with empty fields exposes the four errors', () {
+    test('submit with empty fields exposes the five errors', () {
       final result = container.read(registerFormProvider.notifier).submit();
 
       expect(result, isFalse);
@@ -23,6 +23,7 @@ void main() {
       expect(state.nameError, NameError.empty);
       expect(state.emailError, EmailError.empty);
       expect(state.passwordError, PasswordError.empty);
+      expect(state.confirmPasswordError, ConfirmPasswordError.empty);
       expect(state.termsError, isTrue);
       expect(container.read(userNameProvider), isNull);
     });
@@ -33,13 +34,30 @@ void main() {
       notifier.setName('Juan García');
       notifier.setEmail('juan@correo.com');
       notifier.setPassword('12345678');
+      notifier.setConfirmPassword('12345678');
 
       expect(notifier.submit(), isFalse);
       final state = container.read(registerFormProvider);
       expect(state.nameError, isNull);
       expect(state.emailError, isNull);
       expect(state.passwordError, isNull);
+      expect(state.confirmPasswordError, isNull);
       expect(state.termsError, isTrue);
+      expect(container.read(userNameProvider), isNull);
+    });
+
+    test('mismatched confirm password fails with mismatch error', () {
+      final notifier = container.read(registerFormProvider.notifier);
+
+      notifier.setName('Juan García');
+      notifier.setEmail('juan@correo.com');
+      notifier.setPassword('12345678');
+      notifier.setConfirmPassword('87654321');
+      notifier.setTermsAccepted(true);
+
+      expect(notifier.submit(), isFalse);
+      final state = container.read(registerFormProvider);
+      expect(state.confirmPasswordError, ConfirmPasswordError.mismatch);
       expect(container.read(userNameProvider), isNull);
     });
 
@@ -49,6 +67,7 @@ void main() {
       notifier.setName('Juan García');
       notifier.setEmail('juan@correo.com');
       notifier.setPassword('12345678');
+      notifier.setConfirmPassword('12345678');
       notifier.setTermsAccepted(true);
 
       expect(notifier.submit(), isTrue);

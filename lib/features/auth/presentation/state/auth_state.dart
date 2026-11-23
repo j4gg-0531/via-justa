@@ -10,6 +10,7 @@ class AuthState {
     this.profile,
     this.isBusy = false,
     this.isRestoring = false,
+    this.needsLegalConsent = false,
     this.failure,
     this.usesDemoData = false,
   });
@@ -23,6 +24,9 @@ class AuthState {
   /// `true` durante el arranque de la app mientras se verifica si hay una
   /// sesión previa persistida en el almacenamiento local.
   final bool isRestoring;
+
+  /// `true` cuando la sesión externa aún no registra consentimientos legales vigentes.
+  final bool needsLegalConsent;
 
   /// Último fallo tipado; la vista lo traduce a texto.
   final AuthFailure? failure;
@@ -39,6 +43,7 @@ class AuthState {
     UserProfile? profile,
     bool? isBusy,
     bool? isRestoring,
+    bool? needsLegalConsent,
     AuthFailure? failure,
     bool clearFailure = false,
     bool? usesDemoData,
@@ -48,6 +53,7 @@ class AuthState {
       profile: profile ?? this.profile,
       isBusy: isBusy ?? this.isBusy,
       isRestoring: isRestoring ?? this.isRestoring,
+      needsLegalConsent: needsLegalConsent ?? this.needsLegalConsent,
       failure: clearFailure ? null : (failure ?? this.failure),
       usesDemoData: usesDemoData ?? this.usesDemoData,
     );

@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:via_justa/features/contracts/data/local_contract_ocr_repository.dart';
+import 'package:via_justa/features/contracts/data/pdf_contract_text_extractor.dart';
 import 'package:via_justa/features/contracts/domain/contract_capture.dart';
 import 'package:via_justa/features/contracts/domain/contract_ocr_repository.dart';
 
@@ -28,11 +29,13 @@ typedef ContractFilePicker = Future<PickedContractFile?> Function();
 /// Ejecuta OCR local sobre la imagen en [imagePath] y retorna el texto reconocido.
 typedef ImageTextRecognizer = Future<String> Function(String imagePath);
 
+/// Extrae el texto de un archivo PDF local en [pdfPath].
+typedef PdfTextExtractor = Future<String> Function(String pdfPath);
+
 /// Limpia la carpeta de caché que administra el selector de archivos.
 typedef PickerCacheCleaner = Future<void> Function();
 
-/// Extensiones que se muestran en el selector. `pdf` se incluye a propósito para que el
-/// usuario reciba el aviso "Próximamente" en vez de no ver su archivo.
+/// Extensiones admitidas en el selector de archivos (`JPG`, `JPEG`, `PNG`, `TXT`, `PDF`).
 const List<String> contractPickerExtensions = <String>[
   'jpg',
   'jpeg',
@@ -58,18 +61,21 @@ class DeviceContractOcrRepository implements ContractOcrRepository {
     CameraImagePicker? pickCameraImage,
     ContractFilePicker? pickContractFile,
     ImageTextRecognizer? recognizeImageText,
+    PdfTextExtractor? extractPdfText,
     PickerCacheCleaner? clearFilePickerCache,
     this.cacheDirectory,
     LocalContractOcrRepository? syntheticRepository,
   }) : _pickCameraImage = pickCameraImage ?? _pickImageWithCamera,
        _pickContractFile = pickContractFile ?? _pickFileWithSystemPicker,
        _recognizeImageText = recognizeImageText ?? _recognizeWithMlKit,
+       _extractPdfText = extractPdfText ?? extractTextFromPdfFile,
        _clearFilePickerCache = clearFilePickerCache ?? FilePicker.clearTemporaryFiles,
        _syntheticRepository = syntheticRepository ?? LocalContractOcrRepository();
 
   final CameraImagePicker _pickCameraImage;
   final ContractFilePicker _pickContractFile;
   final ImageTextRecognizer _recognizeImageText;
+  final PdfTextExtractor _extractPdfText;
   final PickerCacheCleaner _clearFilePickerCache;
   /// Carpeta de caché donde image_picker deja sus archivos; inyectable para pruebas.
   final Directory? cacheDirectory;
@@ -169,9 +175,14 @@ class DeviceContractOcrRepository implements ContractOcrRepository {
           validateContractFileExtension(fileName) == null &&
           validateContractFileSize(sizeBytes) == null;
       if (canRead) {
-        text = extractFileExtension(fileName) == 'txt'
-            ? utf8.decode(file.readAsBytesSync(), allowMalformed: true)
-            : await _recognizeImageText(filePath);
+        final ext = extractFileExtension(fileName);
+        if (ext == 'txt') {
+          text = utf8.decode(file.readAsBytesSync(), allowMalformed: true);
+        } else if (ext == 'pdf') {
+          text = await _extractPdfText(filePath);
+        } else {
+          text = await _recognizeImageText(filePath);
+        }
       }
     } finally {
       deleted = _deleteFileSync(filePath);

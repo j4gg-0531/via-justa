@@ -24,6 +24,7 @@ class DemoAuthRepository implements AuthRepository {
 
   AuthSession? _session;
   UserProfile? _profile;
+  final Set<String> _acceptedConsents = <String>{};
 
   @override
   bool get usesDemoData => true;
@@ -51,8 +52,26 @@ class DemoAuthRepository implements AuthRepository {
     final session = AuthSession(userId: demoUserId, email: email);
     _session = session;
     _profile ??= UserProfile(id: demoUserId);
+    _markAllConsentsAccepted(consentDocumentVersion);
     _sessions.add(session);
     return session;
+  }
+
+  @override
+  Future<bool> signInWithGoogle() async {
+    const session = AuthSession(
+      userId: demoUserId,
+      email: 'google.demo@viajusta.co',
+      isExternalProvider: true,
+      suggestedDisplayName: 'Usuario Google Demo',
+    );
+    _session = session;
+    _profile ??= const UserProfile(
+      id: demoUserId,
+      displayName: 'Usuario Google Demo',
+    );
+    _sessions.add(session);
+    return true;
   }
 
   @override
@@ -64,6 +83,7 @@ class DemoAuthRepository implements AuthRepository {
     final session = AuthSession(userId: demoUserId, email: email);
     _session = session;
     _profile = UserProfile(id: demoUserId, displayName: displayName);
+    _markAllConsentsAccepted(consentDocumentVersion);
     _sessions.add(session);
     return SignUpResult(session: session);
   }
@@ -72,12 +92,35 @@ class DemoAuthRepository implements AuthRepository {
   Future<void> signOut() async {
     _session = null;
     _profile = null;
+    _acceptedConsents.clear();
     _sessions.add(null);
   }
 
   @override
   Future<void> deleteAccount() async {
     await signOut();
+  }
+
+  @override
+  Future<void> updatePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    // En modo DEMO la actualización de contraseña se simula en memoria.
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail(String email) async {
+    // En modo DEMO el envío de código de recuperación se simula sin red.
+  }
+
+  @override
+  Future<void> verifyRecoveryOtpAndResetPassword({
+    required String email,
+    required String token,
+    required String newPassword,
+  }) async {
+    // En modo DEMO la verificación del código OTP y cambio de clave se simula en memoria.
   }
 
   @override
@@ -118,7 +161,26 @@ class DemoAuthRepository implements AuthRepository {
     required List<ConsentDocType> documents,
     required String version,
   }) async {
-    // En modo DEMO no hay servidor: la aceptación solo se refleja en la UI.
+    for (final document in documents) {
+      _acceptedConsents.add('${version}_${document.wireValue}');
+    }
+  }
+
+  @override
+  Future<bool> hasAcceptedConsents({
+    required String userId,
+    required List<ConsentDocType> documents,
+    required String version,
+  }) async {
+    return documents.every(
+      (document) => _acceptedConsents.contains('${version}_${document.wireValue}'),
+    );
+  }
+
+  void _markAllConsentsAccepted(String version) {
+    for (final document in ConsentDocType.values) {
+      _acceptedConsents.add('${version}_${document.wireValue}');
+    }
   }
 
   /// Libera el stream al destruir el contenedor de pruebas.

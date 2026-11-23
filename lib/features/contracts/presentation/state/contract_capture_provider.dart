@@ -387,6 +387,13 @@ class ContractCaptureNotifier extends Notifier<ContractCaptureState> {
     );
   }
 
+  /// Recorta el texto al máximo de 15.000 caracteres bajo acción explícita del usuario.
+  void trimToMaxLength() {
+    if (state.text.isEmpty) return;
+    final trimmed = trimContractTextToMaxLength(state.text);
+    updateContractText(trimmed);
+  }
+
   /// Descarta el documento actual, borra cualquier archivo temporal remanente del caché (`RN-10`)
   /// y limpia el texto de la memoria.
   Future<void> discardDocument() async {

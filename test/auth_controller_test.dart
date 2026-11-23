@@ -11,6 +11,7 @@ import 'package:via_justa/features/auth/domain/consent_document.dart';
 import 'package:via_justa/features/auth/domain/sign_up_result.dart';
 import 'package:via_justa/features/auth/domain/user_profile.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
+import 'package:via_justa/features/auth/presentation/state/password_management_providers.dart';
 import 'package:via_justa/features/onboarding/domain/profile_type.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
 
@@ -30,10 +31,15 @@ class _FakeAuthRepository implements AuthRepository {
   int deleteAccountCalls = 0;
 
   final List<ConsentDocType> recordedConsents = <ConsentDocType>[];
+  final Set<String> acceptedConsentKeys = <String>{};
   final List<String> savedDisplayNames = <String>[];
   final List<String> savedLanguages = <String>[];
   final List<ProfileType> savedProfileTypes = <ProfileType>[];
   final List<String> savedMunicipalityCodes = <String>[];
+  final List<String> verifiedCurrentPasswords = <String>[];
+  final List<String> updatedPasswords = <String>[];
+  final List<String> resetEmails = <String>[];
+  final List<String> verifiedOtpTokens = <String>[];
 
   @override
   bool get usesDemoData => false;
@@ -56,6 +62,19 @@ class _FakeAuthRepository implements AuthRepository {
     final session = AuthSession(userId: 'user-1', email: email);
     storedSession = session;
     return session;
+  }
+
+  @override
+  Future<bool> signInWithGoogle() async {
+    final failure = signInFailure;
+    if (failure != null) throw failure;
+    storedSession ??= const AuthSession(
+      userId: 'google-user-1',
+      email: 'garciagonzalezj04@gmail.com',
+      isExternalProvider: true,
+      suggestedDisplayName: 'Juan Garcia',
+    );
+    return true;
   }
 
   @override
@@ -88,6 +107,31 @@ class _FakeAuthRepository implements AuthRepository {
     if (failure != null) throw failure;
     storedSession = null;
     storedProfile = null;
+    acceptedConsentKeys.clear();
+  }
+
+  @override
+  Future<void> updatePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    verifiedCurrentPasswords.add(currentPassword);
+    updatedPasswords.add(newPassword);
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail(String email) async {
+    resetEmails.add(email);
+  }
+
+  @override
+  Future<void> verifyRecoveryOtpAndResetPassword({
+    required String email,
+    required String token,
+    required String newPassword,
+  }) async {
+    verifiedOtpTokens.add('$email:$token');
+    updatedPasswords.add(newPassword);
   }
 
   @override
@@ -129,6 +173,20 @@ class _FakeAuthRepository implements AuthRepository {
     required String version,
   }) async {
     recordedConsents.addAll(documents);
+    for (final document in documents) {
+      acceptedConsentKeys.add('${version}_${document.wireValue}');
+    }
+  }
+
+  @override
+  Future<bool> hasAcceptedConsents({
+    required String userId,
+    required List<ConsentDocType> documents,
+    required String version,
+  }) async {
+    return documents.every(
+      (document) => acceptedConsentKeys.contains('${version}_${document.wireValue}'),
+    );
   }
 
   void dispose() => _sessions.close();
@@ -327,6 +385,107 @@ void main() {
         container.read(authControllerProvider).failure?.kind,
         AuthFailureKind.network,
       );
+    });
+
+    test('changePassword requires currentPassword and forgotPassword completes 2-step OTP reset', () async {
+      final repository = _FakeAuthRepository();
+      final container = _containerWith(repository);
+      container.listen(changePasswordFormProvider, (_, _) {});
+      container.listen(forgotPasswordFormProvider, (_, _) {});
+
+      final changeNotifier = container.read(changePasswordFormProvider.notifier);
+      changeNotifier.setNewPassword('nuevo1234');
+      changeNotifier.setConfirmPassword('nuevo1234');
+      // Fails without current password
+      expect(await changeNotifier.submit(), isFalse);
+      expect(repository.updatedPasswords, isEmpty);
+
+      changeNotifier.setCurrentPassword('actual123');
+      expect(await changeNotifier.submit(), isTrue);
+      expect(repository.verifiedCurrentPasswords, ['actual123']);
+      expect(repository.updatedPasswords, ['nuevo1234']);
+
+      final forgotNotifier = container.read(forgotPasswordFormProvider.notifier);
+      forgotNotifier.setEmail('invalido');
+      expect(await forgotNotifier.requestCode(), isFalse);
+      expect(repository.resetEmails, isEmpty);
+
+      forgotNotifier.setEmail('ana@viajusta.co');
+      expect(await forgotNotifier.requestCode(), isTrue);
+      expect(repository.resetEmails, ['ana@viajusta.co']);
+      expect(container.read(forgotPasswordFormProvider).codeSent, isTrue);
+
+      // Step 2: verify OTP and set new password
+      forgotNotifier.setOtpCode('123');
+      forgotNotifier.setNewPassword('recuperada123');
+      forgotNotifier.setConfirmPassword('recuperada123');
+      expect(await forgotNotifier.verifyOtpAndReset(), isFalse);
+
+      forgotNotifier.setOtpCode('654321');
+      expect(await forgotNotifier.verifyOtpAndReset(), isTrue);
+      expect(repository.verifiedOtpTokens, ['ana@viajusta.co:654321']);
+      expect(repository.updatedPasswords, ['nuevo1234', 'recuperada123']);
+    });
+
+    test('new Google account requires legal consent and upgrades email-prefix display name', () async {
+      final repository = _FakeAuthRepository()
+        ..storedProfile = const UserProfile(
+          id: 'google-user-1',
+          displayName: 'garciagonzalezj04',
+        );
+      final container = _containerWith(repository);
+      final controller = container.read(authControllerProvider.notifier);
+
+      expect(await controller.signInWithGoogle(), isTrue);
+
+      final state = container.read(authControllerProvider);
+      expect(state.isAuthenticated, isTrue);
+      expect(state.needsLegalConsent, isTrue);
+      expect(repository.savedDisplayNames, ['Juan Garcia']);
+      expect(container.read(userNameProvider), 'Juan Garcia');
+
+      expect(await controller.acceptPendingConsents(), isTrue);
+      expect(container.read(authControllerProvider).needsLegalConsent, isFalse);
+      expect(repository.recordedConsents, ConsentDocType.values);
+    });
+
+    test('returning Google account with accepted consents preserves custom name and skips consent prompt', () async {
+      final repository = _FakeAuthRepository()
+        ..storedProfile = const UserProfile(
+          id: 'google-user-1',
+          displayName: 'Juancho Personalizado',
+          profileType: ProfileType.visitor,
+        )
+        ..acceptedConsentKeys.addAll([
+          '${consentDocumentVersion}_${ConsentDocType.termsAndConditions.wireValue}',
+          '${consentDocumentVersion}_${ConsentDocType.privacyPolicy.wireValue}',
+        ]);
+      final container = _containerWith(repository);
+      final controller = container.read(authControllerProvider.notifier);
+
+      expect(await controller.signInWithGoogle(), isTrue);
+
+      final state = container.read(authControllerProvider);
+      expect(state.needsLegalConsent, isFalse);
+      expect(repository.savedDisplayNames, isEmpty);
+      expect(container.read(userNameProvider), 'Juancho Personalizado');
+    });
+
+    test('canceling unconfirmed Google account deletes orphan account and clears state', () async {
+      final repository = _FakeAuthRepository();
+      final container = _containerWith(repository);
+      final controller = container.read(authControllerProvider.notifier);
+
+      await controller.signInWithGoogle();
+      expect(container.read(authControllerProvider).needsLegalConsent, isTrue);
+      expect(container.read(userNameProvider), 'Juan Garcia');
+
+      await container.read(sessionControllerProvider).cancelPendingRegistration();
+
+      expect(repository.deleteAccountCalls, 1);
+      expect(container.read(authControllerProvider).isAuthenticated, isFalse);
+      expect(container.read(authControllerProvider).needsLegalConsent, isFalse);
+      expect(container.read(userNameProvider), isNull);
     });
   });
 

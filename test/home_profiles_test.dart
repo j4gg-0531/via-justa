@@ -13,7 +13,9 @@ import 'package:via_justa/features/city/domain/city_overview.dart';
 import 'package:via_justa/features/city/domain/city_repository.dart';
 import 'package:via_justa/features/city/presentation/state/city_providers.dart';
 import 'package:via_justa/features/city/presentation/widgets/home_city_event_banner.dart';
+import 'package:via_justa/features/home/domain/settler_installation_guide.dart';
 import 'package:via_justa/features/home/presentation/pages/home_page.dart';
+import 'package:via_justa/features/home/presentation/state/settler_checklist_provider.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/onboarding/domain/profile_type.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
@@ -64,6 +66,36 @@ Widget _buildHome(ProfileType? profile) {
 }
 
 void main() {
+  test('settler installation domain functions and provider track progress and reset', () {
+    expect(countCompletedSettlerSteps(const <String>{}), 0);
+    final step1 = toggleSettlerChecklistStep(const <String>{}, 'lease_law_820');
+    expect(step1, contains('lease_law_820'));
+    expect(countCompletedSettlerSteps(step1), 1);
+
+    final ignored = toggleSettlerChecklistStep(step1, 'unknown_step');
+    expect(countCompletedSettlerSteps(ignored), 1);
+
+    final untoggled = toggleSettlerChecklistStep(step1, 'lease_law_820');
+    expect(countCompletedSettlerSteps(untoggled), 0);
+
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    expect(container.read(settlerChecklistProvider).completedCount, 0);
+    expect(container.read(settlerChecklistProvider).totalCount, 4);
+
+    container.read(settlerChecklistProvider.notifier).toggle('lease_law_820');
+    container.read(settlerChecklistProvider.notifier).toggle('civic_rights');
+    expect(container.read(settlerChecklistProvider).completedCount, 2);
+    expect(
+      container.read(settlerChecklistProvider).isCompleted('lease_law_820'),
+      isTrue,
+    );
+
+    container.read(settlerChecklistProvider.notifier).clear();
+    expect(container.read(settlerChecklistProvider).completedCount, 0);
+  });
+
   testWidgets(
     'renders visitor view by default or when visitor profile is active',
     (tester) async {
@@ -98,7 +130,7 @@ void main() {
     },
   );
 
-  testWidgets('renders settler view with procedures and documents cards', (
+  testWidgets('renders settler view with interactive installation guide and documents card', (
     tester,
   ) async {
     await tester.pumpWidget(_buildHome(ProfileType.settler));
@@ -110,11 +142,18 @@ void main() {
     expect(find.text('home.procedures_title'), findsOneWidget);
     expect(find.text('home.documents_title'), findsOneWidget);
 
-    // Tapping procedures card opens feature dialog
+    // Tapping procedures card opens interactive settler installation guide dialog
     await tester.tap(find.text('home.procedures_title'));
     await tester.pumpAndSettle();
 
-    expect(find.text('home.feature_dialog_body'), findsOneWidget);
+    expect(find.text('home.settler_guide_title'), findsOneWidget);
+    expect(find.text('home.settler_step_lease_title'), findsOneWidget);
+    expect(find.text('home.settler_step_rights_title'), findsOneWidget);
+    expect(find.text('home.settler_step_fares_title'), findsOneWidget);
+    expect(find.text('home.settler_step_directory_title'), findsOneWidget);
+
+    await tester.tap(find.text('home.settler_step_lease_title'));
+    await tester.pump();
     await tester.tap(find.text('common.close'));
     await tester.pumpAndSettle();
   });

@@ -10,13 +10,13 @@ Widget _buildPage(Widget page) {
 }
 
 void main() {
-  testWidgets('login hides coming-soon buttons and shows email/password errors', (
+  testWidgets('login renders Google button, shows email/password errors and opens forgot-password dialog', (
     tester,
   ) async {
     await tester.pumpWidget(_buildPage(const LoginPage()));
 
-    expect(find.text('login.google'), findsNothing);
-    expect(find.text('auth.forgot_password'), findsNothing);
+    expect(find.text('login.google'), findsOneWidget);
+    expect(find.text('auth.forgot_password'), findsOneWidget);
 
     await tester.ensureVisible(find.text('common.continue'));
     await tester.tap(find.text('common.continue'));
@@ -24,14 +24,21 @@ void main() {
 
     expect(find.text('auth.error.email_empty'), findsOneWidget);
     expect(find.text('auth.error.password_empty'), findsOneWidget);
+
+    await tester.tap(find.text('auth.forgot_password'));
+    await tester.pumpAndSettle();
+    expect(find.text('auth.forgot_password_title'), findsOneWidget);
+    await tester.tap(find.text('common.close'));
+    await tester.pumpAndSettle();
   });
 
-  testWidgets('register hides coming-soon Google button and shows four errors', (
+  testWidgets('register renders Google button and shows five errors including confirm password', (
     tester,
   ) async {
     await tester.pumpWidget(_buildPage(const RegisterPage()));
 
-    expect(find.text('login.google'), findsNothing);
+    expect(find.text('login.google'), findsOneWidget);
+    expect(find.text('auth.confirm_password'), findsOneWidget);
 
     await tester.ensureVisible(find.text('register.submit'));
     await tester.tap(find.text('register.submit'));
@@ -40,6 +47,7 @@ void main() {
     expect(find.text('auth.error.name_empty'), findsOneWidget);
     expect(find.text('auth.error.email_empty'), findsOneWidget);
     expect(find.text('auth.error.password_empty'), findsOneWidget);
+    expect(find.text('auth.error.confirm_password_empty'), findsOneWidget);
     expect(find.text('auth.error.terms_required'), findsOneWidget);
   });
 

@@ -12,9 +12,13 @@ import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/features/city/presentation/state/city_providers.dart';
 import 'package:via_justa/features/city/presentation/widgets/home_city_event_banner.dart';
+import 'package:via_justa/features/home/domain/settler_installation_guide.dart';
+import 'package:via_justa/features/home/presentation/state/settler_checklist_provider.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/onboarding/domain/profile_type.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
+import 'package:via_justa/features/scan/domain/scan_mode.dart';
+import 'package:via_justa/features/scan/presentation/state/scan_providers.dart';
 
 /// Pantalla 4 · Inicio adaptado al perfil activo (M04 Instalación, M05 Visitante, M02 adaptado Residente).
 class HomePage extends ConsumerWidget {
@@ -311,7 +315,7 @@ class _VisitorHomeView extends ConsumerWidget {
 }
 
 /// M04: Inicio para Instalación / Migrante
-class _SettlerHomeView extends StatelessWidget {
+class _SettlerHomeView extends ConsumerWidget {
   const _SettlerHomeView({required this.onShowDialog});
 
   final void Function(
@@ -320,9 +324,19 @@ class _SettlerHomeView extends StatelessWidget {
     required String body,
   }) onShowDialog;
 
+  void _showSettlerGuideDialog(BuildContext context, String municipalityCode) {
+    showDialog<void>(
+      context: context,
+      builder: (_) =>
+          _SettlerInstallationGuideDialog(municipalityCode: municipalityCode),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
+    final checklist = ref.watch(settlerChecklistProvider);
+    final municipalityCode = ref.watch(activeMunicipalityCodeProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -360,22 +374,18 @@ class _SettlerHomeView extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.md),
 
-        // Tarjetas de trámites con insignia Próximamente
+        // Tarjetas de ruta de trámites interactiva y documentos planificados
         Row(
           children: [
             Expanded(
               child: VjCard(
                 padding: const EdgeInsets.all(AppSpacing.md),
-                onTap: () => onShowDialog(
-                  context,
-                  title: 'home.procedures_title'.tr(),
-                  body: 'home.feature_dialog_body'.tr(),
-                ),
+                onTap: () => _showSettlerGuideDialog(context, municipalityCode),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(
-                      Icons.description_outlined,
+                      Icons.checklist_rtl_outlined,
                       color: AppColors.primary,
                       size: 24,
                     ),
@@ -385,7 +395,14 @@ class _SettlerHomeView extends StatelessWidget {
                       style: textTheme.titleMedium?.copyWith(fontSize: 14),
                     ),
                     const SizedBox(height: AppSpacing.xs),
-                    VjBadge(label: 'common.coming_soon'.tr()),
+                    VjBadge(
+                      label: 'home.settler_guide_progress'.tr(
+                        namedArgs: {
+                          'done': '${checklist.completedCount}',
+                          'total': '${checklist.totalCount}',
+                        },
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -421,6 +438,173 @@ class _SettlerHomeView extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Diálogo interactivo con la ruta y checklist de instalación en Valledupar (`ProfileType.settler`).
+class _SettlerInstallationGuideDialog extends ConsumerWidget {
+  const _SettlerInstallationGuideDialog({required this.municipalityCode});
+
+  final String municipalityCode;
+
+  void _openStepTool(
+    BuildContext context,
+    WidgetRef ref,
+    SettlerInstallationTopic topic,
+  ) {
+    Navigator.of(context).pop();
+    final router = GoRouter.maybeOf(context);
+    if (router == null) return;
+
+    switch (topic) {
+      case SettlerInstallationTopic.leaseContract:
+        ref.read(scanModeProvider.notifier).selectMode(ScanMode.contract);
+        router.go(AppRoutes.scan);
+        break;
+      case SettlerInstallationTopic.civicGuidance:
+        router.push(AppRoutes.cityOverviewPath(municipalityCode));
+        break;
+      case SettlerInstallationTopic.referenceFares:
+        router.go(AppRoutes.map);
+        break;
+      case SettlerInstallationTopic.localDirectory:
+        router.go(AppRoutes.businesses);
+        break;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = Theme.of(context).textTheme;
+    final checklist = ref.watch(settlerChecklistProvider);
+    final notifier = ref.read(settlerChecklistProvider.notifier);
+
+    return AlertDialog(
+      scrollable: true,
+      title: Text('home.settler_guide_title'.tr()),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          VjBadge(
+            label: 'home.settler_guide_progress'.tr(
+              namedArgs: {
+                'done': '${checklist.completedCount}',
+                'total': '${checklist.totalCount}',
+              },
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'home.settler_guide_subtitle'.tr(),
+            style: textTheme.bodyMedium,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          for (var i = 0; i < kSettlerInstallationSteps.length; i++) ...[
+            _SettlerStepCard(
+              step: kSettlerInstallationSteps[i],
+              completed: checklist.isCompleted(kSettlerInstallationSteps[i].id),
+              onToggle: () => notifier.toggle(kSettlerInstallationSteps[i].id),
+              onActionTap: () => _openStepTool(
+                context,
+                ref,
+                kSettlerInstallationSteps[i].topic,
+              ),
+            ),
+            if (i < kSettlerInstallationSteps.length - 1)
+              const SizedBox(height: AppSpacing.sm),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+          child: Text('common.close'.tr()),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettlerStepCard extends StatelessWidget {
+  const _SettlerStepCard({
+    required this.step,
+    required this.completed,
+    required this.onToggle,
+    required this.onActionTap,
+  });
+
+  final SettlerInstallationStep step;
+  final bool completed;
+  final VoidCallback onToggle;
+  final VoidCallback onActionTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: completed ? AppColors.primarySoft : AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+          color: completed ? AppColors.primary : AppColors.border,
+          width: completed ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: onToggle,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    completed ? Icons.check_circle : Icons.circle_outlined,
+                    color: completed ? AppColors.primary : AppColors.textMuted,
+                    size: 22,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      step.titleKey.tr(),
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            step.descriptionKey.tr(),
+            style: textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: onActionTap,
+              icon: const Icon(Icons.arrow_forward, size: 16),
+              label: Text(step.ctaKey.tr()),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                minimumSize: const Size(48, 48),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

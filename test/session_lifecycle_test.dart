@@ -177,6 +177,9 @@ class _SessionFakeAuthRepository implements AuthRepository {
       _session!;
 
   @override
+  Future<bool> signInWithGoogle() async => true;
+
+  @override
   Future<SignUpResult> signUp({
     required String email,
     required String password,
@@ -194,6 +197,22 @@ class _SessionFakeAuthRepository implements AuthRepository {
     if (failDelete) throw const AuthFailure(AuthFailureKind.network);
     _session = null;
   }
+
+  @override
+  Future<void> updatePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {}
+
+  @override
+  Future<void> sendPasswordResetEmail(String email) async {}
+
+  @override
+  Future<void> verifyRecoveryOtpAndResetPassword({
+    required String email,
+    required String token,
+    required String newPassword,
+  }) async {}
 
   @override
   Future<UserProfile?> fetchProfile(String userId) async =>
@@ -220,6 +239,13 @@ class _SessionFakeAuthRepository implements AuthRepository {
     required List<ConsentDocType> documents,
     required String version,
   }) async {}
+
+  @override
+  Future<bool> hasAcceptedConsents({
+    required String userId,
+    required List<ConsentDocType> documents,
+    required String version,
+  }) async => true;
 
   void dispose() => _sessions.close();
 }

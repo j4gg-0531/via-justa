@@ -29,22 +29,6 @@ class BusinessesPage extends ConsumerWidget {
     }
   }
 
-  Future<void> _contactBusiness(
-    BuildContext context,
-    WidgetRef ref,
-    Business business,
-    String localeCode,
-  ) async {
-    final ok = await ref
-        .read(businessExternalActionProvider.notifier)
-        .openCardContact(business, localeCode: localeCode);
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('business_detail.action_launch_error'.tr())),
-      );
-    }
-  }
-
   Future<void> _confirmWithdraw(
     BuildContext context,
     WidgetRef ref,
@@ -252,12 +236,6 @@ class BusinessesPage extends ConsumerWidget {
                             ownerBusy: ownerBusy,
                             onTap: () =>
                                 _openBusinessDetail(context, business.id),
-                            onContactTap: () => _contactBusiness(
-                              context,
-                              ref,
-                              business,
-                              localeCode,
-                            ),
                             onEditTap: isOwner
                                 ? () => context.push(
                                     AppRoutes.businessEditPath(business.id),
@@ -391,7 +369,6 @@ class _BusinessCard extends StatelessWidget {
     required this.business,
     required this.description,
     required this.onTap,
-    required this.onContactTap,
     this.isOwner = false,
     this.ownerBusy = false,
     this.onEditTap,
@@ -401,7 +378,6 @@ class _BusinessCard extends StatelessWidget {
   final Business business;
   final String description;
   final VoidCallback onTap;
-  final VoidCallback onContactTap;
   final bool isOwner;
   final bool ownerBusy;
   final VoidCallback? onEditTap;
@@ -455,13 +431,13 @@ class _BusinessCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            alignment: WrapAlignment.end,
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
-            children: [
-              if (isOwner) ...[
+          if (isOwner) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
                 TextButton.icon(
                   onPressed: ownerBusy ? null : onEditTap,
                   icon: const Icon(Icons.edit_outlined, size: 16),
@@ -481,17 +457,8 @@ class _BusinessCard extends StatelessWidget {
                   ),
                 ),
               ],
-              TextButton.icon(
-                onPressed: onContactTap,
-                icon: const Icon(Icons.phone, size: 16),
-                label: Text('businesses.action_call'.tr()),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  minimumSize: const Size(48, 48),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ],
       ),
     );

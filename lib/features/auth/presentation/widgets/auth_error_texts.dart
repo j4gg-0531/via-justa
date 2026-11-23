@@ -22,3 +22,18 @@ String? passwordErrorText(PasswordError? error) => switch (error) {
     namedArgs: {'min': '$minPasswordLength'},
   ),
 };
+
+/// Traduce el error de confirmación de contraseña a texto; null si no hay error.
+String? confirmPasswordErrorText(ConfirmPasswordError? error) => switch (error) {
+  null => null,
+  ConfirmPasswordError.empty => 'auth.error.confirm_password_empty'.tr(),
+  ConfirmPasswordError.mismatch => 'auth.error.password_mismatch'.tr(),
+};
+
+/// Traduce el error del código OTP o enlace temporal a texto; null si no hay error.
+String? otpCodeErrorText(OtpCodeError? error) => switch (error) {
+  null => null,
+  OtpCodeError.empty => 'auth.error.otp_empty'.tr(),
+  OtpCodeError.invalid => 'auth.error.otp_invalid'.tr(),
+  OtpCodeError.expiredLink => 'auth.error.otp_expired_link'.tr(),
+};

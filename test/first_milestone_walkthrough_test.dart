@@ -234,6 +234,9 @@ void main() {
       await tester.tap(signOutBtn);
       await tester.pumpAndSettle();
 
+      await tester.tap(find.text('profile.sign_out_confirm_cta'));
+      await tester.pumpAndSettle();
+
       // Verifica regreso limpio a WelcomePage y reinicio completo del estado DEMO
       expect(find.byType(WelcomePage), findsOneWidget);
       expect(container.read(profileTypeProvider), isNull);
