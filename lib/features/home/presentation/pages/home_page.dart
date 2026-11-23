@@ -10,6 +10,8 @@ import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_badge.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
+import 'package:via_justa/features/city/presentation/state/city_providers.dart';
+import 'package:via_justa/features/city/presentation/widgets/home_city_event_banner.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/onboarding/domain/profile_type.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
@@ -42,6 +44,7 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(profileTypeProvider);
     final locationLabel = ref.watch(selectedLocationLabelProvider);
+    final municipalityCode = ref.watch(activeMunicipalityCodeProvider);
     final displayName = ref.watch(displayNameProvider);
     final textTheme = Theme.of(context).textTheme;
 
@@ -121,6 +124,9 @@ class HomePage extends ConsumerWidget {
               else
                 _VisitorHomeView(onShowDialog: _showComingSoonDialog),
 
+              // Banner de evento oficial evaluado con ventana temporal real (VJ-15)
+              const HomeCityEventBanner(),
+
               const SizedBox(height: AppSpacing.xl),
 
               // Sección de herramientas principales (común a todos los perfiles)
@@ -154,6 +160,17 @@ class HomePage extends ConsumerWidget {
                 title: 'home.businesses_action_title'.tr(),
                 subtitle: 'home.businesses_action_desc'.tr(),
                 onTap: () => context.go(AppRoutes.businesses),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _QuickActionCard(
+                icon: Icons.location_city_outlined,
+                title: 'home.city_guide_action_title'.tr(),
+                subtitle: 'home.city_guide_action_desc'.tr(),
+                onTap: () {
+                  GoRouter.maybeOf(
+                    context,
+                  )?.push(AppRoutes.cityOverviewPath(municipalityCode));
+                },
               ),
               const SizedBox(height: AppSpacing.md),
               _QuickActionCard(

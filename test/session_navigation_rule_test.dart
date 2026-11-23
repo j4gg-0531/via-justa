@@ -30,6 +30,7 @@ const _mainRoutes = <String>[
   AppRoutes.profile,
   AppRoutes.priceResult,
   AppRoutes.priceContribute,
+  '/city/20001',
 ];
 
 const _publicRoutes = <String>[
@@ -60,6 +61,10 @@ void main() {
       expect(
         classifyRoute(AppRoutes.municipalityPath('20001')),
         NavigationRouteKind.municipalitySetup,
+      );
+      expect(
+        classifyRoute(AppRoutes.cityOverviewPath('20001')),
+        NavigationRouteKind.main,
       );
       for (final route in _mainRoutes) {
         expect(classifyRoute(route), NavigationRouteKind.main, reason: route);

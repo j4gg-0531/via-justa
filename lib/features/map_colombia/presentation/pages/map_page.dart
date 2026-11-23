@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,12 +14,13 @@ import 'package:via_justa/features/map_colombia/presentation/state/map_providers
 import 'package:via_justa/features/municipality/domain/city_visual_identity.dart';
 import 'package:via_justa/features/municipality/presentation/widgets/city_cultural_illustration.dart';
 
-/// Pantalla 3 (M03 · VJ-09) · Croquis ilustrado de los 33 territorios de Colombia
-/// (32 departamentos + Bogotá, D.C.) con resaltado dinámico por zona seleccionada.
+/// Pantalla 3 (M03 · VJ-09) · Mapa editorial en blanco de los 33 territorios de
+/// Colombia (32 departamentos + Bogotá, D.C.) que cambia de color al seleccionar
+/// un departamento, manteniendo una pista sutil sobre el piloto en Cesar.
 class MapPage extends ConsumerWidget {
   const MapPage({super.key});
 
-  void _handleDepartmentSelection(
+  void _openDepartment(
     BuildContext context,
     WidgetRef ref,
     Department department,
@@ -39,14 +38,31 @@ class MapPage extends ConsumerWidget {
     }
   }
 
+  void _handleCanvasTap(
+    BuildContext context,
+    WidgetRef ref,
+    Offset localPosition,
+  ) {
+    FocusScope.of(context).unfocus();
+    final previous = ref.read(selectedDepartmentProvider);
+    final hit = ref
+        .read(selectedDepartmentProvider.notifier)
+        .selectAtCanvasOffset(localPosition.dx, localPosition.dy);
+    if (hit == null) {
+      ref.read(selectedDepartmentProvider.notifier).clear();
+      return;
+    }
+    // Si el usuario vuelve a tocar el departamento piloto ya resaltado, entra directo.
+    if (previous?.code == hit.code && hit.isAvailable) {
+      context.push(AppRoutes.departmentPath(hit.code));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final geometryAsync = ref.watch(colombiaMapGeometryProvider);
     final features = ref.watch(colombiaMapFeaturesProvider);
     final selectedDepartment = ref.watch(selectedDepartmentProvider);
-    final selectedIdentity = CityVisualIdentityCatalog.forDepartment(
-      selectedDepartment.code,
-    );
     final hasQuery = ref.watch(hasDepartmentQueryProvider);
     final suggestions = ref.watch(filteredDepartmentsProvider);
     final textTheme = Theme.of(context).textTheme;
@@ -55,7 +71,7 @@ class MapPage extends ConsumerWidget {
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // 1. Lienzo estilo Croquis de Colombia con zona seleccionada destacada
+          // 1. Lienzo editorial en blanco con resaltado dinámico al seleccionar
           Positioned.fill(
             child: Semantics(
               label: 'map.semantics'.tr(),
@@ -69,7 +85,7 @@ class MapPage extends ConsumerWidget {
             ),
           ),
 
-          // 2. Buscador flotante superior con botón de retorno (mínimo 48x48 dp)
+          // 2. Buscador flotante superior con retorno y accesos rápidos
           Positioned(
             top: 0,
             left: 0,
@@ -96,6 +112,7 @@ class MapPage extends ConsumerWidget {
                           style: IconButton.styleFrom(
                             backgroundColor: AppColors.surface,
                             foregroundColor: AppColors.textPrimary,
+                            side: const BorderSide(color: AppColors.border),
                             minimumSize: const Size(48, 48),
                           ),
                         ),
@@ -111,15 +128,30 @@ class MapPage extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    // Recuadro accesible para San Andrés y Providencia (código 88)
-                    _SanAndresInsetChip(
-                      isSelected:
-                          selectedDepartment.code == Departments.sanAndres.code,
-                      onTap: () => _handleDepartmentSelection(
-                        context,
-                        ref,
-                        Departments.sanAndres,
-                      ),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.xs,
+                      children: [
+                        _MapQuickChip(
+                          icon: Icons.public,
+                          label: 'map.san_andres_inset'.tr(),
+                          isSelected:
+                              selectedDepartment?.code ==
+                              Departments.sanAndres.code,
+                          onTap: () => ref
+                              .read(selectedDepartmentProvider.notifier)
+                              .selectDepartment(Departments.sanAndres),
+                        ),
+                        if (selectedDepartment != null)
+                          _MapQuickChip(
+                            icon: Icons.refresh,
+                            label: 'map.clear_selection'.tr(),
+                            isSelected: false,
+                            onTap: () => ref
+                                .read(selectedDepartmentProvider.notifier)
+                                .clear(),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -186,7 +218,7 @@ class MapPage extends ConsumerWidget {
                                 ref
                                     .read(departmentQueryProvider.notifier)
                                     .setQuery('');
-                                _handleDepartmentSelection(context, ref, dept);
+                                _openDepartment(context, ref, dept);
                               },
                             );
                           },
@@ -195,7 +227,7 @@ class MapPage extends ConsumerWidget {
               ),
             ),
 
-          // 4. Tarjeta inferior del departamento seleccionado con emblema ilustrado + crédito de fuente
+          // 4. Tarjeta inferior reactiva + nota honesta de fuente cartográfica
           Positioned(
             bottom: AppSpacing.lg,
             left: AppSpacing.lg,
@@ -206,76 +238,12 @@ class MapPage extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  VjCard(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.sm,
-                    ),
-                    onTap: () => _handleDepartmentSelection(
-                      context,
-                      ref,
-                      selectedDepartment,
-                    ),
-                    child: Row(
-                      children: [
-                        DepartmentCulturalEmblemBadge(
-                          identity: selectedIdentity,
-                          size: 44,
-                          highlight: selectedDepartment.isAvailable,
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Wrap(
-                                spacing: AppSpacing.xs,
-                                runSpacing: 2,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Text(
-                                    selectedDepartment.name,
-                                    style: textTheme.titleMedium?.copyWith(
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                  Text(
-                                    '· ${selectedDepartment.code}',
-                                    style: textTheme.bodySmall?.copyWith(
-                                      color: AppColors.textSecondary,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  if (selectedDepartment.isAvailable)
-                                    VjBadge(
-                                      label: 'municipality.pilot_badge'.tr(),
-                                    ),
-                                ],
-                              ),
-                              Text(
-                                selectedIdentity.tagKey.tr(),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.bodySmall?.copyWith(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                selectedDepartment.isAvailable
-                                    ? 'municipality.pilot_available'.tr()
-                                    : 'map.unavailable'.tr(),
-                                style: textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Icon(
-                          Icons.chevron_right,
-                          color: AppColors.primary,
-                        ),
-                      ],
-                    ),
+                  _MapSelectionBottomCard(
+                    selectedDepartment: selectedDepartment,
+                    onGoToCesar: () =>
+                        _openDepartment(context, ref, Departments.cesar),
+                    onTapSelected: (dept) =>
+                        _openDepartment(context, ref, dept),
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
@@ -298,7 +266,7 @@ class MapPage extends ConsumerWidget {
     required WidgetRef ref,
     required AsyncValue<ColombiaMapGeometry> geometryAsync,
     required List<DepartmentMapFeature> features,
-    required Department selectedDepartment,
+    required Department? selectedDepartment,
   }) {
     if (geometryAsync.hasError) {
       return Center(
@@ -333,8 +301,8 @@ class MapPage extends ConsumerWidget {
 
     final bounds = geometry.bounds;
     final cesarAnchor = geometry.canvasAnchorForCode(Departments.cesar.code);
-    final selectedAnchor =
-        geometry.canvasAnchorForCode(selectedDepartment.code) ?? cesarAnchor;
+    final isCesarSelected =
+        selectedDepartment?.code == Departments.cesar.code;
 
     return InteractiveViewer(
       minScale: 1,
@@ -344,7 +312,7 @@ class MapPage extends ConsumerWidget {
           AppSpacing.md,
           136,
           AppSpacing.md,
-          136,
+          144,
         ),
         child: SizedBox.expand(
           child: FittedBox(
@@ -354,17 +322,11 @@ class MapPage extends ConsumerWidget {
               height: bounds.height,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTapUp: (details) {
-                  final hit = ref
-                      .read(selectedDepartmentProvider.notifier)
-                      .selectAtCanvasOffset(
-                        details.localPosition.dx,
-                        details.localPosition.dy,
-                      );
-                  if (hit != null) {
-                    _handleDepartmentSelection(context, ref, hit);
-                  }
-                },
+                onTapUp: (details) => _handleCanvasTap(
+                  context,
+                  ref,
+                  details.localPosition,
+                ),
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
@@ -373,22 +335,19 @@ class MapPage extends ConsumerWidget {
                       painter: _ColombiaMapPainter(
                         features: features,
                         bounds: bounds,
-                        selectedCode: selectedDepartment.code,
+                        selectedCode: selectedDepartment?.code,
                         cesarAnchor: cesarAnchor,
-                        selectedAnchor: selectedAnchor,
                       ),
                     ),
                     if (cesarAnchor != null)
                       Positioned(
-                        left: cesarAnchor.x - 52,
-                        top: cesarAnchor.y - 28,
+                        left: cesarAnchor.x + 14,
+                        top: cesarAnchor.y - 26,
                         child: _DepartmentBubble(
                           department: Departments.cesar,
-                          onTap: () => _handleDepartmentSelection(
-                            context,
-                            ref,
-                            Departments.cesar,
-                          ),
+                          isSelected: isCesarSelected,
+                          onTap: () =>
+                              _openDepartment(context, ref, Departments.cesar),
                         ),
                       ),
                   ],
@@ -402,32 +361,263 @@ class MapPage extends ConsumerWidget {
   }
 }
 
-/// Pintor estilo Croquis Ilustrado de Colombia:
-/// 1. Silueta celeste desplazada (`Offset(9, 8)`) exactamente como en el croquis de referencia.
-/// 2. Contorno exterior continuo en tinta oscura (`#181F26`) que bordea el croquis de Colombia.
-/// 3. Relleno interior celeste claro unificado con divisiones departamentales sutiles.
-/// 4. Resaltado vivo de la zona/departamento seleccionado (`selectedCode`, p. ej. Cesar `20`)
-///    con su borde en tinta y adornos culturales.
+class _MapSelectionBottomCard extends StatelessWidget {
+  const _MapSelectionBottomCard({
+    required this.selectedDepartment,
+    required this.onGoToCesar,
+    required this.onTapSelected,
+  });
+
+  final Department? selectedDepartment;
+  final VoidCallback onGoToCesar;
+  final ValueChanged<Department> onTapSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final dept = selectedDepartment;
+
+    if (dept == null) {
+      return VjCard(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        onTap: onGoToCesar,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'map.select_prompt_title'.tr(),
+                        style: textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'map.select_prompt_subtitle'.tr(),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.xs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Text(
+                    'map.go_to_cesar'.tr(),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (dept.isAvailable) {
+      return Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.45),
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => onTapSelected(dept),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Wrap(
+                              spacing: AppSpacing.xs,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(dept.name, style: textTheme.titleMedium),
+                                Text(
+                                  '· ${dept.code}',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textMuted,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                VjBadge(label: 'municipality.pilot_badge'.tr()),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'map.cesar_pilot_summary'.tr(),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      const Icon(
+                        Icons.chevron_right,
+                        color: AppColors.primary,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: Text(
+                      'map.explore_department'.tr(),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppColors.surface,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return VjCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      onTap: () => onTapSelected(dept),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(dept.name, style: textTheme.titleMedium),
+              Text(
+                '· ${dept.code}',
+                style: textTheme.bodySmall?.copyWith(
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Text(
+                  'common.coming_soon'.tr(),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'map.unavailable'.tr(),
+            style: textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: onGoToCesar,
+              icon: const Icon(Icons.place_outlined, size: 16),
+              label: Text('map.go_to_cesar'.tr()),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
+                minimumSize: const Size(48, 48),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pintor editorial limpio de Colombia:
+/// 1. Sombra suave neutra para elevar el mapa sobre `AppColors.background`.
+/// 2. Departamentos en blanco puro (`AppColors.surface`) con divisiones nítidas.
+/// 3. Pista discreta en `AppColors.primarySoft` + punto azul sobre Cesar (piloto).
+/// 4. Al tocar un departamento, cambia su color: azul primario (`AppColors.primary`)
+///    para el piloto o pizarra neutro (`AppColors.textSecondary`) para próximos.
 class _ColombiaMapPainter extends CustomPainter {
   const _ColombiaMapPainter({
     required this.features,
     required this.bounds,
     required this.selectedCode,
     this.cesarAnchor,
-    this.selectedAnchor,
   });
 
   final List<DepartmentMapFeature> features;
   final MapBounds bounds;
-  final String selectedCode;
+  final String? selectedCode;
   final MapPoint? cesarAnchor;
-  final MapPoint? selectedAnchor;
-
-  static const Color _croquisOffsetFillColor = Color(0xFFB3DCFA);
-  static const Color _croquisBaseFillColor = Color(0xFFC9E6FC);
-  static const Color _croquisPilotFillColor = Color(0xFFA9D6FA);
-  static const Color _croquisOuterInkColor = Color(0xFF181F26);
-  static const Color _croquisInternalLineColor = Color(0xFF8ABBE6);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -436,86 +626,112 @@ class _ColombiaMapPainter extends CustomPainter {
       pathsByCode[feature.department.code] = _buildShapePath(feature.shape);
     }
 
-    // 1. Capa de sombra/relleno celeste desplazada (efecto croquis offset)
-    final offsetFillPaint = Paint()
+    // 1. Sombra suave neutra bajo el país completo
+    final shadowPaint = Paint()
       ..style = PaintingStyle.fill
-      ..color = _croquisOffsetFillColor;
+      ..color = AppColors.textPrimary.withValues(alpha: 0.06)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7);
     canvas.save();
-    canvas.translate(9.0, 8.0);
+    canvas.translate(0, 5);
     for (final path in pathsByCode.values) {
-      canvas.drawPath(path, offsetFillPaint);
+      canvas.drawPath(path, shadowPaint);
     }
     canvas.restore();
 
-    // 2. Contorno exterior en tinta oscura del croquis de Colombia:
-    // Al trazar primero el borde grueso negro en todos los polígonos y luego
-    // rellenar el interior encima, las fronteras internas quedan cubiertas y
-    // solo sobresale el trazo negro continuo de la silueta exterior de Colombia.
-    final outerInkPaint = Paint()
+    // 2. Perímetro exterior sutil de Colombia
+    final outerPerimeterPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..color = _croquisOuterInkColor
+      ..color = AppColors.textMuted.withValues(alpha: 0.55)
       ..strokeJoin = StrokeJoin.round
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 7.5;
+      ..strokeWidth = 3.0;
     for (final path in pathsByCode.values) {
-      canvas.drawPath(path, outerInkPaint);
+      canvas.drawPath(path, outerPerimeterPaint);
     }
 
-    // 3. Relleno interior celeste del croquis y líneas divisorias internas sutiles
+    // 3. Relleno blanco limpio y fronteras departamentales nítidas
     final baseFillPaint = Paint()..style = PaintingStyle.fill;
     final internalStrokePaint = Paint()
       ..style = PaintingStyle.stroke
-      ..color = _croquisInternalLineColor.withValues(alpha: 0.65)
+      ..color = AppColors.textMuted.withValues(alpha: 0.38)
       ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 1.1;
+      ..strokeWidth = 1.3;
 
     for (final feature in features) {
       final dept = feature.department;
       final path = pathsByCode[dept.code]!;
-      baseFillPaint.color = dept.isAvailable
-          ? _croquisPilotFillColor
-          : _croquisBaseFillColor;
+      final isSelected = selectedCode == dept.code;
+
+      if (isSelected) {
+        // Se dibuja en la capa superior (paso 4) para que su borde quede limpio.
+        baseFillPaint.color = AppColors.surface;
+      } else if (dept.isAvailable) {
+        // Pista suave del piloto activo cuando aún no está seleccionado.
+        baseFillPaint.color = AppColors.primarySoft;
+      } else {
+        baseFillPaint.color = AppColors.surface;
+      }
       canvas.drawPath(path, baseFillPaint);
       canvas.drawPath(path, internalStrokePaint);
+
+      if (!isSelected && dept.isAvailable) {
+        final pilotHintStroke = Paint()
+          ..style = PaintingStyle.stroke
+          ..color = AppColors.primary.withValues(alpha: 0.72)
+          ..strokeJoin = StrokeJoin.round
+          ..strokeWidth = 2.0;
+        canvas.drawPath(path, pilotHintStroke);
+      }
     }
 
-    // 4. Destacar encima la zona/departamento actualmente seleccionado (ej. Cesar)
-    for (final feature in features) {
-      final dept = feature.department;
-      if (dept.code != selectedCode) continue;
+    // 4. Departamento seleccionado con cambio de color claro y jerárquico
+    if (selectedCode != null) {
+      for (final feature in features) {
+        final dept = feature.department;
+        if (dept.code != selectedCode) continue;
 
-      final path = pathsByCode[dept.code]!;
-      final identity = CityVisualIdentityCatalog.forDepartment(dept.code);
-      final accentColor = Color(identity.accentHex);
+        final path = pathsByCode[dept.code]!;
+        final selectedFillPaint = Paint()
+          ..style = PaintingStyle.fill
+          ..color = dept.isAvailable
+              ? AppColors.primary
+              : AppColors.textSecondary;
 
-      // Relleno destacado de la zona seleccionada
-      final selectedFillPaint = Paint()
-        ..style = PaintingStyle.fill
-        ..color = dept.isAvailable
-            ? const Color(0xFF3B82F6).withValues(alpha: 0.82)
-            : accentColor.withValues(alpha: 0.72);
+        final selectedBorderPaint = Paint()
+          ..style = PaintingStyle.stroke
+          ..color = dept.isAvailable
+              ? AppColors.textPrimary.withValues(alpha: 0.35)
+              : AppColors.textPrimary
+          ..strokeJoin = StrokeJoin.round
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = 2.6;
 
-      // Contorno tipo croquis para separar con nitidez la zona seleccionada
-      final selectedBorderPaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..color = _croquisOuterInkColor
-        ..strokeJoin = StrokeJoin.round
-        ..strokeCap = StrokeCap.round
-        ..strokeWidth = 3.2;
-
-      canvas.drawPath(path, selectedFillPaint);
-      canvas.drawPath(path, selectedBorderPaint);
+        canvas.drawPath(path, selectedFillPaint);
+        canvas.drawPath(path, selectedBorderPaint);
+      }
     }
 
-    // 5. Adorno ilustrado sutil de flores amarillas de Cañaguate alrededor del Cesar
-    if (cesarAnchor != null) {
-      _paintSubtleCanaguateGarnish(
-        canvas,
-        Offset(cesarAnchor!.x, cesarAnchor!.y),
+    // 5. Punto indicador limpio en Cesar cuando no está seleccionado
+    if (cesarAnchor != null && selectedCode != Departments.cesar.code) {
+      final anchor = Offset(cesarAnchor!.x, cesarAnchor!.y);
+      canvas.drawCircle(
+        anchor,
+        9.5,
+        Paint()..color = AppColors.primary.withValues(alpha: 0.18),
+      );
+      canvas.drawCircle(
+        anchor,
+        5.5,
+        Paint()..color = AppColors.surface,
+      );
+      canvas.drawCircle(
+        anchor,
+        3.8,
+        Paint()..color = AppColors.primary,
       );
     }
 
-    // 6. Recuadro guía alrededor del archipiélago de San Andrés y Providencia (esquina sup. izq.)
+    // 6. Recuadro guía alrededor del archipiélago de San Andrés y Providencia
     final insetRect = RRect.fromRectAndRadius(
       const Rect.fromLTWH(-8, -8, 42, 62),
       const Radius.circular(AppRadius.sm),
@@ -524,54 +740,9 @@ class _ColombiaMapPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..color = selectedCode == Departments.sanAndres.code
           ? AppColors.primary
-          : _croquisOuterInkColor.withValues(alpha: 0.45)
-      ..strokeWidth = 1.8;
+          : AppColors.textMuted.withValues(alpha: 0.45)
+      ..strokeWidth = 1.6;
     canvas.drawRRect(insetRect, insetPaint);
-  }
-
-  void _paintSubtleCanaguateGarnish(Canvas canvas, Offset anchor) {
-    const goldColor = Color(0xFFFFCA28);
-    _drawMiniBlossom(
-      canvas,
-      Offset(anchor.dx + 22, anchor.dy - 28),
-      6.2,
-      goldColor,
-    );
-    _drawMiniBlossom(
-      canvas,
-      Offset(anchor.dx - 24, anchor.dy + 20),
-      5.4,
-      goldColor,
-    );
-    _drawMiniBlossom(
-      canvas,
-      Offset(anchor.dx + 18, anchor.dy + 24),
-      4.8,
-      goldColor,
-    );
-  }
-
-  void _drawMiniBlossom(
-    Canvas canvas,
-    Offset center,
-    double radius,
-    Color petalColor,
-  ) {
-    final petalPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = petalColor;
-    for (var i = 0; i < 5; i++) {
-      final angle = (i * 2 * math.pi / 5) - (math.pi / 2);
-      final offset = Offset(
-        center.dx + math.cos(angle) * (radius * 0.6),
-        center.dy + math.sin(angle) * (radius * 0.6),
-      );
-      canvas.drawCircle(offset, radius * 0.52, petalPaint);
-    }
-    final corePaint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = const Color(0xFFE65100);
-    canvas.drawCircle(center, radius * 0.28, corePaint);
   }
 
   Path _buildShapePath(DepartmentShape shape) {
@@ -600,12 +771,16 @@ class _ColombiaMapPainter extends CustomPainter {
   }
 }
 
-class _SanAndresInsetChip extends StatelessWidget {
-  const _SanAndresInsetChip({
+class _MapQuickChip extends StatelessWidget {
+  const _MapQuickChip({
+    required this.icon,
+    required this.label,
     required this.isSelected,
     required this.onTap,
   });
 
+  final IconData icon;
+  final String label;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -636,7 +811,7 @@ class _SanAndresInsetChip extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  Icons.public,
+                  icon,
                   size: 16,
                   color: isSelected
                       ? AppColors.primary
@@ -645,7 +820,7 @@ class _SanAndresInsetChip extends StatelessWidget {
                 const SizedBox(width: AppSpacing.xs),
                 Flexible(
                   child: Text(
-                    'map.san_andres_inset'.tr(),
+                    label,
                     style: textTheme.bodySmall?.copyWith(
                       color: isSelected
                           ? AppColors.primary
@@ -666,35 +841,43 @@ class _SanAndresInsetChip extends StatelessWidget {
 class _DepartmentBubble extends StatelessWidget {
   const _DepartmentBubble({
     required this.department,
+    required this.isSelected,
     required this.onTap,
   });
 
   final Department department;
+  final bool isSelected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final backgroundColor =
+        isSelected ? AppColors.textPrimary : AppColors.surface;
+    final foregroundColor =
+        isSelected ? AppColors.surface : AppColors.textPrimary;
+    final borderColor = isSelected ? AppColors.textPrimary : AppColors.primary;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         child: ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           child: Center(
             child: Container(
               padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
+                horizontal: AppSpacing.md,
                 vertical: AppSpacing.xs,
               ),
               decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(color: const Color(0xFF181F26), width: 1.5),
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: borderColor, width: 1.5),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.16),
-                    blurRadius: 5,
+                    color: AppColors.textPrimary.withValues(alpha: 0.14),
+                    blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
                 ],
@@ -703,35 +886,26 @@ class _DepartmentBubble extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFCA28).withValues(alpha: 0.32),
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
                       shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      department.isAvailable
-                          ? Icons.music_note_rounded
-                          : Icons.place_rounded,
-                      size: 13,
-                      color: department.isAvailable
-                          ? const Color(0xFFD84315)
-                          : AppColors.primary,
                     ),
                   ),
                   const SizedBox(width: 6),
                   Text(
                     department.name,
-                    style: const TextStyle(
-                      color: Color(0xFF181F26),
-                      fontWeight: FontWeight.w800,
+                    style: TextStyle(
+                      color: foregroundColor,
+                      fontWeight: FontWeight.w700,
                       fontSize: 13,
                     ),
                   ),
                   const SizedBox(width: 2),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right,
-                    color: AppColors.primary,
+                    color: isSelected ? AppColors.surface : AppColors.primary,
                     size: 18,
                   ),
                 ],

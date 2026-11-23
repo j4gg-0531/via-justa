@@ -53,13 +53,20 @@ final colombiaMapFeaturesProvider = Provider<List<DepartmentMapFeature>>((ref) {
   );
 });
 
-/// Departamento actualmente resaltado en el mapa de Colombia (por defecto Cesar).
-class SelectedDepartmentNotifier extends Notifier<Department> {
+/// Departamento actualmente resaltado en el mapa de Colombia.
+/// Inicia en `null` para mostrar el mapa en blanco limpio con pista sutil en Cesar;
+/// al seleccionar un departamento cambia su color y actualiza la tarjeta inferior.
+class SelectedDepartmentNotifier extends Notifier<Department?> {
   @override
-  Department build() => Departments.cesar;
+  Department? build() => null;
 
   void selectDepartment(Department department) {
     state = department;
+  }
+
+  /// Limpia la selección para volver a ver el mapa completo en blanco.
+  void clear() {
+    state = null;
   }
 
   /// Selecciona un departamento a partir de su código DANE de 2 dígitos.
@@ -92,7 +99,7 @@ class SelectedDepartmentNotifier extends Notifier<Department> {
 }
 
 final selectedDepartmentProvider =
-    NotifierProvider.autoDispose<SelectedDepartmentNotifier, Department>(
+    NotifierProvider.autoDispose<SelectedDepartmentNotifier, Department?>(
       SelectedDepartmentNotifier.new,
     );
 

@@ -64,6 +64,18 @@ Este documento certifica las fuentes oficiales de datos, licencias de propiedad 
 | `gastronomia_tradicional_cesar` | `gastronomy` | `es`, `en` | Ministerio de Cultura — Biblioteca Básica de Cocinas Tradicionales de Colombia (Región Caribe / Cesar) | `https://www.mincultura.gov.co` |
 | `lineas_atencion_y_emergencia_vup` | `emergency` | `es`, `en` | Alcaldía de Valledupar / Defensoría del Pueblo Regional Cesar — Directorio de Atención Ciudadana | `https://www.defensoria.gov.co` |
 
+### 3.3 Registro Auditable de Fotografías con Licencia Creative Commons (`assets/images/cities/valledupar/`)
+
+Todas las fotografías integradas en la portada de Valledupar y la guía cultural (`VJ-15`) provienen de **Wikimedia Commons** bajo licencias Creative Commons verificadas. Se distribuyen optimizadas (960×600 px JPEG) para carga instantánea sin conexión y con atribución visible en interfaz:
+
+| Asset local | Sitio representado | Autor | Licencia | Archivo fuente (Wikimedia Commons) | Nota de adaptación |
+|---|---|---|---|---|---|
+| `rio_guatapuri.jpg` | Río Guatapurí · Balneario Hurtado | Idaligomezmartinez | CC BY-SA 3.0 (`https://creativecommons.org/licenses/by-sa/3.0`) | `https://commons.wikimedia.org/wiki/File:Rio_guatapuri.JPG` | Redimensionado 16:10 para vista móvil |
+| `pilonera_mayor.jpg` | Glorieta La Pilonera Mayor (Monumento a Consuelo Araújo Noguera) | Petruss | CC BY-SA 3.0 (`https://creativecommons.org/licenses/by-sa/3.0`) | `https://commons.wikimedia.org/wiki/File:Monumento_a_Consuelo_Araujo_Noguera.JPG` | Recorte de encuadre 16:10 eliminando valla comercial lateral |
+| `plaza_alfonso_lopez.jpg` | Plaza Alfonso López (La Revolución en Marcha, Tarima Francisco El Hombre e Iglesia de la Concepción) | Idaligomezmartinez | CC BY-SA 3.0 (`https://creativecommons.org/licenses/by-sa/3.0`) | `https://commons.wikimedia.org/wiki/File:Valledupar_La_revolucion_en_marcha.JPG` | Redimensionado 16:10 para vista móvil |
+| `rotonda_acordeon.jpg` | Rotonda Pedazo de Acordeón | Jdvillalobos | CC BY-SA 3.0 (`https://creativecommons.org/licenses/by-sa/3.0`) | `https://commons.wikimedia.org/wiki/File:Valledupar,_rotonda_Pedazo_de_Acorde%C3%B3n.JPG` | Recorte 16:10 centrado en la escultura y la Sierra |
+| `catedral_ecce_homo.jpg` | Catedral del Santo Ecce Homo | XAVARDILA | CC BY-SA 4.0 (`https://creativecommons.org/licenses/by-sa/4.0`) | `https://commons.wikimedia.org/wiki/File:Nueva_Catedral_Valledupar.jpg` | Recorte 16:10 limpiando borde inferior |
+
 ---
 
 ## 4. Términos de Servicio de Terceros e Inteligencia Artificial

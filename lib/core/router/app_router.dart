@@ -11,6 +11,7 @@ import 'package:via_justa/features/auth/presentation/state/auth_state.dart';
 import 'package:via_justa/features/businesses/presentation/pages/business_detail_page.dart';
 import 'package:via_justa/features/businesses/presentation/pages/businesses_page.dart';
 import 'package:via_justa/features/businesses/presentation/pages/register_business_page.dart';
+import 'package:via_justa/features/city/presentation/pages/city_overview_page.dart';
 import 'package:via_justa/features/home/presentation/pages/home_page.dart';
 import 'package:via_justa/features/map_colombia/presentation/pages/map_page.dart';
 import 'package:via_justa/features/municipality/presentation/pages/municipality_page.dart';
@@ -42,6 +43,9 @@ class AppRoutes {
   static const department = '/department/:code';
   static const municipality = '/municipality/:code';
 
+  /// Vista de ciudad verificada con cultura y eventos oficiales (M18 / VJ-15).
+  static const cityOverview = '/city/:code';
+
   /// Resultado del semáforo de precios (M07 / M20).
   static const priceResult = '/prices/result';
 
@@ -62,6 +66,7 @@ class AppRoutes {
 
   static String departmentPath(String code) => '/department/$code';
   static String municipalityPath(String code) => '/municipality/$code';
+  static String cityOverviewPath(String code) => '/city/$code';
 }
 
 /// Puente reactivo que notifica a `GoRouter` ÚNICAMENTE ante cambios en el
@@ -146,6 +151,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.municipality,
         builder: (context, state) =>
             MunicipalityPage(code: state.pathParameters['code']!),
+      ),
+      GoRoute(
+        path: AppRoutes.cityOverview,
+        builder: (context, state) => CityOverviewPage(
+          municipalityCode: state.pathParameters['code']!,
+        ),
       ),
       GoRoute(
         path: AppRoutes.priceResult,

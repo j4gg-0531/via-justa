@@ -10,12 +10,15 @@ import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/map_colombia/presentation/state/map_providers.dart';
+import 'package:via_justa/features/municipality/domain/city_landmark.dart';
 import 'package:via_justa/features/municipality/domain/city_visual_identity.dart';
 import 'package:via_justa/features/municipality/domain/municipality.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/municipality/presentation/widgets/city_cultural_illustration.dart';
+import 'package:via_justa/features/municipality/presentation/widgets/city_landmark_carousel.dart';
 
-/// Pantallas 5 y 6 · Detalle de un municipio (piloto o fuera del piloto).
+/// Pantallas 5 y 6 · Detalle de un municipio (piloto con galería fotográfica
+/// editorial o municipio no piloto con ilustración regional y registro de interés).
 class MunicipalityPage extends ConsumerWidget {
   const MunicipalityPage({super.key, required this.code});
 
@@ -51,14 +54,17 @@ class _MunicipalityScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.only(
-                left: AppSpacing.xl,
-                top: AppSpacing.sm,
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.sm,
               ),
               child: IconButton(
                 tooltip: 'common.back'.tr(),
@@ -73,22 +79,27 @@ class _MunicipalityScaffold extends StatelessWidget {
                 style: IconButton.styleFrom(
                   backgroundColor: AppColors.surface,
                   foregroundColor: AppColors.textPrimary,
+                  side: const BorderSide(color: AppColors.border),
                   minimumSize: const Size(48, 48),
                 ),
               ),
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: child,
               ),
             ),
-            Padding(
+            Container(
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                border: Border(top: BorderSide(color: AppColors.border)),
+              ),
               padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xl,
+                AppSpacing.lg,
                 AppSpacing.md,
-                AppSpacing.xl,
-                AppSpacing.xl,
+                AppSpacing.lg,
+                AppSpacing.lg,
               ),
               child: action,
             ),
@@ -99,7 +110,8 @@ class _MunicipalityScaffold extends StatelessWidget {
   }
 }
 
-/// Pantalla 5 · Municipio piloto con ilustración cultural (Cañaguate, Acordeón y Guatapurí) y acceso al inicio.
+/// Pantalla 5 (M14) · Municipio piloto con carrusel fotográfico de sitios
+/// icónicos (CC), descripción concisa y acceso directo al inicio.
 class _PilotView extends ConsumerWidget {
   const _PilotView({required this.municipality});
 
@@ -111,6 +123,7 @@ class _PilotView extends ConsumerWidget {
     final departmentName = ref
         .watch(departmentByCodeProvider(municipality.departmentCode))
         ?.name;
+    final landmarks = CityLandmarkCatalog.forMunicipality(municipality.code);
     final visualIdentity = CityVisualIdentityCatalog.forMunicipality(
       municipalityCode: municipality.code,
       departmentCode: municipality.departmentCode,
@@ -132,23 +145,89 @@ class _PilotView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CityCulturalIllustrationBanner(
-            identity: visualIdentity,
-            cityName: municipality.name,
-            departmentName: departmentName,
-            isPilot: true,
+          if (landmarks.isNotEmpty)
+            CityLandmarkCarousel(landmarks: landmarks)
+          else
+            CityCulturalIllustrationBanner(
+              identity: visualIdentity,
+              cityName: municipality.name,
+              departmentName: departmentName,
+              isPilot: true,
+            ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              VjBadge(
+                label: 'municipality.pilot_available'.tr(),
+                icon: Icons.check_circle_outline,
+              ),
+              if (departmentName != null)
+                Text(
+                  departmentName,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: AppColors.textMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(municipality.name, style: textTheme.headlineMedium),
+          const SizedBox(height: 2),
+          Text(
+            'municipality.valledupar_tagline'.tr(),
+            style: textTheme.bodyMedium?.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'municipality.valledupar_intro'.tr(),
+            style: textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          VjBadge(
-            label: 'municipality.pilot_available'.tr(),
-            icon: Icons.check_circle_outline,
+          SizedBox(
+            width: double.infinity,
+            child: VjCard(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'municipality.pilot_includes_title'.tr(),
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: [
+                      _PilotFeatureChip(
+                        icon: Icons.local_taxi_outlined,
+                        label: 'municipality.pilot_feature_prices'.tr(),
+                      ),
+                      _PilotFeatureChip(
+                        icon: Icons.description_outlined,
+                        label: 'municipality.pilot_feature_contracts'.tr(),
+                      ),
+                      _PilotFeatureChip(
+                        icon: Icons.location_city_outlined,
+                        label: 'municipality.pilot_feature_guide'.tr(),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          Text(municipality.name, style: textTheme.headlineMedium),
-          if (departmentName != null) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(departmentName, style: textTheme.bodyLarge),
-          ],
           const SizedBox(height: AppSpacing.lg),
         ],
       ),
@@ -156,7 +235,51 @@ class _PilotView extends ConsumerWidget {
   }
 }
 
-/// Pantalla 6 · Municipio fuera del piloto: muestra su identidad regional ilustrada y registra el interés.
+class _PilotFeatureChip extends StatelessWidget {
+  const _PilotFeatureChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppColors.primary),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              style: textTheme.bodySmall?.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pantalla 6 (M15) · Municipio fuera del piloto: conserva la ilustración
+/// regional por subregión del Cesar y permite registrar interés de apertura.
 class _NotPilotView extends ConsumerWidget {
   const _NotPilotView({required this.municipality});
 
