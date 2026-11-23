@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:via_justa/features/contracts/data/device_contract_ocr_repository.dart';
 import 'package:via_justa/features/contracts/data/local_contract_ocr_repository.dart';
+import 'package:via_justa/features/contracts/data/pdf_contract_text_extractor.dart';
 import 'package:via_justa/features/contracts/domain/contract_capture.dart';
 import 'package:via_justa/features/contracts/presentation/state/contract_capture_provider.dart';
 
@@ -142,14 +145,26 @@ void main() {
       expect(png.existsSync(), isFalse);
     });
 
-    test('file picker: PDF is not read, is deleted and keeps pdfComingSoon downstream', () async {
+    test('file picker: PDF is extracted locally, deleted from cache (RN-10) and reaches readyForAnalysis', () async {
       final cache = await _createCacheDir();
-      final pdf = _writeFile(cache, 'file_picker/1702/arriendo.pdf', List<int>.filled(4096, 9));
+      const pdfContent = '%PDF-1.4\n'
+          '1 0 obj << /Length 110 >>\n'
+          'stream\n'
+          'BT /F1 12 Tf 72 720 Td '
+          '(CLAUSULA PRIMERA: Contrato de arrendamiento urbano en Valledupar por 900.000 COP.) Tj ET\n'
+          'endstream\n'
+          'endobj\n'
+          '%%EOF';
+      final pdf = _writeFile(
+        cache,
+        'file_picker/1702/arriendo.pdf',
+        latin1.encode(pdfContent),
+      );
 
       final repo = DeviceContractOcrRepository(
         pickContractFile: () async =>
             PickedContractFile(name: 'arriendo.pdf', path: pdf.path),
-        recognizeImageText: (_) async => fail('PDF must not go through OCR'),
+        recognizeImageText: (_) async => fail('PDF must not go through image OCR'),
         clearFilePickerCache: () async {},
         cacheDirectory: cache,
       );
@@ -165,9 +180,55 @@ void main() {
       final state = container.read(contractCaptureProvider);
 
       expect(pdf.existsSync(), isFalse);
-      expect(state.status, ContractCaptureStatus.error);
-      expect(state.error, ContractCaptureError.pdfComingSoon);
-      expect(state.text, isEmpty);
+      expect(state.status, ContractCaptureStatus.readyForAnalysis);
+      expect(state.error, isNull);
+      expect(
+        state.text,
+        contains('CLAUSULA PRIMERA: Contrato de arrendamiento urbano'),
+      );
+    });
+
+    test('pdf_contract_text_extractor decodes FlateDecode streams and ToUnicode CMaps', () {
+      const cmapStream = 'beginbfchar\n'
+          '<01> <0043>\n'
+          '<02> <004F>\n'
+          '<03> <0050>\n'
+          'endbfchar';
+      const contentStream = 'BT\n'
+          '[(CONTRATO DE ARRIENDO EN ) -220 <010203>] TJ\n'
+          'T*\n'
+          '(LEY 820 DE 2003 VIGENTE.) Tj\n'
+          'ET';
+      final compressedContent = zlib.encode(latin1.encode(contentStream));
+
+      final builder = BytesBuilder()
+        ..add(latin1.encode('%PDF-1.4\n1 0 obj <<>>\nstream\n$cmapStream\nendstream\nendobj\n'))
+        ..add(latin1.encode('2 0 obj << /Filter /FlateDecode >>\nstream\n'))
+        ..add(compressedContent)
+        ..add(latin1.encode('\nendstream\nendobj\n%%EOF'));
+
+      final extracted = extractTextFromPdfBytes(builder.toBytes());
+      expect(extracted, contains('CONTRATO DE ARRIENDO EN COP'));
+      expect(extracted, contains('LEY 820 DE 2003 VIGENTE.'));
+    });
+
+    test('pdf_contract_text_extractor joins runs on the same Tm Y coordinate without splitting words', () {
+      const contentStream = 'BT 1 0 0 1 70.94 631.06 Tm [(A)] TJ ET\n'
+          'BT 1 0 0 1 77.78 631.06 Tm [(RENDATARIO (s):)] TJ ET\n'
+          'BT 1 0 0 1 166.82 631.06 Tm [( )] TJ ET\n'
+          'BT 1 0 0 1 70.94 619.00 Tm [(así c)] TJ ET\n'
+          'BT 1 0 0 1 92.10 619.00 Tm [(omo por la Ley 820 de 2003.)] TJ ET';
+      final pdfBytes = Uint8List.fromList(
+        latin1.encode(
+          '%PDF-1.4\n1 0 obj <<>>\nstream\n$contentStream\nendstream\nendobj\n%%EOF',
+        ),
+      );
+
+      final extracted = extractTextFromPdfBytes(pdfBytes);
+      expect(
+        extracted,
+        'ARENDATARIO (s):\nasí como por la Ley 820 de 2003.',
+      );
     });
 
     test('file picker: oversized image is not processed and is deleted', () async {

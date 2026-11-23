@@ -113,10 +113,12 @@ void main() {
     // No synthetic sample list in ScanPage
     expect(find.text('contract_capture.samples_title'), findsNothing);
 
-    // Tapping PDF coming soon chip displays the notice
+    // Tapping PDF chip opens the RN-10 local processing consent dialog to pick a PDF file
     await tester.tap(find.text('contract_capture.pdf_coming_soon_chip'));
     await tester.pumpAndSettle();
-    expect(find.text('contract_capture.error_pdf_coming_soon'), findsOneWidget);
+    expect(find.text('contract_capture.consent_dialog_title'), findsOneWidget);
+    await tester.tap(find.text('contract_capture.consent_cancel'));
+    await tester.pumpAndSettle();
 
     // Tapping manual text toggle opens the editable text review box
     await tester.ensureVisible(find.text('scan.manual_text_toggle'));

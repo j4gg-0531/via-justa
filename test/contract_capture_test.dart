@@ -74,21 +74,13 @@ class _FakeContractOcrRepository implements ContractOcrRepository {
 
 void main() {
   group('Domain contract capture validators (VJ-13 Paso A)', () {
-    test('accepts JPG, JPEG, PNG and TXT; marks PDF as pdfComingSoon and rejects others', () {
+    test('accepts JPG, JPEG, PNG, TXT and PDF; rejects other formats', () {
       expect(validateContractFileExtension('foto_contrato.jpg'), isNull);
       expect(validateContractFileExtension('FOTO_CONTRATO.JPEG'), isNull);
       expect(validateContractFileExtension('pagina_1.png'), isNull);
       expect(validateContractFileExtension('clausulas.txt'), isNull);
-
-      // Ajuste obligatorio 1: PDF queda "Próximamente"
-      expect(
-        validateContractFileExtension('arriendo.pdf'),
-        ContractCaptureError.pdfComingSoon,
-      );
-      expect(
-        validateContractFileExtension('ARRIENDO.PDF'),
-        ContractCaptureError.pdfComingSoon,
-      );
+      expect(validateContractFileExtension('arriendo.pdf'), isNull);
+      expect(validateContractFileExtension('ARRIENDO.PDF'), isNull);
 
       // Otros formatos no soportados
       expect(
@@ -214,7 +206,7 @@ void main() {
   });
 
   group('ContractCaptureNotifier state transitions with fake repository', () {
-    test('rejects PDF with pdfComingSoon and oversized files with fileTooLarge', () async {
+    test('accepts PDF reaching readyForAnalysis and rejects unsupported or oversized files', () async {
       final fakeRepo = _FakeContractOcrRepository(
         nextFileResult: const ContractDocumentCaptureResult(
           source: ContractInputSource.documentFile,
@@ -237,11 +229,25 @@ void main() {
 
       expect(
         container.read(contractCaptureProvider).status,
-        ContractCaptureStatus.error,
+        ContractCaptureStatus.readyForAnalysis,
       );
+      expect(container.read(contractCaptureProvider).error, isNull);
+
+      // Formato no soportado (.docx)
+      fakeRepo.nextFileResult = const ContractDocumentCaptureResult(
+        source: ContractInputSource.documentFile,
+        fileName: 'contrato.docx',
+        fileSizeBytes: 2048,
+        extractedText: 'Texto de prueba suficientemente largo para pasar.',
+      );
+
+      await container
+          .read(contractCaptureProvider.notifier)
+          .pickDocumentFile(languageCode: 'es');
+
       expect(
         container.read(contractCaptureProvider).error,
-        ContractCaptureError.pdfComingSoon,
+        ContractCaptureError.unsupportedFormat,
       );
 
       // Archivo demasiado grande (> 10 MB)
@@ -285,13 +291,13 @@ void main() {
       expect(errorState.excessCharacters, 50);
       expect(errorState.isReadyForAnalysis, isFalse);
 
-      // Cuando el usuario recorta el texto a <= 15.000 caracteres, pasa a readyForAnalysis
-      final trimmed = overLimit.substring(0, 14900);
-      notifier.updateContractText(trimmed);
+      // Cuando el usuario usa la acción explícita trimToMaxLength(), pasa a readyForAnalysis
+      notifier.trimToMaxLength();
 
       final readyState = container.read(contractCaptureProvider);
       expect(readyState.status, ContractCaptureStatus.readyForAnalysis);
       expect(readyState.error, isNull);
+      expect(readyState.text.length, lessThanOrEqualTo(maxContractCharacters));
       expect(readyState.isReadyForAnalysis, isTrue);
     });
 

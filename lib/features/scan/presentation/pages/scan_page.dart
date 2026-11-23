@@ -472,18 +472,23 @@ class _ContractContentSection extends StatelessWidget {
                 avatar: const Icon(
                   Icons.picture_as_pdf_outlined,
                   size: 16,
-                  color: AppColors.textSecondary,
+                  color: AppColors.primary,
                 ),
                 label: Text(
                   'contract_capture.pdf_coming_soon_chip'.tr(),
                   style: textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                backgroundColor: AppColors.background,
-                side: const BorderSide(color: AppColors.border),
-                onPressed: captureNotifier.notifyPdfComingSoon,
+                backgroundColor: AppColors.primarySoft,
+                side: const BorderSide(color: AppColors.primary),
+                onPressed: captureState.status ==
+                        ContractCaptureStatus.readingDocument
+                    ? null
+                    : () => captureNotifier.requestFilePicker(
+                          languageCode: languageCode,
+                        ),
               ),
               const SizedBox(height: AppSpacing.sm),
               VjButton(
@@ -578,7 +583,7 @@ class _ContractContentSection extends StatelessWidget {
           ),
         ],
 
-        // Aviso de error de captura (formato no soportado, PDF próximamente, > 10 MB, texto vacío o exceso de longitud)
+        // Aviso de error de captura (formato no soportado, > 10 MB, texto vacío o exceso de longitud)
         if (captureState.error != null) ...[
           const SizedBox(height: AppSpacing.md),
           Container(
@@ -589,24 +594,45 @@ class _ContractContentSection extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(color: AppColors.primary, width: 1.5),
             ),
-            child: Row(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
-                  Icons.warning_amber_rounded,
-                  color: AppColors.primary,
-                  size: 20,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        _resolveCaptureErrorMessage(captureState),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    _resolveCaptureErrorMessage(captureState),
-                    style: textTheme.bodySmall?.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
+                if (captureState.error ==
+                    ContractCaptureError.exceedsMaxLength) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: captureNotifier.trimToMaxLength,
+                      icon: const Icon(Icons.content_cut, size: 16),
+                      label: Text('contract_capture.trim_to_limit_cta'.tr()),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        minimumSize: const Size(48, 48),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

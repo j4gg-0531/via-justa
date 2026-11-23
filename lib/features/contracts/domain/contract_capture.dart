@@ -66,6 +66,7 @@ const Set<String> supportedContractExtensions = <String>{
   'jpeg',
   'png',
   'txt',
+  'pdf',
 };
 
 /// Extrae la extensión en minúsculas (sin punto) a partir del nombre o ruta de un archivo.
@@ -78,15 +79,11 @@ String extractFileExtension(String fileNameOrPath) {
   return trimmed.substring(dotIndex + 1).toLowerCase();
 }
 
-/// Valida que la extensión del archivo corresponda a los formatos del MVP (`JPG`, `PNG`, `TXT`).
-/// Si el archivo es `PDF`, retorna [ContractCaptureError.pdfComingSoon].
+/// Valida que la extensión del archivo corresponda a los formatos admitidos (`PDF`, `JPG`, `PNG`, `TXT`).
 ContractCaptureError? validateContractFileExtension(String fileNameOrPath) {
   final ext = extractFileExtension(fileNameOrPath);
   if (ext.isEmpty) {
     return ContractCaptureError.unsupportedFormat;
-  }
-  if (ext == 'pdf') {
-    return ContractCaptureError.pdfComingSoon;
   }
   if (!supportedContractExtensions.contains(ext)) {
     return ContractCaptureError.unsupportedFormat;
@@ -125,6 +122,26 @@ ContractCaptureError? validateContractText(String text) {
     return ContractCaptureError.exceedsMaxLength;
   }
   return null;
+}
+
+/// Recorta explícitamente el texto del contrato al límite máximo ([maxContractCharacters])
+/// cuando el usuario solicita ajustar el documento con un toque, cortando en el último
+/// salto de línea o espacio disponible para no dejar palabras partidas.
+String trimContractTextToMaxLength(String text) {
+  final normalized = normalizeExtractedContractText(text);
+  if (normalized.length <= maxContractCharacters) {
+    return normalized;
+  }
+  final slice = normalized.substring(0, maxContractCharacters);
+  final lastNewline = slice.lastIndexOf('\n');
+  if (lastNewline >= maxContractCharacters - 250) {
+    return slice.substring(0, lastNewline).trimRight();
+  }
+  final lastSpace = slice.lastIndexOf(' ');
+  if (lastSpace >= maxContractCharacters - 120) {
+    return slice.substring(0, lastSpace).trimRight();
+  }
+  return slice.trimRight();
 }
 
 /// Contrato sintético de prueba bilingüe (ES/EN) sin datos personales reales

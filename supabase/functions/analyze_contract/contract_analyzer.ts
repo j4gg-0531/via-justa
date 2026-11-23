@@ -531,16 +531,9 @@ export class GeminiContractModelClient implements ContractModelClient {
     params.signal?.addEventListener("abort", onExternalAbort, { once: true });
 
     try {
-      const endpoint =
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
-
-      const response = await this.fetchFn(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
+      const buildRequestBody = (modelName: string) => {
+        const supportsThinkingConfig = modelName.startsWith("gemini-2.5-");
+        return JSON.stringify({
           systemInstruction: {
             parts: [{ text: systemInstruction }],
           },
@@ -554,15 +547,88 @@ export class GeminiContractModelClient implements ContractModelClient {
             temperature: 0.1,
             responseMimeType: "application/json",
             responseSchema: GEMINI_RESPONSE_SCHEMA,
+            ...(supportsThinkingConfig
+              ? { thinkingConfig: { thinkingBudget: 0 } }
+              : {}),
           },
-        }),
-      });
+        });
+      };
 
-      if (!response.ok) {
+      const primaryModel = this.model.replace(/^models\//i, "").trim();
+      const candidateModels = Array.from(
+        new Set([
+          "gemini-2.5-flash-lite",
+          "gemini-2.0-flash",
+          "gemini-2.0-flash-lite",
+          ...(primaryModel ? [primaryModel] : []),
+          "gemini-2.5-flash",
+          "gemini-flash-latest",
+        ]),
+      );
+
+      let response: Response | null = null;
+      for (const candidate of candidateModels) {
+        const endpoint =
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(candidate)}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
+        try {
+          response = await this.fetchWithPerAttemptTimeout(
+            endpoint,
+            buildRequestBody(candidate),
+            controller.signal,
+            15000,
+          );
+        } catch (attemptErr) {
+          if (controller.signal.aborted) {
+            throw attemptErr;
+          }
+          continue;
+        }
+        if (response.ok) {
+          break;
+        }
+        if (response.status === 401 || response.status === 403) {
+          break;
+        }
+      }
+
+      // Si los alias estáticos fallaron con 404/503/429, descubrimos dinámicamente los modelos activos
+      if (
+        (!response || !response.ok) &&
+        response?.status !== 401 &&
+        response?.status !== 403
+      ) {
+        const discoveredModels = await this.discoverAvailableGeminiModels(
+          controller.signal,
+        );
+        for (const discoveredModel of discoveredModels) {
+          if (candidateModels.includes(discoveredModel)) continue;
+          const endpoint =
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(discoveredModel)}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
+          try {
+            response = await this.fetchWithPerAttemptTimeout(
+              endpoint,
+              buildRequestBody(discoveredModel),
+              controller.signal,
+              15000,
+            );
+          } catch (attemptErr) {
+            if (controller.signal.aborted) {
+              throw attemptErr;
+            }
+            continue;
+          }
+          if (response.ok) {
+            break;
+          }
+        }
+      }
+
+      if (!response || !response.ok) {
+        const statusCode = response ? response.status : 502;
         throw new ContractServiceError(
           "AI_SERVICE_UNAVAILABLE",
           502,
-          `El proveedor de IA respondió con estado HTTP ${response.status}.`,
+          `El proveedor de IA respondió con estado HTTP ${statusCode}.`,
         );
       }
 
@@ -624,6 +690,74 @@ export class GeminiContractModelClient implements ContractModelClient {
     } finally {
       clearTimeout(timeoutId);
       params.signal?.removeEventListener("abort", onExternalAbort);
+    }
+  }
+
+  private async fetchWithPerAttemptTimeout(
+    endpoint: string,
+    body: string,
+    parentSignal: AbortSignal,
+    attemptTimeoutMs: number,
+  ): Promise<Response> {
+    const attemptController = new AbortController();
+    const timer = setTimeout(() => attemptController.abort(), attemptTimeoutMs);
+    const onParentAbort = () => attemptController.abort();
+    parentSignal.addEventListener("abort", onParentAbort, { once: true });
+    try {
+      return await this.fetchFn(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        signal: attemptController.signal,
+        body,
+      });
+    } finally {
+      clearTimeout(timer);
+      parentSignal.removeEventListener("abort", onParentAbort);
+    }
+  }
+
+  private async discoverAvailableGeminiModels(
+    signal: AbortSignal,
+  ): Promise<string[]> {
+    try {
+      const listUrl =
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(this.apiKey)}`;
+      const res = await this.fetchFn(listUrl, {
+        method: "GET",
+        signal,
+      });
+      if (!res.ok) return [];
+      const data = (await res.json()) as Record<string, unknown>;
+      const models = data["models"];
+      if (!Array.isArray(models)) return [];
+
+      const supported: string[] = [];
+      for (const item of models) {
+        if (!item || typeof item !== "object") continue;
+        const m = item as Record<string, unknown>;
+        const name = typeof m["name"] === "string"
+          ? m["name"].replace(/^models\//i, "")
+          : "";
+        const methods = Array.isArray(m["supportedGenerationMethods"])
+          ? m["supportedGenerationMethods"]
+          : [];
+        if (
+          name.startsWith("gemini-") &&
+          methods.includes("generateContent") &&
+          !name.includes("tts") &&
+          !name.includes("image") &&
+          !name.includes("embedding")
+        ) {
+          supported.push(name);
+        }
+      }
+      const flashModels = supported.filter((n) => n.includes("flash"));
+      const otherModels = supported.filter((n) => !n.includes("flash"));
+      return [...flashModels, ...otherModels];
+    } catch {
+      return [];
     }
   }
 }
