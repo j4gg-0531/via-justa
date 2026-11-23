@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:via_justa/core/navigation/app_scaffold.dart';
 import 'package:via_justa/core/session/session_navigation_rule.dart';
+import 'package:via_justa/features/activity/presentation/pages/user_activity_page.dart';
 import 'package:via_justa/features/auth/presentation/pages/login_page.dart';
 import 'package:via_justa/features/auth/presentation/pages/register_page.dart';
 import 'package:via_justa/features/auth/presentation/pages/welcome_page.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_state.dart';
+import 'package:via_justa/features/budget/presentation/pages/trip_budget_page.dart';
 import 'package:via_justa/features/businesses/presentation/pages/business_detail_page.dart';
 import 'package:via_justa/features/businesses/presentation/pages/businesses_page.dart';
 import 'package:via_justa/features/businesses/presentation/pages/register_business_page.dart';
@@ -51,6 +53,12 @@ class AppRoutes {
 
   /// Flujo en 4 pasos para aportar un precio (M10).
   static const priceContribute = '/prices/contribute';
+
+  /// Estimador determinístico de presupuesto de viaje desde Inicio.
+  static const tripBudget = '/budget';
+
+  /// Memoria de usuario (consultas recientes, favoritos y aportes) desde Perfil.
+  static const activity = '/activity';
 
   // Rutas de las 5 ramas de la barra inferior persistente (experiencia dentro del municipio)
   static const home = '/home';
@@ -186,6 +194,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.priceContribute,
         builder: (context, state) => const ContributePricePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.tripBudget,
+        builder: (context, state) => const TripBudgetPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.activity,
+        builder: (context, state) => const UserActivityPage(),
       ),
       GoRoute(
         path: AppRoutes.businessRegister,

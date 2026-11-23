@@ -400,17 +400,93 @@ class _VisitorHomeView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDemoMode = ref.watch(isDemoModeProvider);
+    final locationLabel = ref.watch(selectedLocationLabelProvider);
+    final cityName = locationLabel ?? 'home.default_city'.tr();
 
-    return _HomeHeroBannerCard(
-      icon: Icons.verified_user_outlined,
-      badgeLabel: isDemoMode
-          ? 'home.visitor_banner_badge'.tr()
-          : 'home.visitor_banner_live_badge'.tr(),
-      title: 'home.visitor_banner_title'.tr(),
-      description: 'home.visitor_banner_desc'.tr(),
-      ctaLabel: 'home.scan_action_title'.tr(),
-      ctaIcon: Icons.document_scanner_rounded,
-      onPressed: () => GoRouter.maybeOf(context)?.go(AppRoutes.scan),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _HomeHeroBannerCard(
+          icon: Icons.verified_user_outlined,
+          badgeLabel: isDemoMode
+              ? 'home.visitor_banner_badge'.tr()
+              : 'home.visitor_banner_live_badge'.tr(),
+          title: 'home.visitor_banner_title'.tr(),
+          description: 'home.visitor_banner_desc'.tr(),
+          ctaLabel: 'home.scan_action_title'.tr(),
+          ctaIcon: Icons.document_scanner_rounded,
+          onPressed: () => GoRouter.maybeOf(context)?.go(AppRoutes.scan),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _TripBudgetEntryCard(cityName: cityName),
+      ],
+    );
+  }
+}
+
+/// Tarjeta destacada en Inicio para abrir el estimador determinístico de presupuesto (`/budget`).
+class _TripBudgetEntryCard extends StatelessWidget {
+  const _TripBudgetEntryCard({required this.cityName});
+
+  final String cityName;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return VjCard(
+      borderRadius: AppRadius.xl,
+      backgroundColor: AppColors.primarySoft,
+      borderColor: AppColors.primaryBorder,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      onTap: () => GoRouter.maybeOf(context)?.push(AppRoutes.tripBudget),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: const Icon(
+              Icons.calculate_outlined,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'home.budget_card_title'.tr(),
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.brandNavy,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'home.budget_card_subtitle'.tr(
+                    namedArgs: {'city': cityName},
+                  ),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: AppColors.primary,
+            size: 22,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -432,6 +508,8 @@ class _SettlerHomeView extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
     final checklist = ref.watch(settlerChecklistProvider);
     final municipalityCode = ref.watch(activeMunicipalityCodeProvider);
+    final locationLabel = ref.watch(selectedLocationLabelProvider);
+    final cityName = locationLabel ?? 'home.default_city'.tr();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -448,6 +526,8 @@ class _SettlerHomeView extends ConsumerWidget {
             GoRouter.maybeOf(context)?.go(AppRoutes.scan);
           },
         ),
+        const SizedBox(height: AppSpacing.md),
+        _TripBudgetEntryCard(cityName: cityName),
         const SizedBox(height: AppSpacing.md),
 
         // Tarjetas de ruta de trámites interactiva y documentos contractuales

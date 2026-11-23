@@ -2,6 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:via_justa/core/currency/currency_formatter.dart';
+import 'package:via_justa/core/currency/currency_providers.dart';
 import 'package:via_justa/core/router/app_router.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
@@ -19,6 +21,7 @@ import 'package:via_justa/features/contracts/presentation/widgets/contract_analy
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/prices/domain/municipality_zone.dart';
 import 'package:via_justa/features/prices/domain/price_category.dart';
+import 'package:via_justa/features/prices/domain/price_category_filter.dart';
 import 'package:via_justa/features/prices/presentation/state/price_scan_provider.dart';
 import 'package:via_justa/features/prices/presentation/widgets/map_point_picker_sheet.dart';
 import 'package:via_justa/features/scan/domain/scan_mode.dart';
@@ -898,6 +901,10 @@ class _PriceContentSection extends ConsumerWidget {
         return Icons.restaurant_outlined;
       case 'lodging':
         return Icons.hotel_outlined;
+      case 'housing':
+        return Icons.apartment_outlined;
+      case 'groceries':
+        return Icons.shopping_basket_outlined;
       default:
         return Icons.local_laundry_service_outlined;
     }
@@ -969,6 +976,11 @@ class _PriceContentSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final notifier = ref.read(priceScanProvider.notifier);
+    final filteredCategoriesAsync = ref.watch(filteredPriceCategoriesProvider);
+    final selectedAudience = ref.watch(priceCategoryAudienceProvider);
+    final showAudienceFilter = ref.watch(showPriceAudienceFilterProvider);
+    final currencyMode = ref.watch(effectiveCurrencyModeProvider(languageCode));
+    final copPerUsd = ref.watch(activeCopPerUsdRateProvider);
     final originZoneName =
         activeZone?.localizedName(languageCode) ?? scanState.selectedZoneId;
     final destinationZoneName = activeDestinationZone != null
@@ -987,8 +999,42 @@ class _PriceContentSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (showAudienceFilter) ...[
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                ChoiceChip(
+                  label: Text('scan.audience_all'.tr()),
+                  selected: selectedAudience == PriceCategoryAudience.all,
+                  onSelected: (_) => ref
+                      .read(priceCategoryAudienceProvider.notifier)
+                      .select(PriceCategoryAudience.all),
+                ),
+                const SizedBox(width: AppSpacing.xs + 2),
+                ChoiceChip(
+                  label: Text('scan.audience_travel'.tr()),
+                  selected: selectedAudience == PriceCategoryAudience.travel,
+                  onSelected: (_) => ref
+                      .read(priceCategoryAudienceProvider.notifier)
+                      .select(PriceCategoryAudience.travel),
+                ),
+                const SizedBox(width: AppSpacing.xs + 2),
+                ChoiceChip(
+                  label: Text('scan.audience_living'.tr()),
+                  selected: selectedAudience == PriceCategoryAudience.living,
+                  onSelected: (_) => ref
+                      .read(priceCategoryAudienceProvider.notifier)
+                      .select(PriceCategoryAudience.living),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+
         // 1. Carrusel horizontal de categorías (una sola fila limpia, sin escalera vertical)
-        categoriesAsync.when(
+        filteredCategoriesAsync.when(
           loading: () => const SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -1171,6 +1217,24 @@ class _PriceContentSection extends ConsumerWidget {
                         ),
                       ),
                     ),
+                    if (currencyMode != CurrencyDisplayMode.copOnly &&
+                        scanState.parsedAmount != null) ...[
+                      Text(
+                        'scan.usd_reference_line'.tr(
+                          namedArgs: {
+                            'usd': formatUsdApprox(
+                              scanState.parsedAmount!,
+                              copPerUsd: copPerUsd,
+                            ),
+                          },
+                        ),
+                        style: textTheme.labelMedium?.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.sm),
                     Wrap(
                       alignment: WrapAlignment.center,
