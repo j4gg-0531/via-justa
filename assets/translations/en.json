@@ -211,6 +211,7 @@
     "visitor_banner_title": "Fair Price Guide — Festival & Tourism",
     "visitor_banner_desc": "Check fair rates for cabs, local cuisine, and lodging in Valledupar.",
     "visitor_banner_badge": "PILOT DEMO",
+    "visitor_banner_live_badge": "LIVE PILOT",
     "settler_card_title": "Arrival & Settling Route",
     "settler_card_desc": "Monitor fair rent, basic utilities, and recommended procedures to settle in Valledupar.",
     "settler_card_badge": "RECOMMENDED",
@@ -450,7 +451,23 @@
     "sign_out": "Sign out",
     "dialog_profile_title": "Select profile type",
     "legal_dialog_title": "Legal notice",
-    "legal_dialog_body": "Vía Justa is a civic initiative for price and contract transparency."
+    "legal_dialog_body": "Vía Justa is a civic initiative for price and contract transparency.",
+    "delete_account_section_title": "Account & data deletion",
+    "delete_account_section_desc": "Exercise your right to erasure (Law 1581). Permanently remove your account, profile, businesses, and consents.",
+    "delete_account_cta": "Delete my account",
+    "delete_account_loading": "Deleting account...",
+    "delete_account_dialog_title": "Permanently delete your account?",
+    "delete_account_dialog_body": "This action cannot be undone.\n\nYour login account, profile, registered businesses, dishes, photos, ratings, interests, AI usage quotas, and consent records will be permanently deleted.\n\nTo preserve statistical integrity of the price semaphore, submitted price amounts remain dissociated without your user ID, place names, notes, or GPS coordinates.",
+    "delete_account_demo_body": "You are running in local DEMO mode (not connected to a server). Confirming will reset all sample session data on this device.",
+    "delete_account_confirm_check": "I understand this deletion is permanent and cannot be reversed.",
+    "delete_account_confirm_cta": "Delete permanently"
+  },
+  "legal": {
+    "version_label": "Current version {version}",
+    "terms_title": "Terms of Service",
+    "terms_body": "1. Orientative nature: Vía Justa is a civic and academic project. The price semaphore compares amounts against community reports (statistical median) and does not replace official tariffs or binding regulations.\n\n2. Contracts & AI: Contract analysis is orientative and educational; it does not constitute professional legal advice or replace a licensed attorney.\n\n3. Responsible participation: Price reports and business listings must reflect truthful and respectful information. Vía Justa enforces daily quotas and may hide abusive or non-compliant entries.\n\n4. External links: WhatsApp, phone call, Google Maps, and order links open third-party services governed by their own terms; Vía Justa does not process payments or internal orders.",
+    "privacy_title": "Privacy Policy (Law 1581)",
+    "privacy_body": "In accordance with Colombian Statutory Law 1581 of 2012 and Decree 1377 of 2013, we inform how your personal data is handled in Vía Justa:\n\n1. Data processed: Sign-in email, display name, profile type, language, active municipality, versioned consent records, businesses you publish, and price reports.\n\n2. Location privacy: GPS coordinates attached to price reports are automatically rounded on the server (~110 m) to protect your exact location.\n\n3. Contracts & AI (RN-10): Photos or files processed with local OCR are removed from temporary device cache immediately after reading. Contract text sent to orientative AI analysis is never stored in the server database or disk; only daily usage counts are kept.\n\n4. Secure storage: On Android, your session is stored encrypted using the device's secure keystore.\n\n5. Your rights: You may edit your display name or withdraw your businesses in the app, and permanently delete your account under Profile → Delete my account."
   },
   "contract_capture": {
     "title": "Local contract capture & OCR",

@@ -1,13 +1,13 @@
 # Progreso, Control de Cambios y Dictamen Go/No-Go — Vía Justa MVP
 
-**Última actualización:** 10 de noviembre de 2026 (Rediseño Analizar: Precios, Taxi con Origen/Destino, Semáforo y Contratos)  
-**Rama actual:** `feature/redisenio-analizar-precios-contratos`  
+**Última actualización:** 22 de noviembre de 2026 (Cierre `RF-06`, textos legales Ley 1581, limpieza Auth/Inicio y preparación `VJ-20` Android `co.viajusta.app`)  
+**Rama actual:** `feature/cierre-rf06-legal-vj20` (partiendo de `main` en `336d080` tras integrar PRs #30–#38)  
 **Repositorio remoto:** `https://github.com/j4gg-0531/via-justa.git`  
-**Proyecto Supabase Remoto:** `via-justa` (`vjehsjqmwibmiqmxlsou`, PostgreSQL 17.11 — `14/14` migraciones base + migración `0014` de Taxi en SQL)  
+**Proyecto Supabase Remoto:** `via-justa` (`vjehsjqmwibmiqmxlsou`, PostgreSQL 17.11 — `21` archivos de migración en `supabase/migrations/`)  
 **Entorno de ejecución:** Windows 10/11 x64, PowerShell 5.1, Flutter `3.47.7` (`stable`), Dart `3.13.5`, Supabase CLI `2.101.0`  
 **Suites de pruebas automatizadas:**
-- **Flutter (`test/`):** `268/268` pruebas unitarias, de widgets y E2E en PASS (`0` errores en `flutter analyze`).
-- **PostgreSQL pgTAP (`supabase/tests/`):** `9` suites con `168` aserciones cubriendo RLS, semáforo estadístico, cuotas de reportes, geoespacial/mapa, cuota IA, contenido cultural/eventos, negocios/Storage/moderación, catálogo/acciones externas y auditoría cruzada de seguridad (`VJ-18`/`VJ-19`).
+- **Flutter (`test/`):** `364/364` pruebas unitarias, de widgets y E2E en PASS (`54` archivos, `0` errores en `flutter analyze`).
+- **PostgreSQL pgTAP (`supabase/tests/`):** `12` archivos de suite en repositorio (`9` suites base con `168` aserciones documentadas + `business_direct_publication.sql`, `business_ratings.sql`, `business_transactional_update.sql` añadidos en PRs #30–#35).
 - **Edge Function Deno (`supabase/functions/analyze_contract/`):** `6` bloques de pruebas unitarias y de handler HTTP en `contract_analyzer_test.ts`.
 
 ---
@@ -24,20 +24,20 @@
 | **VJ-05** | P1 | Frontend | Pantalla M10: aportar precio en 4 pasos demo por zona | **INTEGRADO** | `feature/vj-05-aportar-precio-demo` (`main`) |
 | **VJ-06** | P1 | Ambos | Cierre del primer avance: walkthrough E2E, CI y documentación de sustentación | **INTEGRADO** | `feature/vj-06-cierre-primer-avance` (`main`) |
 | **VJ-07** | P0 | Backend | Supabase: migración inicial, RLS, GRANT, seeds y ER | **INTEGRADO + NUBE** | PR #15 + `supabase db push` (`vjehsjqmwibmiqmxlsou`) |
-| **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos (`delete_my_account`) | **INTEGRADO + NUBE** | PR #16 + PR #18 (`main`) |
-| **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **INTEGRADO** | PR #21 + VJ-09b (`feature/vj-09b-persistencia-perfil-municipio`) |
+| **VJ-08** | P0 | Ambos | Supabase Auth real, sesión, perfil y consentimientos (`delete_my_account`) | **INTEGRADO + VERIFICADO** | PR #16 + PR #18 (`main`) + conectado en `ProfilePage` / `AuthController` (`feature/cierre-rf06-legal-vj20`) |
+| **VJ-09** | P0 | Frontend | Navegación por sesión, municipios reales y mapa oficial | **INTEGRADO** | PR #21 + PR #28 + PR #37 (`identidad-ilustrada-mapas-y-ciudades`) |
 | **VJ-10** | P0 | Backend | Función SQL de semáforo: única fuente de verdad (`calculate_price_verdict`) | **INTEGRADO + NUBE** | PR #18 (`23/23` pgTAP PASS) |
-| **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **HECHO-VERIFICADO** | Conectado a `submit_price_report` con respaldo y sin fallback a datos falsos |
-| **VJ-12** | P1 | Ambos | Google Maps de precios, filtros y optimización geoespacial | **HECHO-VERIFICADO** | `showMapPointPickerSheet` con Google Maps + GPS y cálculo por rangos de taxi en SQL (`0014`) |
+| **VJ-11** | P0 | Ambos | Reportes reales: aporte, límites, fuente y sincronización | **INTEGRADO** | PR #28 + PR #38 (`feat/mapa-lugares-y-estimador-taxi`) |
+| **VJ-12** | P1 | Ambos | Google Maps de precios, filtros, pines vectoriales y estimador de taxi | **INTEGRADO** | PR #22 + PR #28 + PR #38 (`feat/mapa-lugares-y-estimador-taxi`) |
 | **VJ-13** | P1 | Frontend | Captura de contratos: cámara, archivos y OCR local con ML Kit | **INTEGRADO** | PR #14 (`main`, verificado en `moto_g22`) |
-| **VJ-14** | P1 | Ambos | Análisis de contratos con Gemini en Edge Function y cuota diaria SQL | **HECHO-VERIFICADO** | Conectado a Edge Function `analyze_contract`, editor editable y doble consentimiento |
-| **VJ-15** | P2 | Ambos | Vista de ciudad de Valledupar: cultura verificada `es`/`en` y eventos | **BACKEND HECHO EN NUBE / APP PENDIENTE** | Migración `20261030130000` + semilla `08_city_content_valledupar.sql` (`16/16` pgTAP PASS); falta pantalla `M18` |
-| **VJ-16** | P2 | Ambos | Registro de negocio en 4 pasos, bucket privado `business-media`, RLS y moderación | **BACKEND HECHO EN NUBE / APP PENDIENTE** | Migración `20261031100000` + semilla `09` (`24/24` pgTAP PASS); falta wizard `M19` en app |
-| **VJ-17** | P2 | Ambos | Negocios: catálogo paginado, detalle y acciones externas seguras | **BACKEND HECHO EN NUBE / APP PENDIENTE** | Migración `20261031110000` + semilla `10` (`18/18` pgTAP PASS); falta conectar `M21`/`M09` a RPCs |
-| **VJ-18** | P0 | Ambos | Correcciones cruzadas de seguridad, privacidad y confiabilidad | **BACKEND HECHO EN NUBE** | Migración `20261108220000` + `docs/seguridad-privacidad.md` + `docs/backend/guia-respaldo-restauracion.md` |
-| **VJ-19** | P0 | Ambos | Suite de pruebas integrales y matriz RF → pruebas | **INTEGRADO** | 9 suites pgTAP + 268 pruebas en Flutter |
-| **VJ-20** | P0 | Frontend | Entrega Android real: applicationId, firma release, APK | **DOCUMENTADO (PROTOCOLO LISTO) / PENDIENTE FIRMA APK** | `docs/release-android.md` |
-| **VJ-21** | P0 | Ambos | Documentación final, sustentación y decisión Go/No-Go | **HECHO-VERIFICADO** | `docs/arquitectura.md`, `docs/manual-usuario.md`, `docs/guion-sustentacion-7min.md` |
+| **VJ-14** | P1 | Ambos | Análisis de contratos con Gemini en Edge Function y cuota diaria SQL | **INTEGRADO** | PR #17 + PR #20 + PR #28 |
+| **VJ-15** | P2 | Ambos | Vista de ciudad de Valledupar: cultura verificada `es`/`en` y eventos | **BACKEND EN NUBE + IDENTIDAD VISUAL / CONEXIÓN `get_city_overview` DIFERIDA** | Backend en `20261030130000` (PR #23); ilustración visual en PR #37; vistas conectadas a RPC diferidas |
+| **VJ-16** | P2 | Ambos | Registro de negocio en 4 pasos, bucket privado `business-media` y publicación | **INTEGRADO** | PR #24 + PR #30 (`codex/vj-16-publicacion-directa-negocios`) + PR #35 (`aviso-precios-zona`) |
+| **VJ-17** | P2 | Ambos | Negocios: catálogo paginado, detalle, valoraciones y acciones externas seguras | **INTEGRADO** | PR #25 + PR #33 + PR #34 (`valoraciones-negocios`) |
+| **VJ-18** | P0 | Ambos | Correcciones cruzadas de seguridad, privacidad, OWASP y `delete_my_account` | **INTEGRADO** | PR #26 + PR #32 (`auditoria-owasp-mobile-top10`) + `feature/cierre-rf06-legal-vj20` |
+| **VJ-19** | P0 | Ambos | Suite de pruebas integrales y matriz RF → pruebas | **INTEGRADO** | `12` suites pgTAP + `364` pruebas en Flutter (`54` archivos) |
+| **VJ-20** | P0 | Frontend | Entrega Android real: `applicationId` `co.viajusta.app`, firma release, APK | **CONFIGURADO EN GRADLE / PENDIENTE KEYSTORE LOCAL Y APK FINAL** | `android/app/build.gradle.kts`, `MainActivity.kt`, `AndroidManifest.xml`, `docs/release-android.md` |
+| **VJ-21** | P0 | Ambos | Documentación final, sustentación y decisión Go/No-Go | **ACTUALIZADO** | `docs/arquitectura.md`, `docs/manual-usuario.md`, `docs/guia-demo.md`, `docs/seguridad-privacidad.md` |
 
 ---
 
@@ -73,8 +73,8 @@ Las migraciones en `supabase/migrations/` se encuentran sincronizadas entre el r
 | **G2** | Backend operativo y seguro (`VJ-07`–`VJ-08`) | **APROBADO (GO)** | 16 tablas con RLS activa, `GRANT`s de mínimo privilegio, Auth real integrado en app (`PR #16`), consentimientos `v1.0` y `14/14` migraciones aplicadas en Supabase Cloud (`vjehsjqmwibmiqmxlsou`). |
 | **G3** | Núcleo de precios de extremo a extremo (`VJ-10`–`VJ-12`) | **APROBADO (GO)** | **Backend 100% GO:** `calculate_price_verdict`, `submit_price_report` y `get_price_map_markers` con cálculo de taxi por distancias en SQL. **Frontend 100% GO:** Conectado a Supabase real sin fallback a datos falsos, selección de puntos en Google Maps / GPS (`showMapPointPickerSheet`) y semáforo rediseñado con umbrales y sugerencia determinista. |
 | **G4** | Núcleo de contratos de extremo a extremo (`VJ-13`–`VJ-14`) | **APROBADO (GO)** | OCR local con ML Kit verificado en dispositivo real (`moto_g22`, `PR #14`), UI limpia sin cajas falsas ni muestras sintéticas fijas, subida de archivos JPG/PNG/TXT hasta 10 MB, aviso de PDF próximamente y conexión con Edge Function `analyze_contract`. |
-| **G5** | Ciudad y negocios (`VJ-15`–`VJ-17`) | **APROBADO EN BACKEND / PENDIENTE EN APP** | **Backend 100% GO:** RPCs `get_city_overview`, `submit_business`, `moderate_business`, `get_business_catalog` y `get_business_detail` + bucket privado `business-media` desplegados y verificados con 58 aserciones pgTAP. **Pendiente en Frontend:** implementar las vistas/adaptadores reales de `M18`, `M19` y conectar `M21`/`M09`. |
-| **G6** | Candidato a entrega final (`VJ-18`–`VJ-21`) | **GO EN BACKEND Y DOCUMENTACIÓN / CONDICIONAL EN RELEASE ANDROID** | **Backend y Documentación 100% GO:** endurecimiento cruzado `VJ-18`, suite `security_cross_audit.sql`, matriz `matriz-rf-casos.md`, protocolo `release-android.md`, manual de usuario y guion de 7 min completados. **Condición para Release Final:** que el responsable de Frontend conecte los adaptadores pendientes de Negocios (`G5`), aplique el `applicationId` definitivo (`co.viajusta.app`) y firme el APK release según `docs/release-android.md`. |
+| **G5** | Ciudad y negocios (`VJ-15`–`VJ-17`) | **NEGOCIOS INTEGRADOS / `VJ-15` RPC DIFERIDA** | **Negocios 100% integrados:** registro en 4 pasos, publicación directa, directorio paginado, ficha con valoraciones y aviso de precios por zona (PRs #30, #33, #34, #35). **Ciudad (`VJ-15`):** backend `get_city_overview` y semillas listos; identidad visual ilustrada integrada en PR #37; conexión de la vista cultural/eventos a RPC diferida por decisión de alcance. |
+| **G6** | Candidato a entrega final (`VJ-18`–`VJ-21`) | **GO EN APP Y BACKEND / PENDIENTE FIRMA APK LOCAL** | Auditoría OWASP (PR #32), eliminación de cuenta `delete_my_account` en `ProfilePage`, textos legales `Ley 1581`, limpieza de botones provisionales, `applicationId` definitivo `co.viajusta.app` y lectura de `key.properties` en Gradle listos (`364/364` pruebas Flutter). **Único paso operativo pendiente:** crear keystore `.jks` local, actualizar `MAPS_API_KEY` en GCP con el `SHA-1` release y firmar/probar el APK final en teléfono físico según `docs/release-android.md`. |
 
 ---
 
@@ -83,12 +83,12 @@ Las migraciones en `supabase/migrations/` se encuentran sincronizadas entre el r
 ### 4.1 Dictamen por Ámbito de Responsabilidad
 
 1. **Ámbito Backend, Seguridad, Base de Datos y Documentación Técnica (`supabase/` y `docs/`):**
-   - **DICTAMEN: `GO` (100% Completado, Auditado y Desplegado en Supabase Cloud).**
-   - Las 14 migraciones están aplicadas en `vjehsjqmwibmiqmxlsou`.
-   - Todas las invariantes de negocio, seguridad, privacidad (`RN-10`, Ley 1581 de 2012, ofuscación GPS, cuotas de reportes e IA, moderación de negocios y precios, anti-escalación y supresión en 5 fases) están respaldadas por **168 aserciones pgTAP** distribuidas en 9 suites y **6 bloques Deno**.
-2. **Ámbito Integración Frontend y Empaquetado Release Android (`lib/` y `android/`):**
-   - **DICTAMEN: `GO CONDICIONAL` (Apto para sustentación inmediata con Auth, Precios Reales y Contratos Reales; requiere cierre de adaptadores UI de `VJ-15/16/17` y firma APK `VJ-20` para producción 100% conectada).**
+   - **DICTAMEN: `GO` (Completado, Auditado y Sincronizado hasta `21` migraciones SQL).**
+   - Todas las invariantes de negocio, seguridad, privacidad (`RN-10`, Ley 1581 de 2012, ofuscación GPS, cuotas de reportes e IA, publicación/valoraciones de negocios, anti-escalación y supresión en 5 fases) están respaldadas por **12 archivos de suite pgTAP** en `supabase/tests/` y **6 bloques Deno**.
+2. **Ámbito Aplicación Móvil y Empaquetado Release Android (`lib/` y `android/`):**
+   - **DICTAMEN: `GO` EN CÓDIGO (`364/364` pruebas PASS) / PENDIENTE FIRMA APK EN EQUIPO LOCAL (`VJ-20`).**
+   - Auth, Mapa Colombia con identidad visual, Precios/Taxi con estimador, Contratos OCR+Gemini, Directorio/Registro/Valoraciones de Negocios, `delete_my_account` y textos legales Ley 1581 están integrados; solo resta generar el `.jks` local, autorizar el `SHA-1` release en Google Cloud Console y emitir el `app-release.apk` firmado (`VJ-15` RPC cultural queda diferida explícitamente).
 
-### 4.2 Hoja de Ruta Inmediata Posterior a `VJ-21`
-1. **Nutrición y curaduría de datos reales en la base de datos (`Supabase Cloud`):** Poblar muestras iniciales verificadas (`is_seed = true`, `is_demo = false`) ejecutando `supabase/seed/11_price_reports_seed_valledupar.sql`, eventos reales y comercios aprobados verificados, de modo que el semáforo responda con Verde, Amarillo y Rojo desde el primer segundo.
-2. **Coordinación con Frontend:** Terminar adaptadores de Negocios (`M19`/`M21`) y generar el APK firmado según `docs/release-android.md`.
+### 4.2 Hoja de Ruta Inmediata Posterior
+1. **Empaquetado Release (`VJ-20`):** Generar el keystore `.jks` fuera del repo, crear `android/key.properties`, autorizar `co.viajusta.app` + `SHA-1` release en Google Cloud Console y validar `app-release.apk` en dispositivo físico (`docs/release-android.md`).
+2. **Cultura real (`VJ-15`, cuando se retome):** Conectar `get_city_overview` y `get_city_events_status` en las vistas de ciudad e inicio.

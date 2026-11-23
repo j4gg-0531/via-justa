@@ -7,7 +7,10 @@ import 'package:via_justa/core/session/session_providers.dart';
 import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_card.dart';
+import 'package:via_justa/features/auth/domain/consent_document.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
+import 'package:via_justa/features/auth/presentation/widgets/auth_failure_text.dart';
+import 'package:via_justa/features/auth/presentation/widgets/legal_document_dialog.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/onboarding/domain/profile_type.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
@@ -78,20 +81,28 @@ class ProfilePage extends ConsumerWidget {
     }
   }
 
-  void _showLegalDialog(BuildContext context, String title) {
-    showDialog<void>(
+  Future<void> _confirmDeleteAccount(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool isDemoMode,
+  }) async {
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(title),
-        content: Text('profile.legal_dialog_body'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text('common.close'.tr()),
-          ),
-        ],
-      ),
+      builder: (_) => _DeleteAccountDialog(isDemoMode: isDemoMode),
     );
+    if (confirmed != true || !context.mounted) return;
+
+    final deleted = await ref.read(sessionControllerProvider).deleteAccount();
+    if (!context.mounted) return;
+
+    if (!deleted) {
+      final message =
+          authFailureText(ref.read(authControllerProvider).failure) ??
+          'auth.error.unknown'.tr();
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   void _changeLocale(BuildContext context, WidgetRef ref, Locale newLocale) {
@@ -270,28 +281,12 @@ class ProfilePage extends ConsumerWidget {
                       style: textTheme.bodySmall,
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    Row(
-                      children: [
-                        Icon(profileIcon, color: AppColors.primary, size: 24),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Text(
-                            profileName,
-                            style: textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => _showProfileSelectionDialog(context, ref),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.primary,
-                            minimumSize: const Size(48, 48),
-                          ),
-                          child: Text('home.change_city'.tr()),
-                        ),
-                      ],
+                    _ProfileSettingValueRow(
+                      icon: profileIcon,
+                      value: profileName,
+                      actionLabel: 'home.change_city'.tr(),
+                      onActionPressed: () =>
+                          _showProfileSelectionDialog(context, ref),
                     ),
                   ],
                 ),
@@ -315,32 +310,12 @@ class ProfilePage extends ConsumerWidget {
                       style: textTheme.bodySmall,
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          color: AppColors.primary,
-                          size: 24,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Text(
-                            cityName,
-                            style: textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => context.push(AppRoutes.departmentMap),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.primary,
-                            minimumSize: const Size(48, 48),
-                          ),
-                          child: Text('profile.change_city'.tr()),
-                        ),
-                      ],
+                    _ProfileSettingValueRow(
+                      icon: Icons.location_on,
+                      value: cityName,
+                      actionLabel: 'profile.change_city'.tr(),
+                      onActionPressed: () =>
+                          context.push(AppRoutes.departmentMap),
                     ),
                   ],
                 ),
@@ -445,14 +420,20 @@ class ProfilePage extends ConsumerWidget {
                       contentPadding: EdgeInsets.zero,
                       title: Text('profile.terms'.tr()),
                       trailing: const Icon(Icons.chevron_right, size: 20),
-                      onTap: () => _showLegalDialog(context, 'profile.terms'.tr()),
+                      onTap: () => showLegalDocumentDialog(
+                        context,
+                        ConsentDocType.termsAndConditions,
+                      ),
                     ),
                     const Divider(color: AppColors.border),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: Text('profile.privacy'.tr()),
                       trailing: const Icon(Icons.chevron_right, size: 20),
-                      onTap: () => _showLegalDialog(context, 'profile.privacy'.tr()),
+                      onTap: () => showLegalDocumentDialog(
+                        context,
+                        ConsentDocType.privacyPolicy,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Center(
@@ -471,16 +452,25 @@ class ProfilePage extends ConsumerWidget {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    ref.read(sessionControllerProvider).signOut();
-                  },
-                  icon: const Icon(Icons.logout, color: Colors.red),
+                  onPressed: authState.isBusy
+                      ? null
+                      : () {
+                          ref.read(sessionControllerProvider).signOut();
+                        },
+                  icon: Icon(
+                    Icons.logout,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                   label: Text(
                     'profile.sign_out'.tr(),
-                    style: const TextStyle(color: Colors.red),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.red),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                     minimumSize: const Size(48, 48),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadius.md),
@@ -489,9 +479,215 @@ class ProfilePage extends ConsumerWidget {
                 ),
               ),
 
+              const SizedBox(height: AppSpacing.lg),
+
+              // Sección: Eliminación definitiva de cuenta (RF-06 / Ley 1581)
+              VjCard(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'profile.delete_account_section_title'.tr(),
+                      style: textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'profile.delete_account_section_desc'.tr(),
+                      style: textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: authState.isBusy
+                            ? null
+                            : () => _confirmDeleteAccount(
+                                context,
+                                ref,
+                                isDemoMode: authState.usesDemoData,
+                              ),
+                        icon: authState.isBusy
+                            ? SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              )
+                            : Icon(
+                                Icons.delete_forever_outlined,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                        label: Text(
+                          authState.isBusy
+                              ? 'profile.delete_account_loading'.tr()
+                              : 'profile.delete_account_cta'.tr(),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          minimumSize: const Size(48, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
               const SizedBox(height: AppSpacing.xxl),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Diálogo explícito de doble confirmación para eliminar la cuenta (`RF-06`).
+class _DeleteAccountDialog extends StatefulWidget {
+  const _DeleteAccountDialog({required this.isDemoMode});
+
+  final bool isDemoMode;
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final ValueNotifier<bool> _acknowledged = ValueNotifier<bool>(false);
+
+  @override
+  void dispose() {
+    _acknowledged.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final errorColor = Theme.of(context).colorScheme.error;
+
+    return AlertDialog(
+      scrollable: true,
+      title: Text('profile.delete_account_dialog_title'.tr()),
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            widget.isDemoMode
+                ? 'profile.delete_account_demo_body'.tr()
+                : 'profile.delete_account_dialog_body'.tr(),
+            style: textTheme.bodyMedium,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          ValueListenableBuilder<bool>(
+            valueListenable: _acknowledged,
+            builder: (context, accepted, _) {
+              return CheckboxListTile(
+                value: accepted,
+                onChanged: (value) => _acknowledged.value = value ?? false,
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  'profile.delete_account_confirm_check'.tr(),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+          child: Text('common.close'.tr()),
+        ),
+        ValueListenableBuilder<bool>(
+          valueListenable: _acknowledged,
+          builder: (context, accepted, _) {
+            return TextButton(
+              onPressed: accepted ? () => Navigator.of(context).pop(true) : null,
+              style: TextButton.styleFrom(
+                foregroundColor: errorColor,
+                minimumSize: const Size(48, 48),
+              ),
+              child: Text('profile.delete_account_confirm_cta'.tr()),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// Fila adaptable para mostrar un valor de ajuste con su acción sin desbordes en texto grande.
+class _ProfileSettingValueRow extends StatelessWidget {
+  const _ProfileSettingValueRow({
+    required this.icon,
+    required this.value,
+    required this.actionLabel,
+    required this.onActionPressed,
+  });
+
+  final IconData icon;
+  final String value;
+  final String actionLabel;
+  final VoidCallback onActionPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return LayoutBuilder(
+      builder: (context, constraints) => SizedBox(
+        width: constraints.maxWidth,
+        child: Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          alignment: WrapAlignment.spaceBetween,
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: AppColors.primary, size: 24),
+                  const SizedBox(width: AppSpacing.sm),
+                  Flexible(
+                    child: Text(
+                      value,
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: onActionPressed,
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                minimumSize: const Size(48, 48),
+              ),
+              child: Text(actionLabel),
+            ),
+          ],
         ),
       ),
     );

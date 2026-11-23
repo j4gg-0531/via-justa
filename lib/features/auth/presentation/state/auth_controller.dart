@@ -113,6 +113,24 @@ class AuthController extends Notifier<AuthState> {
     state = AuthState(isRestoring: false, usesDemoData: _repository.usesDemoData);
   }
 
+  /// Elimina la cuenta definitivamente (`RF-06`). Si falla, conserva la sesión activa y expone `failure`.
+  Future<bool> deleteAccount() async {
+    if (!ref.mounted) return false;
+    state = state.copyWith(isBusy: true, clearFailure: true);
+    try {
+      await _repository.deleteAccount();
+      if (!ref.mounted) return true;
+      state = AuthState(
+        isRestoring: false,
+        usesDemoData: _repository.usesDemoData,
+      );
+      return true;
+    } catch (error) {
+      _setFailure(error);
+      return false;
+    }
+  }
+
   /// Actualiza el nombre visible en el servidor y en la UI.
   Future<bool> saveDisplayName(String displayName) async {
     final session = state.session;

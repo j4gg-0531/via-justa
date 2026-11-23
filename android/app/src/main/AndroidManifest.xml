@@ -12,7 +12,7 @@
         impiden extracción de tokens de sesión o cachés temporales de contratos (RN-10) vía backup.
     -->
     <application
-        android:label="via_justa"
+        android:label="Vía Justa"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"

@@ -1,7 +1,20 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:via_justa/core/session/session_providers.dart';
+import 'package:via_justa/features/auth/domain/auth_failure.dart';
+import 'package:via_justa/features/auth/domain/auth_repository.dart';
+import 'package:via_justa/features/auth/domain/auth_session.dart';
+import 'package:via_justa/features/auth/domain/consent_document.dart';
+import 'package:via_justa/features/auth/domain/sign_up_result.dart';
+import 'package:via_justa/features/auth/domain/user_profile.dart';
+import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
 import 'package:via_justa/features/businesses/domain/business.dart';
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 import 'package:via_justa/features/municipality/domain/municipality.dart';
@@ -9,6 +22,85 @@ import 'package:via_justa/features/municipality/presentation/state/municipality_
 import 'package:via_justa/features/onboarding/domain/profile_type.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
 import 'package:via_justa/features/profile/presentation/pages/profile_page.dart';
+
+class _ProfileFakeAuthRepository implements AuthRepository {
+  _ProfileFakeAuthRepository({this.failDelete = false});
+
+  final bool failDelete;
+  final StreamController<AuthSession?> _sessions =
+      StreamController<AuthSession?>.broadcast();
+  AuthSession? _session = const AuthSession(
+    userId: 'user-1',
+    email: 'ana@viajusta.co',
+  );
+  int deleteCalls = 0;
+
+  @override
+  bool get usesDemoData => false;
+
+  @override
+  Stream<AuthSession?> watchSession() => _sessions.stream;
+
+  @override
+  Future<AuthSession?> currentSession() async => _session;
+
+  @override
+  Future<AuthSession> signIn({
+    required String email,
+    required String password,
+  }) async =>
+      _session!;
+
+  @override
+  Future<SignUpResult> signUp({
+    required String email,
+    required String password,
+    required String displayName,
+  }) async =>
+      SignUpResult(session: _session);
+
+  @override
+  Future<void> signOut() async {
+    _session = null;
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    deleteCalls++;
+    if (failDelete) {
+      throw const AuthFailure(AuthFailureKind.network);
+    }
+    _session = null;
+  }
+
+  @override
+  Future<UserProfile?> fetchProfile(String userId) async =>
+      const UserProfile(id: 'user-1', displayName: 'Ana');
+
+  @override
+  Future<void> saveDisplayName(String userId, String displayName) async {}
+
+  @override
+  Future<void> saveLanguage(String userId, String language) async {}
+
+  @override
+  Future<void> saveProfileType(String userId, ProfileType type) async {}
+
+  @override
+  Future<void> saveCurrentMunicipality(
+    String userId,
+    String municipalityCode,
+  ) async {}
+
+  @override
+  Future<void> registerConsents({
+    required String userId,
+    required List<ConsentDocType> documents,
+    required String version,
+  }) async {}
+
+  void dispose() => _sessions.close();
+}
 
 Widget _buildProfilePage(ProviderContainer container) {
   return UncontrolledProviderScope(
@@ -112,4 +204,169 @@ void main() {
     expect(container.read(businessSearchQueryProvider), isEmpty);
     expect(container.read(businessCategoryProvider), isNull);
   });
+
+  testWidgets('terms and privacy tiles open full Law 1581 dialogs', (
+    tester,
+  ) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_buildProfilePage(container));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('profile.terms'));
+    await tester.tap(find.text('profile.terms'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('legal.terms_title'), findsOneWidget);
+    expect(find.text('legal.terms_body'), findsOneWidget);
+    await tester.tap(find.text('common.close'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('profile.privacy'));
+    await tester.tap(find.text('profile.privacy'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('legal.privacy_title'), findsOneWidget);
+    expect(find.text('legal.privacy_body'), findsOneWidget);
+  });
+
+  testWidgets('delete account requires checkbox confirmation and clears state on success', (
+    tester,
+  ) async {
+    final fakeRepo = _ProfileFakeAuthRepository();
+    final container = ProviderContainer(
+      overrides: [authRepositoryProvider.overrideWithValue(fakeRepo)],
+    );
+    addTearDown(container.dispose);
+    addTearDown(fakeRepo.dispose);
+
+    await tester.pumpWidget(_buildProfilePage(container));
+    await tester.pumpAndSettle();
+    container.read(userNameProvider.notifier).setName('Ana');
+    container.read(profileTypeProvider.notifier).select(ProfileType.resident);
+
+    await tester.ensureVisible(find.text('profile.delete_account_cta'));
+    await tester.tap(find.text('profile.delete_account_cta'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('profile.delete_account_dialog_title'), findsOneWidget);
+
+    // El botón destructivo sigue deshabilitado hasta marcar la casilla.
+    await tester.tap(find.text('profile.delete_account_confirm_cta'));
+    await tester.pump();
+    expect(fakeRepo.deleteCalls, 0);
+
+    await tester.tap(find.text('profile.delete_account_confirm_check'));
+    await tester.pump();
+    await tester.tap(find.text('profile.delete_account_confirm_cta'));
+    await tester.pumpAndSettle();
+
+    expect(fakeRepo.deleteCalls, 1);
+    expect(container.read(authControllerProvider).isAuthenticated, isFalse);
+    expect(container.read(userNameProvider), isNull);
+    expect(container.read(profileTypeProvider), isNull);
+  });
+
+  testWidgets('delete account keeps session and shows error when RPC fails', (
+    tester,
+  ) async {
+    final fakeRepo = _ProfileFakeAuthRepository(failDelete: true);
+    final container = ProviderContainer(
+      overrides: [authRepositoryProvider.overrideWithValue(fakeRepo)],
+    );
+    addTearDown(container.dispose);
+    addTearDown(fakeRepo.dispose);
+
+    await tester.pumpWidget(_buildProfilePage(container));
+    await tester.pumpAndSettle();
+    container.read(userNameProvider.notifier).setName('Ana');
+
+    await tester.ensureVisible(find.text('profile.delete_account_cta'));
+    await tester.tap(find.text('profile.delete_account_cta'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('profile.delete_account_confirm_check'));
+    await tester.pump();
+    await tester.tap(find.text('profile.delete_account_confirm_cta'));
+    await tester.pumpAndSettle();
+
+    expect(fakeRepo.deleteCalls, 1);
+    expect(container.read(authControllerProvider).isAuthenticated, isTrue);
+    expect(container.read(userNameProvider), 'Ana');
+    expect(find.text('auth.error.network'), findsOneWidget);
+  });
+
+  testWidgets('profile and delete dialog have no overflow at 360dp and 2.0x text scale', (
+    tester,
+  ) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/shared_preferences'),
+          (call) async => call.method == 'getAll' ? <String, Object>{} : true,
+        );
+    await EasyLocalization.ensureInitialized();
+    final translations = jsonDecode(
+      File('assets/translations/es.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
+
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: EasyLocalization(
+          supportedLocales: const [Locale('es')],
+          startLocale: const Locale('es'),
+          path: 'assets/translations',
+          assetLoader: _ProfileTestTranslations(translations),
+          child: Builder(
+            builder: (context) => MediaQuery(
+              data: const MediaQueryData(
+                size: Size(360, 780),
+                textScaler: TextScaler.linear(2.0),
+              ),
+              child: MaterialApp(
+                localizationsDelegates: context.localizationDelegates,
+                supportedLocales: context.supportedLocales,
+                locale: context.locale,
+                home: const ProfilePage(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.text(translations['profile']['delete_account_cta'] as String),
+    );
+    await tester.tap(
+      find.text(translations['profile']['delete_account_cta'] as String),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        translations['profile']['delete_account_dialog_title'] as String,
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+}
+
+class _ProfileTestTranslations extends AssetLoader {
+  const _ProfileTestTranslations(this.data);
+  final Map<String, dynamic> data;
+
+  @override
+  Future<Map<String, dynamic>> load(String path, Locale locale) async => data;
 }

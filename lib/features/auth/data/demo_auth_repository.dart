@@ -76,6 +76,11 @@ class DemoAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> deleteAccount() async {
+    await signOut();
+  }
+
+  @override
   Future<UserProfile?> fetchProfile(String userId) async => _profile;
 
   @override

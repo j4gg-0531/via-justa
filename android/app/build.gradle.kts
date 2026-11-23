@@ -12,6 +12,22 @@ if (localPropertiesFile.exists()) {
     localPropertiesFile.inputStream().use { localProperties.load(it) }
 }
 
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+
+val releaseStoreFilePath: String? = keystoreProperties.getProperty("storeFile")?.trim()?.takeIf { it.isNotEmpty() }
+val releaseStorePassword: String? = keystoreProperties.getProperty("storePassword")?.trim()?.takeIf { it.isNotEmpty() }
+val releaseKeyAlias: String? = keystoreProperties.getProperty("keyAlias")?.trim()?.takeIf { it.isNotEmpty() }
+val releaseKeyPassword: String? = keystoreProperties.getProperty("keyPassword")?.trim()?.takeIf { it.isNotEmpty() }
+val hasReleaseSigning: Boolean =
+    releaseStoreFilePath != null &&
+        releaseStorePassword != null &&
+        releaseKeyAlias != null &&
+        releaseKeyPassword != null
+
 val mapsApiKey: String =
     localProperties.getProperty("MAPS_API_KEY")
         ?: localProperties.getProperty("GOOGLE_MAPS_API_KEY")
@@ -20,7 +36,7 @@ val mapsApiKey: String =
         ?: ""
 
 android {
-    namespace = "com.example.via_justa"
+    namespace = "co.viajusta.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -30,13 +46,24 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.via_justa"
+        applicationId = "co.viajusta.app"
         // Compatible con Google Maps SDK for Android y ML Kit Text Recognition (minSdk >= 23).
         minSdk = maxOf(flutter.minSdkVersion, 23)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFilePath!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
@@ -51,7 +78,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            signingConfig = signingConfigs.getByName("debug")
+            // Usa android/key.properties cuando existe; respalda a debug solo en pruebas locales previas al keystore.
+            signingConfig =
+                if (hasReleaseSigning) {
+                    signingConfigs.getByName("release")
+                } else {
+                    signingConfigs.getByName("debug")
+                }
         }
     }
 }

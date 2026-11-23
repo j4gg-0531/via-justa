@@ -19,7 +19,7 @@ Los controles de seguridad y privacidad se clasifican rigurosamente según su es
 
 ### 2.1 Proveedores Soportados
 - **Correo y Contraseña:** Registro y login validado localmente en `domain/auth_validators.dart` y conectado a Supabase Auth **[IMPLEMENTADO EN VJ-08]**.
-- **Google OAuth:** Botón en interfaz **[IMPLEMENTADO EN DEMO]**; flujo federado real vía Supabase Auth **[PROPUESTO]**.
+- **Google OAuth:** **[DIFERIDO A FASE 2]** (se retiraron los botones provisionales de Login/Registro para no mostrar flujos incompletos en el MVP).
 
 ### 2.2 Registro y Política de Contraseñas
 - **Validación Local:** La contraseña debe contener mínimo 8 caracteres (validado por `auth_validators.dart`) **[IMPLEMENTADO]**.
@@ -37,7 +37,7 @@ Los controles de seguridad y privacidad se clasifican rigurosamente según su es
 - El historial de navegación de `go_router` se reinicia para impedir que el botón "Atrás" de Android recupere vistas privadas anteriores **[IMPLEMENTADO]**.
 
 ### 2.5 Protocolo Transaccional de Eliminación de Cuenta y Minimización de Datos (RF-06 / VJ-18)
-- El usuario puede solicitar la eliminación definitiva de su cuenta desde la pantalla de Perfil invocando `public.delete_my_account()` **[IMPLEMENTADO EN VJ-08 Y ENDURECIDO EN VJ-18]**.
+- El usuario puede solicitar la eliminación definitiva de su cuenta desde la pantalla de Perfil (`ProfilePage` → `SessionController.deleteAccount()` → `AuthController.deleteAccount()` → `SupabaseAuthRepository.deleteAccount()`), con diálogo de doble confirmación y casilla explícita, invocando `public.delete_my_account()` y limpiando la sesión local solo si el servidor confirma el borrado **[IMPLEMENTADO EN APP Y BACKEND]**.
 - **Orden de Ejecución Obligatorio (Pre-supresión antes de eliminar `auth.users`):**
   - La clave foránea `ON DELETE SET NULL` sobre `price_reports.user_id` solo opera al suprimirse el registro de autenticación. Si se elimina primero en `auth.users`, los reportes quedan huérfanos con `user_id = NULL` y se pierde la capacidad de saber qué reportes pertenecían a ese usuario para depurar información contextual o privada.
   - La función transaccional `public.delete_my_account()` (`supabase/migrations/20261108220000_security_reliability_cross_hardening.sql`) serializa ejecuciones concurrentes con `pg_advisory_xact_lock` y ejecuta 5 fases estrictas:
@@ -54,7 +54,7 @@ Los controles de seguridad y privacidad se clasifican rigurosamente según su es
 ## 3. Modelo de Privacidad y Consentimiento (Habeas Data)
 
 ### 3.1 Consentimiento Explícito y Versionado
-- Antes de completar el registro o continuar con Google, el usuario debe aceptar expresamente los Términos de Servicio y la Política de Privacidad **[IMPLEMENTADO]**.
+- Antes de completar el registro, el usuario debe aceptar expresamente los Términos de Servicio y la Política de Privacidad (ambos consultables completos en `es`/`en` desde `LegalText` en Bienvenida/Registro y desde Perfil mediante `showLegalDocumentDialog`) **[IMPLEMENTADO]**.
 - Se almacena un registro inmutable en la tabla `consents` con `user_id`, `doc_type`, `version` y `accepted_at` **[IMPLEMENTADO]**.
 - Si los términos se actualizan a una versión posterior (ej. `v2.0`), la aplicación presentará una pantalla de re-consentimiento obligatorio antes de permitir nuevas acciones **[PROPUESTO]**.
 

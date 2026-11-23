@@ -25,7 +25,9 @@ class _FakeAuthRepository implements AuthRepository {
   UserProfile? storedProfile;
   AuthFailure? signInFailure;
   AuthFailure? signUpFailure;
+  AuthFailure? deleteAccountFailure;
   bool confirmationRequired = false;
+  int deleteAccountCalls = 0;
 
   final List<ConsentDocType> recordedConsents = <ConsentDocType>[];
   final List<String> savedDisplayNames = <String>[];
@@ -77,6 +79,15 @@ class _FakeAuthRepository implements AuthRepository {
   @override
   Future<void> signOut() async {
     storedSession = null;
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    deleteAccountCalls++;
+    final failure = deleteAccountFailure;
+    if (failure != null) throw failure;
+    storedSession = null;
+    storedProfile = null;
   }
 
   @override
@@ -281,6 +292,41 @@ void main() {
       expect(repository.savedDisplayNames, ['Carla']);
       expect(repository.savedLanguages, ['en']);
       expect(container.read(userNameProvider), 'Carla');
+    });
+
+    test('deleteAccount clears session only on success', () async {
+      final repository = _FakeAuthRepository();
+      final container = _containerWith(repository);
+      final controller = container.read(authControllerProvider.notifier);
+
+      await controller.signIn(email: 'ana@example.test', password: 'secreto123');
+      expect(container.read(authControllerProvider).isAuthenticated, isTrue);
+
+      final deleted = await controller.deleteAccount();
+
+      expect(deleted, isTrue);
+      expect(repository.deleteAccountCalls, 1);
+      expect(container.read(authControllerProvider).isAuthenticated, isFalse);
+      expect(container.read(authControllerProvider).profile, isNull);
+    });
+
+    test('deleteAccount preserves session and exposes failure when repository throws', () async {
+      final repository = _FakeAuthRepository()
+        ..deleteAccountFailure = const AuthFailure(AuthFailureKind.network);
+      final container = _containerWith(repository);
+      final controller = container.read(authControllerProvider.notifier);
+
+      await controller.signIn(email: 'ana@example.test', password: 'secreto123');
+
+      final deleted = await controller.deleteAccount();
+
+      expect(deleted, isFalse);
+      expect(repository.deleteAccountCalls, 1);
+      expect(container.read(authControllerProvider).isAuthenticated, isTrue);
+      expect(
+        container.read(authControllerProvider).failure?.kind,
+        AuthFailureKind.network,
+      );
     });
   });
 
