@@ -25,6 +25,9 @@ abstract class AuthRepository {
     required String password,
   });
 
+  /// Inicia el flujo de autenticación con cuenta de Google (OAuth 2.0).
+  Future<bool> signInWithGoogle();
+
   /// Crea la cuenta. Puede no devolver sesión si el proyecto exige confirmar
   /// el correo.
   Future<SignUpResult> signUp({
@@ -38,6 +41,22 @@ abstract class AuthRepository {
 
   /// Elimina definitivamente la cuenta autenticada y sus datos personales (`RF-06`).
   Future<void> deleteAccount();
+
+  /// Actualiza la contraseña del usuario autenticado tras verificar su contraseña actual.
+  Future<void> updatePassword({
+    required String currentPassword,
+    required String newPassword,
+  });
+
+  /// Envía un correo con código/enlace de restablecimiento de contraseña a la dirección indicada.
+  Future<void> sendPasswordResetEmail(String email);
+
+  /// Verifica el código OTP temporal de recuperación y establece la nueva contraseña.
+  Future<void> verifyRecoveryOtpAndResetPassword({
+    required String email,
+    required String token,
+    required String newPassword,
+  });
 
   /// Perfil del usuario o `null` si todavía no existe la fila.
   Future<UserProfile?> fetchProfile(String userId);
@@ -56,6 +75,13 @@ abstract class AuthRepository {
 
   /// Registra la aceptación de los documentos legales.
   Future<void> registerConsents({
+    required String userId,
+    required List<ConsentDocType> documents,
+    required String version,
+  });
+
+  /// Verifica si el usuario ya registró la aceptación de los documentos vigentes.
+  Future<bool> hasAcceptedConsents({
     required String userId,
     required List<ConsentDocType> documents,
     required String version,

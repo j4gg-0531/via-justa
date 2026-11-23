@@ -233,6 +233,38 @@ void main() {
         );
       }
     });
+
+    test('con consentimiento legal pendiente siempre fuerza /onboarding', () {
+      expect(
+        resolveFirstIncompleteStep(
+          status: _in,
+          hasSelectedProfile: true,
+          hasSelectedPilotMunicipality: true,
+          needsLegalConsent: true,
+        ),
+        AppRoutes.onboarding,
+      );
+      expect(
+        resolveNavigationRedirect(
+          location: AppRoutes.home,
+          status: _in,
+          hasSelectedProfile: true,
+          hasSelectedPilotMunicipality: true,
+          needsLegalConsent: true,
+        ),
+        AppRoutes.onboarding,
+      );
+      expect(
+        resolveNavigationRedirect(
+          location: AppRoutes.onboarding,
+          status: _in,
+          hasSelectedProfile: true,
+          hasSelectedPilotMunicipality: true,
+          needsLegalConsent: true,
+        ),
+        isNull,
+      );
+    });
   });
 
   group('sin bucles de redirección', () {

@@ -9,6 +9,7 @@ import 'package:via_justa/features/auth/domain/auth_failure.dart';
 import 'package:via_justa/features/auth/domain/auth_repository.dart';
 import 'package:via_justa/features/auth/domain/auth_session.dart';
 import 'package:via_justa/features/auth/domain/consent_document.dart';
+import 'package:via_justa/features/auth/domain/display_name_resolver.dart';
 import 'package:via_justa/features/auth/domain/user_profile.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_state.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
@@ -54,6 +55,26 @@ class AuthController extends Notifier<AuthState> {
       if (!ref.mounted) return false;
       await _applySession(session);
       return true;
+    } catch (error) {
+      _setFailure(error);
+      return false;
+    }
+  }
+
+  /// Inicia sesión o registro mediante cuenta de Google (OAuth 2.0).
+  Future<bool> signInWithGoogle() async {
+    state = state.copyWith(isBusy: true, clearFailure: true);
+    try {
+      final launched = await _repository.signInWithGoogle();
+      if (!ref.mounted) return false;
+      final session = await _repository.currentSession();
+      if (!ref.mounted) return false;
+      if (session != null) {
+        await _applySession(session);
+      } else {
+        state = state.copyWith(isBusy: false, clearFailure: true);
+      }
+      return launched;
     } catch (error) {
       _setFailure(error);
       return false;
@@ -124,6 +145,109 @@ class AuthController extends Notifier<AuthState> {
         isRestoring: false,
         usesDemoData: _repository.usesDemoData,
       );
+      return true;
+    } catch (error) {
+      _setFailure(error);
+      return false;
+    }
+  }
+
+  /// Registra el consentimiento legal de una cuenta OAuth recién creada y habilita el acceso.
+  Future<bool> acceptPendingConsents() async {
+    final session = state.session;
+    if (session == null || !ref.mounted) return false;
+
+    state = state.copyWith(isBusy: true, clearFailure: true);
+    try {
+      await _repository.registerConsents(
+        userId: session.userId,
+        documents: ConsentDocType.values,
+        version: consentDocumentVersion,
+      );
+      if (!ref.mounted) return false;
+      state = state.copyWith(
+        isBusy: false,
+        needsLegalConsent: false,
+        clearFailure: true,
+      );
+      return true;
+    } catch (error) {
+      _setFailure(error);
+      return false;
+    }
+  }
+
+  /// Revoca una cuenta OAuth nueva que el usuario decidió no crear y limpia la sesión.
+  Future<bool> cancelPendingNewAccount() async {
+    if (!ref.mounted) return false;
+    state = state.copyWith(isBusy: true, clearFailure: true);
+    try {
+      await _repository.deleteAccount();
+    } catch (_) {
+      try {
+        await _repository.signOut();
+      } catch (_) {}
+    }
+    if (!ref.mounted) return true;
+    state = AuthState(
+      isRestoring: false,
+      usesDemoData: _repository.usesDemoData,
+    );
+    return true;
+  }
+
+  /// Actualiza la contraseña del usuario autenticado verificando primero su contraseña actual.
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    if (!ref.mounted) return false;
+    state = state.copyWith(isBusy: true, clearFailure: true);
+    try {
+      await _repository.updatePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      if (!ref.mounted) return false;
+      state = state.copyWith(isBusy: false, clearFailure: true);
+      return true;
+    } catch (error) {
+      _setFailure(error);
+      return false;
+    }
+  }
+
+  /// Solicita el envío de un correo con código de recuperación de contraseña.
+  Future<bool> requestPasswordReset(String email) async {
+    if (!ref.mounted) return false;
+    state = state.copyWith(isBusy: true, clearFailure: true);
+    try {
+      await _repository.sendPasswordResetEmail(email.trim());
+      if (!ref.mounted) return false;
+      state = state.copyWith(isBusy: false, clearFailure: true);
+      return true;
+    } catch (error) {
+      _setFailure(error);
+      return false;
+    }
+  }
+
+  /// Verifica el código OTP temporal enviado por correo y establece la nueva contraseña.
+  Future<bool> confirmPasswordResetWithOtp({
+    required String email,
+    required String token,
+    required String newPassword,
+  }) async {
+    if (!ref.mounted) return false;
+    state = state.copyWith(isBusy: true, clearFailure: true);
+    try {
+      await _repository.verifyRecoveryOtpAndResetPassword(
+        email: email.trim(),
+        token: token.trim(),
+        newPassword: newPassword,
+      );
+      if (!ref.mounted) return false;
+      state = state.copyWith(isBusy: false, clearFailure: true);
       return true;
     } catch (error) {
       _setFailure(error);
@@ -240,6 +364,23 @@ class AuthController extends Notifier<AuthState> {
     UserProfile? profile;
     try {
       profile = await _repository.fetchProfile(session.userId);
+      final preferredName = session.isExternalProvider
+          ? resolvePreferredGoogleDisplayName(
+              currentDisplayName: profile?.displayName,
+              oauthDisplayName: session.suggestedDisplayName,
+              email: session.email,
+            )
+          : null;
+      if (preferredName != null && ref.mounted) {
+        profile = (profile ?? UserProfile(id: session.userId)).copyWith(
+          displayName: preferredName,
+        );
+        try {
+          await _repository.saveDisplayName(session.userId, preferredName);
+        } catch (_) {
+          // Conserva el nombre real en memoria aunque falle la actualización remota.
+        }
+      }
       if (profile != null && ref.mounted) {
         await _syncLocalProfile(profile);
       }
@@ -247,11 +388,34 @@ class AuthController extends Notifier<AuthState> {
       // La sesión sigue siendo válida aunque el perfil no se pueda leer.
     }
 
+    if (ref.mounted && (profile?.displayName?.trim().isEmpty ?? true)) {
+      final fallbackName = session.suggestedDisplayName?.trim();
+      if (fallbackName != null && fallbackName.isNotEmpty) {
+        ref.read(userNameProvider.notifier).setName(fallbackName);
+      }
+    }
+
+    var needsConsent = false;
+    if (session.isExternalProvider && ref.mounted) {
+      try {
+        final accepted = await _repository.hasAcceptedConsents(
+          userId: session.userId,
+          documents: ConsentDocType.values,
+          version: consentDocumentVersion,
+        );
+        needsConsent = !accepted;
+      } catch (_) {
+        // Ante error de lectura transitorio no bloqueamos a cuentas existentes.
+        needsConsent = false;
+      }
+    }
+
     if (!ref.mounted) return;
     state = state.copyWith(
       session: session,
       profile: profile ?? state.profile,
       isBusy: false,
+      needsLegalConsent: needsConsent,
       clearFailure: true,
     );
   }

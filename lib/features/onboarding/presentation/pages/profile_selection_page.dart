@@ -8,7 +8,9 @@ import 'package:via_justa/core/theme/app_colors.dart';
 import 'package:via_justa/core/theme/app_spacing.dart';
 import 'package:via_justa/core/widgets/vj_button.dart';
 import 'package:via_justa/features/auth/presentation/state/auth_controller.dart';
+import 'package:via_justa/features/auth/presentation/widgets/auth_failure_text.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
+import 'package:via_justa/features/onboarding/presentation/widgets/new_account_consent_view.dart';
 import 'package:via_justa/features/onboarding/presentation/widgets/profile_option_card.dart';
 import 'package:via_justa/features/onboarding/domain/profile_type.dart';
 
@@ -34,13 +36,39 @@ class ProfileSelectionPage extends ConsumerWidget {
     }
   }
 
+  Future<void> _acceptGoogleConsents(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final accepted = await ref
+        .read(authControllerProvider.notifier)
+        .acceptPendingConsents();
+    if (accepted || !context.mounted) return;
+
+    final message =
+        authFailureText(ref.read(authControllerProvider).failure) ??
+        'auth.error.unknown'.tr();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _cancelGoogleCreation(WidgetRef ref) async {
+    await ref.read(sessionControllerProvider).cancelPendingRegistration();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authControllerProvider);
     final selected = ref.watch(profileTypeProvider);
     final displayName = ref.watch(displayNameProvider);
     final textTheme = Theme.of(context).textTheme;
 
     void handleBack() {
+      if (authState.needsLegalConsent) {
+        _cancelGoogleCreation(ref);
+        return;
+      }
       if (context.canPop()) {
         context.pop();
       } else {
@@ -65,81 +93,93 @@ class ProfileSelectionPage extends ConsumerWidget {
                 IconButton(
                   tooltip: 'common.back'.tr(),
                   icon: const Icon(Icons.arrow_back),
-                  onPressed: handleBack,
+                  onPressed: authState.isBusy ? null : handleBack,
                   style: IconButton.styleFrom(
                     backgroundColor: AppColors.surface,
                     foregroundColor: AppColors.textPrimary,
                     minimumSize: const Size(48, 48),
                   ),
                 ),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: AppSpacing.lg),
-                      Text(
-                        'onboarding.greeting'.tr(
-                          namedArgs: {'name': displayName},
-                        ),
-                        style: textTheme.headlineMedium,
+                if (authState.needsLegalConsent)
+                  Expanded(
+                    child: NewAccountConsentView(
+                      displayName: displayName,
+                      email: authState.email,
+                      isBusy: authState.isBusy,
+                      onAccept: () => _acceptGoogleConsents(context, ref),
+                      onCancel: () => _cancelGoogleCreation(ref),
+                    ),
+                  )
+                else ...[
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: AppSpacing.lg),
+                          Text(
+                            'onboarding.greeting'.tr(
+                              namedArgs: {'name': displayName},
+                            ),
+                            style: textTheme.headlineMedium,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            'onboarding.subtitle'.tr(),
+                            style: textTheme.bodyLarge,
+                          ),
+                          const SizedBox(height: AppSpacing.xl),
+                          ProfileOptionCard(
+                            icon: Icons.luggage_outlined,
+                            title: 'onboarding.visitor.title'.tr(),
+                            description: 'onboarding.visitor.description'.tr(),
+                            selected: selected == ProfileType.visitor,
+                            onTap: () =>
+                                _selectProfile(context, ref, ProfileType.visitor),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          ProfileOptionCard(
+                            icon: Icons.home_work_outlined,
+                            title: 'onboarding.settler.title'.tr(),
+                            description: 'onboarding.settler.description'.tr(),
+                            selected: selected == ProfileType.settler,
+                            badge: 'onboarding.settler.badge'.tr(),
+                            onTap: () =>
+                                _selectProfile(context, ref, ProfileType.settler),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          ProfileOptionCard(
+                            icon: Icons.storefront_outlined,
+                            title: 'onboarding.resident.title'.tr(),
+                            description: 'onboarding.resident.description'.tr(),
+                            selected: selected == ProfileType.resident,
+                            onTap: () =>
+                                _selectProfile(context, ref, ProfileType.resident),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                        ],
                       ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        'onboarding.subtitle'.tr(),
-                        style: textTheme.bodyLarge,
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
-                      ProfileOptionCard(
-                        icon: Icons.luggage_outlined,
-                        title: 'onboarding.visitor.title'.tr(),
-                        description: 'onboarding.visitor.description'.tr(),
-                        selected: selected == ProfileType.visitor,
-                        onTap: () =>
-                            _selectProfile(context, ref, ProfileType.visitor),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      ProfileOptionCard(
-                        icon: Icons.home_work_outlined,
-                        title: 'onboarding.settler.title'.tr(),
-                        description: 'onboarding.settler.description'.tr(),
-                        selected: selected == ProfileType.settler,
-                        badge: 'onboarding.settler.badge'.tr(),
-                        onTap: () =>
-                            _selectProfile(context, ref, ProfileType.settler),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      ProfileOptionCard(
-                        icon: Icons.storefront_outlined,
-                        title: 'onboarding.resident.title'.tr(),
-                        description: 'onboarding.resident.description'.tr(),
-                        selected: selected == ProfileType.resident,
-                        onTap: () =>
-                            _selectProfile(context, ref, ProfileType.resident),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-              VjButton(
-                label: 'common.continue'.tr(),
-                trailingIcon: Icons.arrow_forward,
-                onPressed: selected == null
-                    ? null
-                    : () {
-                        ref
-                            .read(authControllerProvider.notifier)
-                            .persistProfileType(selected);
-                        context.push(AppRoutes.departmentMap);
-                      },
-              ),
-              const SizedBox(height: AppSpacing.xl),
-            ],
+                  VjButton(
+                    label: 'common.continue'.tr(),
+                    trailingIcon: Icons.arrow_forward,
+                    onPressed: selected == null
+                        ? null
+                        : () {
+                            ref
+                                .read(authControllerProvider.notifier)
+                                .persistProfileType(selected);
+                            context.push(AppRoutes.departmentMap);
+                          },
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                ],
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

@@ -27,12 +27,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -60,6 +62,20 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
     }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    final succeeded = await ref
+        .read(authControllerProvider.notifier)
+        .signInWithGoogle();
+    if (!mounted || succeeded) return;
+
+    final message =
+        authFailureText(ref.read(authControllerProvider).failure) ??
+        'auth.error.unknown'.tr();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -127,8 +143,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                         onChanged: notifier.setPassword,
                         errorText: passwordErrorText(state.passwordError),
                         obscureText: state.obscurePassword,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _submit(),
+                        textInputAction: TextInputAction.next,
                         suffixIcon: IconButton(
                           tooltip: state.obscurePassword
                               ? 'auth.show_password'.tr()
@@ -139,6 +154,32 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                 : Icons.visibility_off,
                           ),
                           onPressed: notifier.toggleObscurePassword,
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(48, 48),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      VjTextField(
+                        label: 'auth.confirm_password'.tr(),
+                        controller: _confirmPasswordController,
+                        onChanged: notifier.setConfirmPassword,
+                        errorText: confirmPasswordErrorText(
+                          state.confirmPasswordError,
+                        ),
+                        obscureText: state.obscureConfirmPassword,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _submit(),
+                        suffixIcon: IconButton(
+                          tooltip: state.obscureConfirmPassword
+                              ? 'auth.show_password'.tr()
+                              : 'auth.hide_password'.tr(),
+                          icon: Icon(
+                            state.obscureConfirmPassword
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                          ),
+                          onPressed: notifier.toggleObscureConfirmPassword,
                           style: IconButton.styleFrom(
                             minimumSize: const Size(48, 48),
                           ),
@@ -167,6 +208,33 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       VjButton(
                         label: 'register.submit'.tr(),
                         onPressed: authState.isBusy ? null : _submit,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Divider(color: AppColors.border),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                            ),
+                            child: Text(
+                              'login.or'.tr(),
+                              style: textTheme.bodySmall,
+                            ),
+                          ),
+                          const Expanded(
+                            child: Divider(color: AppColors.border),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      VjButton(
+                        label: 'login.google'.tr(),
+                        variant: VjButtonVariant.outlined,
+                        leadingIcon: Icons.account_circle_outlined,
+                        onPressed: authState.isBusy ? null : _signInWithGoogle,
                       ),
                       if (authState.usesDemoData) ...[
                         const SizedBox(height: AppSpacing.xl),

@@ -72,12 +72,13 @@ NavigationRouteKind classifyRoute(String location) {
 
 /// Devuelve la ruta del primer paso que le falta completar al usuario.
 ///
-/// Orden: sesión → perfil → municipio piloto → inicio. Con sesión `unknown`
-/// devuelve `/splash` porque todavía no se puede decidir.
+/// Orden: sesión → consentimientos legales → perfil → municipio piloto → inicio.
+/// Con sesión `unknown` devuelve `/splash` porque todavía no se puede decidir.
 String resolveFirstIncompleteStep({
   required SessionNavigationStatus status,
   required bool hasSelectedProfile,
   required bool hasSelectedPilotMunicipality,
+  bool needsLegalConsent = false,
 }) {
   switch (status) {
     case SessionNavigationStatus.unknown:
@@ -85,6 +86,7 @@ String resolveFirstIncompleteStep({
     case SessionNavigationStatus.unauthenticated:
       return _welcome;
     case SessionNavigationStatus.authenticated:
+      if (needsLegalConsent) return _onboarding;
       if (!hasSelectedProfile) return _onboarding;
       if (!hasSelectedPilotMunicipality) return _departmentMap;
       return _home;
@@ -100,21 +102,24 @@ String resolveFirstIncompleteStep({
 /// 1. `unknown`: se permanece en `/splash`; cualquier otra ruta va a `/splash`.
 /// 2. `/splash` con sesión resuelta: va al primer paso incompleto.
 /// 3. Sin sesión: solo rutas de entrada públicas; lo demás va a `/welcome`.
-/// 4. Con sesión en una ruta de entrada pública: va al primer paso incompleto
+/// 4. Con sesión pendiente de consentimientos legales: permanece en `/onboarding`.
+/// 5. Con sesión en una ruta de entrada pública: va al primer paso incompleto
 ///    (no siempre a `/home`).
-/// 5. Con sesión: `/onboarding` siempre se permite; las rutas de municipio
+/// 6. Con sesión: `/onboarding` siempre se permite; las rutas de municipio
 ///    exigen perfil; las rutas principales exigen perfil y municipio piloto.
 String? resolveNavigationRedirect({
   required String location,
   required SessionNavigationStatus status,
   required bool hasSelectedProfile,
   required bool hasSelectedPilotMunicipality,
+  bool needsLegalConsent = false,
 }) {
   final target = _resolveTarget(
     kind: classifyRoute(location),
     status: status,
     hasSelectedProfile: hasSelectedProfile,
     hasSelectedPilotMunicipality: hasSelectedPilotMunicipality,
+    needsLegalConsent: needsLegalConsent,
   );
   if (target == null || target == location) return null;
   return target;
@@ -125,11 +130,13 @@ String? _resolveTarget({
   required SessionNavigationStatus status,
   required bool hasSelectedProfile,
   required bool hasSelectedPilotMunicipality,
+  required bool needsLegalConsent,
 }) {
   String firstIncomplete() => resolveFirstIncompleteStep(
     status: status,
     hasSelectedProfile: hasSelectedProfile,
     hasSelectedPilotMunicipality: hasSelectedPilotMunicipality,
+    needsLegalConsent: needsLegalConsent,
   );
 
   if (status == SessionNavigationStatus.unknown) return _splash;
@@ -137,6 +144,10 @@ String? _resolveTarget({
 
   if (status == SessionNavigationStatus.unauthenticated) {
     return kind == NavigationRouteKind.publicEntry ? null : _welcome;
+  }
+
+  if (needsLegalConsent) {
+    return kind == NavigationRouteKind.profileSetup ? null : _onboarding;
   }
 
   switch (kind) {

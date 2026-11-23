@@ -6,6 +6,7 @@ import 'package:via_justa/features/auth/presentation/state/auth_controller.dart'
 import 'package:via_justa/features/businesses/presentation/state/business_providers.dart';
 import 'package:via_justa/features/contracts/presentation/state/contract_analysis_provider.dart';
 import 'package:via_justa/features/contracts/presentation/state/contract_capture_provider.dart';
+import 'package:via_justa/features/home/presentation/state/settler_checklist_provider.dart';
 import 'package:via_justa/features/municipality/presentation/state/municipality_providers.dart';
 import 'package:via_justa/features/onboarding/presentation/state/profile_type_provider.dart';
 import 'package:via_justa/features/prices/presentation/state/price_contribution_provider.dart';
@@ -54,6 +55,12 @@ class SessionController {
     _clearLocalFeatureState();
   }
 
+  /// Cancela el alta de una cuenta OAuth sin consentimiento previo y limpia todo el estado local.
+  Future<void> cancelPendingRegistration() async {
+    await _ref.read(authControllerProvider.notifier).cancelPendingNewAccount();
+    _clearLocalFeatureState();
+  }
+
   /// Elimina la cuenta en el servidor y solo limpia el estado local si el borrado tuvo éxito (`RF-06`).
   Future<bool> deleteAccount() async {
     final deleted = await _ref
@@ -78,6 +85,7 @@ class SessionController {
     _ref.read(contractCaptureProvider.notifier).discardDocument();
     _ref.read(contractAnalysisProvider.notifier).reset(clearConsent: true);
     _ref.read(scanModeProvider.notifier).reset();
+    _ref.read(settlerChecklistProvider.notifier).clear();
   }
 }
 

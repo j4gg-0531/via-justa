@@ -232,6 +232,9 @@ void main() {
     await tester.tap(find.byIcon(Icons.logout));
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('profile.sign_out_confirm_cta'));
+    await tester.pumpAndSettle();
+
     expect(find.byType(WelcomePage), findsOneWidget);
     expect(container.read(authControllerProvider).isAuthenticated, isFalse);
   });
